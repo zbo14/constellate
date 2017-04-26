@@ -1,0 +1,47 @@
+<html>
+  <head>
+    <title>constellate</title>
+    <script src='https://code.jquery.com/jquery-3.2.1.min.js'
+    integrity='sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4='
+    crossorigin='anonymous'></script>
+    <link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css' />
+    <script src='https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js'></script>
+    <script src='https://cdn.jsdelivr.net/brutusin.json-forms/1.6.2/js/brutusin-json-forms.min.js'></script>
+    <link rel='stylesheet' href='https://cdn.jsdelivr.net/brutusin.json-forms/1.6.2/css/brutusin-json-forms.min.css' />
+    <script src='https://cdn.jsdelivr.net/brutusin.json-forms/1.6.2/js/brutusin-json-forms-bootstrap.min.js'></script>
+  </head>
+  <body>
+    <select>
+      <option selected disabled>--type--</option>
+      <option value='user'>user</option>
+      <option value='composition'>composition</option>
+      <option value='recording'>recording</option>
+    </select>
+    <button id='submit'>submit</button>
+    <div id='form-container'></div>
+  </body>
+  <script src='./bundle.js'></script>
+  <script type='text/javascript'>
+    let bf, schema;
+    let container = document.getElementById('form-container');
+    let BrutusinForms = brutusin['json-forms'];
+    let select = document.getElementsByTagName('select')[0];
+    select.addEventListener('change', function() {
+      container.innerHTML = null;
+      switch(select.value) {
+        case 'user':
+          schema = user_schema;
+          break;
+        case 'composition':
+          schema = composition_schema;
+          break;
+        case 'recording':
+          schema = recording_schema;
+          break;
+        //..
+      }
+      bf = BrutusinForms.create(schema)
+      bf.render(container);
+    });
+  </script>
+</html>
