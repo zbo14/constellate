@@ -5,13 +5,7 @@ import { User } from '../lib/user.js';
 import { Composition } from '../lib/composition.js';
 import { Recording } from '../lib/recording.js';
 
-import {
-  headerSchema,
-  userSchema,
-  compositionSchema,
-  recordingSchema,
-  validateSchema
-} from '../lib/schema.js';
+const schema = require('../lib/schema.js');
 
 // @flow
 
@@ -35,25 +29,25 @@ const recording = new Recording(
 describe('Schema', () => {
   it('validates a header schema', () => {
     assert(
-      validateSchema(header, headerSchema),
+      schema.validate(header, schema.header),
       'should validate header schema'
     );
   });
   it('validates a user schema', () => {
     assert(
-      validateSchema(user, headerSchema) && validateSchema(user, userSchema),
+      schema.validate(user, schema.header) && schema.validate(user, schema.user),
       'should validate user schema'
     );
   });
   it('validates a composition schema', () => {
     assert(
-      validateSchema(composition, headerSchema) && validateSchema(composition, compositionSchema),
+      schema.validate(composition, schema.header) && schema.validate(composition, schema.composition),
       'should validate composition schema'
     );
   });
   it('validates a recording schema', () => {
     assert(
-      validateSchema(recording, headerSchema) && validateSchema(recording, recordingSchema),
+      schema.validate(recording, schema.header) && schema.validate(recording, schema.recording),
       'should validate recordinßg schema'
     );
   });

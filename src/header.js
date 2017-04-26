@@ -80,8 +80,8 @@ Header.prototype.remove = function(property: string, value: Object): boolean {
   return false;
 }
 
-Header.prototype.validate = function(schema: Object = schema.header): ?Error {
-  if (!schema.validate(this, schema)) {
+Header.prototype.validate = function(_schema: Object = schema.header): ?Error {
+  if (!schema.validate(this, _schema)) {
     return new Error('Invalid schema');
   }
   if (this.id !== this.calcId()) {
