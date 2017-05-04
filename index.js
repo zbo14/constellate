@@ -15,6 +15,12 @@ net.httpFetch('http://requestb.in/######', {
 });
 */
 
+
+const arranger = spec.newUser(
+  'arranger@email.com', null, 'arranger',
+  null, 'http://www.arranger.com'
+);
+
 const composer = spec.newUser(
   'composer@email.com', '000000012150090X',
   'composer', null, 'http://www.composer.com'
@@ -26,7 +32,7 @@ const lyricist = spec.newUser(
 );
 
 let composition = spec.newComposition(
-  composer, null, lyricist, null,
+  arranger, composer, null, lyricist, null,
   null, 'trap boogie', 'http://www.composition.com'
 );
 
@@ -56,7 +62,12 @@ console.log(composition, recording);
 
 // let parser = new DOMParser();
 // let doc = parser.parseFromString(spec.generateForm(schema.composition), 'text/html');
-console.log(spec.generateForm(schema.composition));
+const form = spec.generateForm(schema.composition);
+console.log(form);
+const parsed = spec.parseForm(form);
+console.log(JSON.stringify(parsed));
+
+// TODO: generate form from parsed and check that it matches
 
 window.user_schema = util.clone(schema.user);
 window.composition_schema = util.clone(schema.composition);

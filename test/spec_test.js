@@ -7,6 +7,11 @@ const spec = require('../lib/spec.js');
 
 let keypair = generateKeypairFromPassword('passwerd');
 
+let arranger = spec.newUser(
+  'arranger@email.com', null, 'arranger',
+  null, 'http://www.arranger.com'
+);
+
 let composer = spec.newUser(
   'composer@email.com', '000000012150090X', 'composer',
   keypair.publicKey, 'http://www.composer.com'
@@ -43,8 +48,8 @@ let recordLabel = spec.newUser(
 );
 
 let composition = spec.newComposition(
-  composer, 'T-034.524.680-1', lyricist, publisher,
-  null, 'fire-song', 'http://www.composition.com'
+  arranger, composer, 'T-034.524.680-1', lyricist,
+  publisher, null, 'fire-song', 'http://www.composition.com'
 );
 
 composition = spec.addCompositionValue(composition, 'lyricist', wordsmith);

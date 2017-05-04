@@ -9,7 +9,7 @@ const Ajv = require('ajv');
 */
 
 const ajv = new Ajv();
-const schema = 'http://json-schema.org/draft-06/schema#';
+const SCHEMA = 'http://json-schema.org/draft-06/schema#';
 
 function validate(obj: Object, schema: Object) {
   return ajv.compile(schema)(obj);
@@ -28,7 +28,7 @@ const url = {
 }
 
 const header = {
-  '$schema': schema,
+  '$schema': SCHEMA,
   'title': 'header',
   'type': 'object',
   'properties': {
@@ -66,7 +66,7 @@ So we explicitly add 'id' and 'url' for now.
 */
 
 const user = {
-  '$schema': schema,
+  '$schema': SCHEMA,
   'title': 'user',
   'type': 'object',
   'properties': {
@@ -101,7 +101,7 @@ const headers = {
 }
 
 const composition = {
-  '$schema': schema,
+  '$schema': SCHEMA,
   'title': 'composition',
   'type': 'object',
   'definitions': {
@@ -126,7 +126,7 @@ const composition = {
 }
 
 const recording = {
-  '$schema': schema,
+  '$schema': SCHEMA,
   'title': 'recording',
   'type': 'object',
   'definitions': {
@@ -149,6 +149,7 @@ const recording = {
   'required': ['id', 'performer', 'producer', 'recordingOf', 'url']
 }
 
+exports.SCHEMA = SCHEMA;
 exports.header = header;
 exports.user = user;
 exports.composition= composition;
