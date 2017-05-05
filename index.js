@@ -7,6 +7,7 @@ const util = require('./lib/util.js');
 const button = document.querySelector('button');
 const form = document.querySelector('form');
 const generateKeypair = document.getElementById('generate-keypair');
+const ols = document.getElementsByTagName('ol');
 const password = document.querySelector('input[type="password"]');
 const pre = document.querySelector('pre');
 
@@ -33,6 +34,30 @@ button.addEventListener('click', () => {
 })
 */
 
+function listModifiers() {
+  Array.from(ols).forEach((ol, idx) => {
+    const remover = document.createElement('button');
+    remover.className = 'remover';
+    remover.id = 'remover-' + idx;
+    remover.textContent = '-';
+    remover.addEventListener('click', (event) => {
+      event.preventDefault();
+      if (ol.children.length <= 3) { return; }
+      ol.removeChild(ol.lastChild);
+    })
+    ol.prepend(remover);
+    const adder = document.createElement('button');
+    adder.className = 'adder';
+    adder.id = 'adder-' + idx;
+    adder.textContent = '+';
+    adder.addEventListener('click', (event) => {
+      event.preventDefault();
+      ol.appendChild(ol.lastChild.cloneNode(true));
+    });
+    ol.prepend(adder);
+  });
+}
+
 select.addEventListener('change', () => {
   form.innerHTML = null;
   generateKeypair.hidden = true;
@@ -53,6 +78,7 @@ select.addEventListener('change', () => {
   }
   spec.generateForm(_schema).forEach((div) => form.appendChild(div));
   form.appendChild(submit);
+  listModifiers();
 });
 
 form.addEventListener('submit', (event) => {
