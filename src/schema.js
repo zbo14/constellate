@@ -11,7 +11,7 @@ const Ajv = require('ajv');
 const ajv = new Ajv();
 const SCHEMA = 'http://json-schema.org/draft-06/schema#';
 
-function validate(obj: Object, schema: Object) {
+function validate(obj: Object, schema: Object): boolean {
   return ajv.compile(schema)(obj);
 }
 

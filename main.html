@@ -43,7 +43,9 @@
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       pre.innerHTML = null;
-      pre.textContent = JSON.stringify(evalForm(Array.from(form.children).slice(0, -1)), null, 2);
+      let _form = Array.from(form.children).slice(0, -1);
+      // pre.textContent = JSON.stringify(evalForm(_form), null, 2);
+      pre.textContent = JSON.stringify(validateForm(_form), null, 2);
     })
   </script>
 </html>

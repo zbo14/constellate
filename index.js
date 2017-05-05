@@ -72,6 +72,7 @@ console.log(form);
 
 window.evalForm = spec.evalForm;
 window.generateForm = spec.generateForm;
+window.validateForm = spec.validateForm;
 
 window.user = util.clone(schema.user);
 window.composition= util.clone(schema.composition);
