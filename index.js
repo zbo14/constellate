@@ -62,16 +62,20 @@ console.log(composition, recording);
 
 // let parser = new DOMParser();
 // let doc = parser.parseFromString(spec.generateForm(schema.composition), 'text/html');
-const form = spec.generateForm(schema.composition);
-console.log(form);
+let form = spec.generateForm(schema.composition);
 const parsed = spec.parseForm(form);
 console.log(JSON.stringify(parsed));
+form = spec.generateForm(parsed);
+console.log(form);
+// console.log(spec.evalForm(form));
+// document.body.appendChild(form);
 
-// TODO: generate form from parsed and check that it matches
+window.evalForm = spec.evalForm;
+window.generateForm = spec.generateForm;
 
-window.user_schema = util.clone(schema.user);
-window.composition_schema = util.clone(schema.composition);
-window.recording_schema = util.clone(schema.recording);
+window.user = util.clone(schema.user);
+window.composition= util.clone(schema.composition);
+window.recording = util.clone(schema.recording);
 
 /*
 let select = document.getElementsByTagName('select')[0];
