@@ -9,43 +9,14 @@
       <option value='composition'>composition</option>
       <option value='recording'>recording</option>
     </select>
+    <div id='generate-keypair' hidden>
+      <label>password</label>
+      <input type='password' />
+      <button>generate keypair</button>
+      <hr>
+    </div>
     <form></form>
     <pre></pre>
   </body>
   <script src='./bundle.js'></script>
-  <script type='text/javascript'>
-    let pre = document.getElementsByTagName('pre')[0];
-    let form = document.getElementsByTagName('form')[0];
-    let select = document.getElementsByTagName('select')[0];
-    let submit = document.createElement('input');
-    submit.type = 'submit';
-    select.addEventListener('change', () => {
-      form.innerHTML = null;
-      switch(select.value) {
-        case 'user':
-          schema = user;
-          break;
-        case 'composition':
-          schema = composition;
-          break;
-        case 'recording':
-          schema = recording;
-          break;
-        default:
-          console.error(`unexpected type: ${select.value}`);
-          return;
-      }
-      generateForm(schema).forEach((div) => {
-        form.appendChild(div);
-      });
-      form.appendChild(submit);
-    });
-    form.addEventListener('submit', (event) => {
-      event.preventDefault();
-      pre.innerHTML = null;
-      let _form = Array.from(form.children).slice(0, -1);
-      // pre.textContent = JSON.stringify(evalForm(_form), null, 2);
-      pre.textContent = JSON.stringify(validateForm(_form), null, 2);
-    })
-  </script>
 </html>
