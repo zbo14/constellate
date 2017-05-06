@@ -1,5 +1,4 @@
 // const crypto = require('./lib/crypto.js');
-const net = require('./lib/net.js');
 const schema = require('./lib/schema.js');
 const spec = require('./lib/spec.js');
 const util = require('./lib/util.js');
