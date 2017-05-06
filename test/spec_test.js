@@ -1,88 +1,116 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
-import { base64_digest, orderStringify } from '../lib/util.js';
+import { base58_encode, base64_digest, orderStringify } from '../lib/util.js';
 import { generateKeypairFromPassword } from '../lib/crypto.js';
 
+const schema = require('../lib/schema.js');
 const spec = require('../lib/spec.js');
 
-let keypair = generateKeypairFromPassword('passwerd');
+const keypair = generateKeypairFromPassword('passwerd');
 
-let arranger = spec.newUser(
-  'arranger@email.com', null, 'arranger',
-  null, 'http://www.arranger.com'
-);
+const arranger = spec.setId({
+  '@context': schema.context,
+  '@type': 'Person',
+  email: 'arranger@email.com',
+  name: 'arranger',
+  url: 'http://arranger.com'
+});
 
-let composer = spec.newUser(
-  'composer@email.com', '000000012150090X', 'composer',
-  keypair.publicKey, 'http://www.composer.com'
-);
+const composer = spec.setId({
+  '@context': schema.context,
+  '@type': 'Person',
+  email: 'composer@email.com',
+  name: 'composer',
+  publicKey: base58_encode(keypair.publicKey),
+  sameAs: ['http://facebook-profile.com'],
+  url: 'http://composer.com'
+});
 
-let lyricist = spec.newUser(
-  'lyricist@email.com', '000000012250078X',
-  'lyricist', null, 'http://www.lyricist.com'
-);
+const lyricist = spec.setId({
+  '@context': schema.context,
+  '@type': 'Person',
+  email: 'lyricist@email.com',
+  name: 'lyricist',
+  url: 'http://lyricist.com'
+});
 
-let wordsmith = spec.newUser(
-  'wordsmith@email.com', null, 'wordsmith',
-  null, 'http://www.wordsmith.com'
-);
+const performer = spec.setId({
+  '@context': schema.context,
+  '@type': 'MusicGroup',
+  email: 'performer@email.com',
+  name: 'performer',
+  sameAs: ['http://bandcamp-page.com'],
+  url: 'http://performer.com'
+});
 
-let performer = spec.newUser(
-  'performer@email.com', null,
-  'performer', null, 'http://www.performer.com'
-);
+const producer = spec.setId({
+  '@context': schema.context,
+  '@type': 'Person',
+  name: 'producer',
+  sameAs: ['http://soundcloud-page.com'],
+  url: 'http://producer.com'
+});
 
-let producer = spec.newUser(
-  'producer@email.com', '001006501215004X',
-  'producer', null, 'http://www.producer.com'
-);
+const publisher = spec.setId({
+  '@context': schema.context,
+  '@type': 'Organization',
+  email: 'publisher@email.com',
+  name: 'publisher',
+  url: 'http://publisher.com'
+});
 
-let publisher = spec.newUser(
-  'publisher@email.com', '301006507115002X',
-  'publisher', null, 'http://www.publisher.com'
-);
+const recordLabel = spec.setId({
+  '@context': schema.context,
+  '@type': 'Organization',
+  email: 'recordLabel@email.com',
+  name: 'recordLabel',
+  url: 'http://recordLabel.com'
+});
 
-let recordLabel = spec.newUser(
-  'recordLabel@email.com', null, 'recordLabel',
-  null, 'http://www.record-label.com'
-);
+const composition = spec.setId({
+  '@context': schema.context,
+  '@type': 'MusicComposition',
+  arranger: spec.getHeaders(arranger),
+  composer: spec.getHeaders(composer),
+  iswcCode: 'T-034.524.680-1',
+  lyricist: spec.getHeaders(lyricist),
+  publisher: spec.getHeaders(publisher),
+  title: 'fire-song',
+  url: 'http://composition.com'
+});
 
-let composition = spec.newComposition(
-  arranger, composer, 'T-034.524.680-1', lyricist,
-  publisher, null, 'fire-song', 'http://www.composition.com'
-);
-
-composition = spec.addCompositionValue(composition, 'lyricist', wordsmith);
-
-let recording = spec.newRecording(
-  null, performer, producer,
-  composition, null, 'http://www.recording.com'
-);
-
-recording = spec.removeCompositionValue(recording, 'performer', performer);
-recording = spec.removeCompositionValue(recording, 'recordLabel', recordLabel);
-recording = spec.removeCompositionValue(recording, 'recordLabel', recordLabel);
-
-composition = spec.addCompositionValue(composition, 'recordedAs', recording);
+const recording = spec.setId({
+  '@context': schema.context,
+  '@type': 'MusicRecording',
+  performer: spec.getHeaders(performer),
+  producer: spec.getHeaders(producer),
+  recordingOf: spec.getHeader(composition),
+  recordLabel: spec.getHeaders(recordLabel),
+  url: 'http://recording.com'
+});
 
 describe('Spec', () => {
-    it('validates a user', () => {
+    it('validates an artist', () => {
       assert.equal(
-        spec.validateUser(composer), null,
+        spec.validate(composer, schema.artist), null,
         'should validate user'
       );
     });
-    // console.log(composition);
+    it('validates an organization', () => {
+      assert.equal(
+        spec.validate(recordLabel, schema.organization), null,
+        'should validate an organization'
+      );
+    });
     it('validates a composition', () => {
       assert.equal(
-        spec.validateComposition(composition), null,
+        spec.validate(composition, schema.composition), null,
         'should validate composition'
       );
     });
-    // console.log(recording);
     it('validates a recording', () => {
       assert.equal(
-        spec.validateRecording(recording), null,
+        spec.validate(recording, schema.recording), null,
         'should validate recording'
       );
     });

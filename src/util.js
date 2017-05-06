@@ -12,7 +12,7 @@ const urlsafeBase64  = require('urlsafe-base64');
 * @module constellate/src/util
 */
 
-function encode_base58(key: Buffer): string {
+function base58_encode(key: Buffer): string {
   if (key == null) { return null; }
   return bs58.encode(key);
 }
@@ -63,7 +63,7 @@ function writeObject(obj: Object, writable: stream.Writeable) {
   rs.pipe(new StringifyStream()).pipe(writable);
 }
 
-exports.encode_base58 = encode_base58;
+exports.base58_encode = base58_encode;
 exports.base64_digest = base64_digest;
 exports.clone = clone;
 exports.extend = extend;

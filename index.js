@@ -62,9 +62,13 @@ select.addEventListener('change', () => {
   form.innerHTML = null;
   generateKeypair.hidden = true;
   switch(select.value) {
-    case 'user':
+    case 'artist':
       generateKeypair.hidden = false;
-      _schema = schema.user;
+      _schema = schema.artist;
+      break;
+    case 'organization':
+      generateKeypair.hidden = false;
+      _schema = schema.organization;
       break;
     case 'composition':
       _schema = schema.composition;

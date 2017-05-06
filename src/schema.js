@@ -1,6 +1,6 @@
 'use strict';
 
-const Ajv = require('ajv');
+var Ajv = require('ajv');
 
 // @flow
 
@@ -9,16 +9,30 @@ const Ajv = require('ajv');
 */
 
 const ajv = new Ajv();
-const SCHEMA = 'http://json-schema.org/draft-06/schema#';
+
+const context = {
+  type: 'object',
+  properties: {
+    '@vocab': {
+      enum: ['http://schema.org'],
+      readonly: true
+    }
+  },
+  required: ['@vocab']
+}
+
+const draft = 'http://json-schema.org/draft-06/schema#';
 
 function validate(obj: Object, schema: Object): boolean {
   return ajv.compile(schema)(obj);
 }
 
 const id = {
-  type: 'string',
+  type: ['string', 'null'],
   pattern: '^[A-Za-z0-9-_]{43}$'
 }
+
+const required = ['@context', '@type', '@id']
 
 const url = {
   type: 'string',
@@ -26,30 +40,57 @@ const url = {
   pattern: '^https?:\/\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%_\\+.~#?&\/\/=]*)$'
 }
 
-const header = {
-  $schema: SCHEMA,
-  title: 'header',
+var artist = {
+  $schema: draft,
+  title: 'artist',
   type: 'object',
   properties: {
-    id: id,
-    url: url
-  },
-  required: ['id', 'url']
-}
-
-const user = {
-  $schema: SCHEMA,
-  title: 'user',
-  type: 'object',
-  properties: {
-    id: Object.assign({readonly: true}, id),
+    '@context': context,
+    '@type': {
+      enum: ['MusicGroup', 'Person']
+    },
+    '@id': id,
     email: {
-      type: 'string'
+      type: 'string',
+      pattern: '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'
       // /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
     },
-    isni: {
+    // isni: {
+    //  type: 'string',
+    //  pattern: '^[0-9]{15}[0-9X]$'
+    // },
+    name: {
+      type: 'string'
+    },
+    publicKey: {
       type: 'string',
-      pattern: '^[0-9]{15}[0-9X]$'
+      pattern: '^[1-9A-HJ-NP-Za-km-z]{43,44}$'
+    },
+    sameAs: {
+      type: 'array',
+      items: url,
+      minItems: 1,
+      uniqueItems: true
+    },
+    url: url
+  },
+  required: required
+}
+
+var organization = {
+  $schema: draft,
+  title: 'organization',
+  type: 'object',
+  properties: {
+    '@context': context,
+    '@type': {
+      enum: ['Organization'],
+      readonly: true
+    },
+    '@id': id,
+    email: {
+      type: 'string',
+      pattern: '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'
     },
     name: {
       type: 'string'
@@ -58,72 +99,138 @@ const user = {
       type: 'string',
       pattern: '^[1-9A-HJ-NP-Za-km-z]{43,44}$'
     },
+    sameAs: {
+      type: 'array',
+      items: url,
+      minItems: 1,
+      uniqueItems: true
+    },
     url: url
   },
-  required: ['email', 'id', 'name', 'url']
+  required: required
 }
 
-const headers = {
-  type: 'array',
-  items: {
-    $ref: '#/definitions/header'
-  },
-  minItems: 1,
-  uniqueItems: true
-}
-
-const composition = {
-  $schema: SCHEMA,
+var composition = {
+  $schema: draft,
   title: 'composition',
   type: 'object',
-  definitions: {
-    header: header
-  },
   properties: {
-    id: Object.assign({readonly: true}, id),
-    composer: headers,
-    iswc: {
+    '@context': context,
+    '@type': {
+      enum: ['MusicComposition'],
+      readonly: true
+    },
+    '@id': id,
+    arranger: {
+      type: 'array',
+      items: artist,
+      minItems: 1,
+      uniqueItems: true
+    },
+    composer: {
+      type: 'array',
+      items: artist,
+      minItems: 1,
+      uniqueItems: true
+    },
+    iswcCode: {
       type: 'string',
       pattern: 'T-[0-9]{3}.[0-9]{3}.[0-9]{3}-[0-9]'
     },
-    lyricist: headers,
-    publisher: headers,
-    recordedAs: headers,
+    lyricist: {
+      type: 'array',
+      items: artist,
+      minItems: 1,
+      uniqueItems: true
+    },
+    publisher: {
+      type: 'array',
+      items: organization,
+      minItems: 1,
+      uniqueItems: true
+    },
+    recordedAs: {
+      type: 'array',
+      items: recording,
+      minItems: 1,
+      uniqueItems: true
+    },
     title: {
       type: 'string'
     },
     url: url
   },
-  required: ['composer', 'id', 'title', 'url']
+  required: required
 }
 
-const recording = {
-  $schema: SCHEMA,
+var recording = {
+  $schema: draft,
   title: 'recording',
   type: 'object',
-  definitions: {
-    header: header
-  },
   properties: {
-    id: Object.assign({readonly: true}, id),
-    isrc: {
+    '@context': context,
+    '@type': {
+      enum: ['MusicRecording'],
+      readonly: true
+    },
+    '@id': id,
+    isrcCode: {
       type: 'string',
       pattern: '^[A-Z]{2}-[A-Z0-9]{3}-[7890][0-9]-[0-9]{5}$'
     },
-    performer: headers,
-    producer: headers,
-    recordingOf: {
-      $ref: '#/definitions/header'
+    performer: {
+      type: 'array',
+      items: artist,
+      minItems: 1,
+      uniqueItems: true
     },
-    recordLabel: headers,
+    producer: {
+      type: 'array',
+      items: artist,
+      minItems: 1,
+      uniqueItems: true
+    },
+    recordingOf: composition,
+    recordLabel: {
+      type: 'array',
+      items: organization,
+      minItems: 1,
+      uniqueItems: true
+    },
     url: url
   },
-  required: ['id', 'performer', 'producer', 'recordingOf', 'url']
+  required: required
 }
 
-exports.SCHEMA = SCHEMA;
-exports.header = header;
-exports.user = user;
+var album = {
+  $schema: draft,
+  title: 'album',
+  type: 'object',
+  properties: {
+    '@context': context,
+    '@type': {
+      enum: ['MusicAlbum'],
+      readonly: true
+    },
+    '@id': id,
+    track: {
+      type: 'array',
+      items: recording,
+      minItems: 1,
+      uniqueItems: true
+    }
+  },
+  required: required
+}
+
+exports.context = context;
+exports.draft = draft;
+
+exports.artist = artist
+exports.organization = organization;
+
 exports.composition= composition;
 exports.recording = recording;
+// exports.album = album;
+
 exports.validate = validate;
