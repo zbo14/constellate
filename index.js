@@ -82,9 +82,9 @@ select.addEventListener('change', () => {
   spec.generateForm(_schema).forEach((div) => form.appendChild(div));
   form.appendChild(submit);
   listModifiers();
-});
+}, false);
 
 form.addEventListener('submit', (event) => {
   event.preventDefault();
   pre.textContent = JSON.stringify(spec.validateForm(Array.from(form.children).slice(0, -1)), null, 2);
-});
+}, false);

@@ -12,11 +12,15 @@
     "flow:file": "read -p 'Enter path to file: ' path_to_file && export PATH_TO_FILE=$path_to_file && flow check-contents < ${PATH_TO_FILE}",
     "gulp": "gulp",
     "prepublish": "npm run build",
+    "remove-types:file": "read -p 'Enter filename: ' filename && export FILENAME=$filename && flow-remove-types src/${FILENAME} > lib/${FILENAME}",
     "test": "mocha --compilers js:babel-core/register --require babel-polyfill --recursive './test/*_test.js'",
     "_comment": "test command from https://github.com/Envoke-org/envokeJS/blob/master/package.json"
   },
   "babel": {
-    "presets": ["es2015", "flow"]
+    "presets": [
+      "es2015",
+      "flow"
+    ]
   },
   "devDependencies": {
     "ajv": "^5.0.0",
@@ -37,6 +41,7 @@
     "eslint": "^3.19.0",
     "exorcist": "^0.4.0",
     "flow-bin": "^0.44.0",
+    "flow-remove-types": "^1.2.1",
     "gulp": "^3.9.1",
     "gulp-flowtype": "^1.0.0",
     "gulp-react": "^3.1.0",
