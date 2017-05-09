@@ -34,6 +34,9 @@ button.addEventListener('click', () => {
 */
 
 function listModifiers() {
+  const lis = Array.from(document.getElementsByTagName('li')).map((li) => {
+    return li.cloneNode(true);
+  });
   Array.from(ols).forEach((ol, idx) => {
     const remover = document.createElement('button');
     remover.className = 'remover';
@@ -41,7 +44,7 @@ function listModifiers() {
     remover.textContent = '-';
     remover.addEventListener('click', (event) => {
       event.preventDefault();
-      if (ol.children.length <= 3) { return; }
+      if (ol.lastChild.nodeName !== 'LI') { return; }
       ol.removeChild(ol.lastChild);
     })
     ol.prepend(remover);
@@ -51,7 +54,7 @@ function listModifiers() {
     adder.textContent = '+';
     adder.addEventListener('click', (event) => {
       event.preventDefault();
-      ol.appendChild(ol.lastChild.cloneNode(true));
+      ol.appendChild(lis[idx]);
     });
     ol.prepend(adder);
   });
@@ -76,7 +79,7 @@ select.addEventListener('change', () => {
       _schema = schema.recording;
       break;
     default:
-      console.error(`unexpected type: ${select.value}`);
+      console.error('unexpected type:', select.value);
       return;
   }
   spec.generateForm(_schema).forEach((div) => form.appendChild(div));
@@ -86,5 +89,13 @@ select.addEventListener('change', () => {
 
 form.addEventListener('submit', (event) => {
   event.preventDefault();
-  pre.textContent = JSON.stringify(spec.validateForm(Array.from(form.children).slice(0, -1)), null, 2);
+  const divs = Array.from(form.children).slice(0, -1).filter((div) => {
+    const elem = div.children[1];
+    if (elem.nodeName === 'OL') {
+      if (elem.lastChild.nodeName !== 'LI') { return false; }
+    }
+    //..
+    return true;
+  });
+  pre.textContent = JSON.stringify(spec.validateForm(divs), null, 2);
 }, false);

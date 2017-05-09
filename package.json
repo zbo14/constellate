@@ -11,6 +11,7 @@
     "flow": "flow",
     "flow:file": "read -p 'Enter path to file: ' path_to_file && export PATH_TO_FILE=$path_to_file && flow check-contents < ${PATH_TO_FILE}",
     "gulp": "gulp",
+    "http-serve": "http-server -a localhost -p 8888",
     "prepublish": "npm run build",
     "remove-types:file": "read -p 'Enter filename: ' filename && export FILENAME=$filename && flow-remove-types src/${FILENAME} > lib/${FILENAME}",
     "test": "mocha --compilers js:babel-core/register --require babel-polyfill --recursive './test/*_test.js'",
@@ -49,13 +50,17 @@
     "gulp-sourcemaps": "^2.6.0",
     "gulp-uglify": "^2.1.2",
     "gulp-util": "^3.0.8",
+    "http-server": "^0.10.0",
     "js-sha3": "^0.5.7",
     "mocha": "^3.2.0",
     "node-fetch": "^1.6.3",
+    "qrcode": "^0.8.1",
+    "qrcode-reader": "^1.0.0",
     "request": "^2.81.0",
     "unflowify": "^1.0.1",
     "urlsafe-base64": "^1.0.0",
     "vinyl-buffer": "^1.0.0",
-    "vinyl-source-stream": "^1.1.0"
+    "vinyl-source-stream": "^1.1.0",
+    "wrtc": "0.0.62"
   }
 }
