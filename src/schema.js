@@ -10,9 +10,11 @@ const Ajv = require('ajv');
 
 const ajv = new Ajv();
 
+const vocabURL = 'http://schema.org/';
+
 const vocab = {
   type: 'string',
-  default: 'http://schema.org/',
+  default: vocabURL,
   readonly: true
 }
 
@@ -126,6 +128,8 @@ const organization = {
 
 const organizationHeader = requireHeader(organization);
 
+const titleURL = 'http://schema.org/name';
+
 const composition = {
   $schema: draft,
   title: 'Composition',
@@ -137,7 +141,7 @@ const composition = {
         '@vocab': vocab,
         title: {
           type: 'string',
-          default: 'http://schema.org/name'
+          default: titleURL
         }
       },
       readonly: true,
@@ -191,6 +195,8 @@ const composition = {
 
 const compositionHeader = requireHeader(composition);
 
+const performerURL = 'http://schema.org/byArtist';
+
 const recording = {
   $schema: draft,
   title: 'Recording',
@@ -202,7 +208,7 @@ const recording = {
         '@vocab': vocab,
         performer: {
           type: 'string',
-          default: 'http://schema.org/byArtist'
+          default: performerURL
         }
       },
       readonly: true,
@@ -266,8 +272,9 @@ const Composition = requireFields(hideId(composition), ...required);
 const Recording = requireFields(hideId(recording), ...required);
 const Album = requireFields(hideId(album), ...required);
 
-exports.draft = draft;
-exports.vocab = vocab;
+exports.vocabURL = vocabURL;
+exports.titleURL = titleURL;
+exports.performerURL = performerURL;
 
 exports.Artist = Artist
 exports.Organization = Organization;

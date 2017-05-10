@@ -10,18 +10,18 @@ const keypair = generateKeypairFromPassword('passwerd');
 
 const getHeaders = (...objs) => objs.map(spec.getHeader);
 
-const context = 'http://schema.org/';
-
+/*
 const arranger = spec.setId({
-  '@context': context,
+  '@context': schema.vocabURL,
   '@type': 'Person',
   email: 'arranger@email.com',
   name: 'arranger',
   url: 'http://arranger.com'
 });
+*/
 
 const composer = spec.setId({
-  '@context': context,
+  '@context': schema.vocabURL,
   '@type': 'Person',
   email: 'composer@email.com',
   name: 'composer',
@@ -31,24 +31,24 @@ const composer = spec.setId({
 });
 
 const lyricist = spec.setId({
-  '@context': context,
+  '@context': schema.vocabURL,
   '@type': 'Person',
   email: 'lyricist@email.com',
   name: 'lyricist',
   url: 'http://lyricist.com'
 });
 
-const perspecer = spec.setId({
-  '@context': context,
+const performer = spec.setId({
+  '@context': schema.vocabURL,
   '@type': 'MusicGroup',
-  email: 'perspecer@email.com',
-  name: 'perspecer',
+  email: 'performer@email.com',
+  name: 'performer',
   sameAs: ['http://bandcamp-page.com'],
-  url: 'http://perspecer.com'
+  url: 'http://performer.com'
 });
 
 const producer = spec.setId({
-  '@context': context,
+  '@context': schema.vocabURL,
   '@type': 'Person',
   name: 'producer',
   sameAs: ['http://soundcloud-page.com'],
@@ -56,7 +56,7 @@ const producer = spec.setId({
 });
 
 const publisher = spec.setId({
-  '@context': context,
+  '@context': schema.vocabURL,
   '@type': 'Organization',
   email: 'publisher@email.com',
   name: 'publisher',
@@ -64,7 +64,7 @@ const publisher = spec.setId({
 });
 
 const recordLabel = spec.setId({
-  '@context': context,
+  '@context': schema.vocabURL,
   '@type': 'Organization',
   email: 'recordLabel@email.com',
   name: 'recordLabel',
@@ -72,9 +72,12 @@ const recordLabel = spec.setId({
 });
 
 const composition = spec.setId({
-  '@context': context,
+  '@context': {
+    '@vocab': schema.vocabURL,
+    title: schema.titleURL
+  },
   '@type': 'MusicComposition',
-  arranger: getHeaders(arranger),
+  // arranger: getHeaders(arranger),
   composer: getHeaders(composer),
   iswcCode: 'T-034.524.680-1',
   lyricist: getHeaders(lyricist),
@@ -84,13 +87,24 @@ const composition = spec.setId({
 });
 
 const recording = spec.setId({
-  '@context': context,
+  '@context': {
+    '@vocab': schema.vocabURL,
+    performer: schema.performerURL
+  },
   '@type': 'MusicRecording',
-  performer: getHeaders(perspecer),
+  performer: getHeaders(performer),
   producer: getHeaders(producer),
   recordingOf: spec.getHeader(composition),
   recordLabel: getHeaders(recordLabel),
   url: 'http://recording.com'
+});
+
+const album = spec.setId({
+  '@context': schema.vocabURL,
+  '@type': 'MusicAlbum',
+  byArtist: performer,
+  track: getHeaders(recording),
+  url: 'http://album.com'
 });
 
 describe('Spec', () => {
@@ -116,6 +130,12 @@ describe('Spec', () => {
       assert(
         spec.validate(recording, schema.Recording),
         'should validate recording'
+      );
+    });
+    it('validates an album', () => {
+      assert(
+        spec.validate(album, schema.Album),
+        'should validate album'
       );
     });
 });

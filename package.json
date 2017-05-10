@@ -11,7 +11,6 @@
     "flow": "flow",
     "flow:file": "read -p 'Enter path to file: ' path_to_file && export PATH_TO_FILE=$path_to_file && flow check-contents < ${PATH_TO_FILE}",
     "gulp": "gulp",
-    "http-serve": "http-server -a localhost -p 8888",
     "prepublish": "npm run build",
     "remove-types:file": "read -p 'Enter filename: ' filename && export FILENAME=$filename && flow-remove-types src/${FILENAME} > lib/${FILENAME}",
     "test": "mocha --compilers js:babel-core/register --require babel-polyfill --recursive './test/*_test.js'",
