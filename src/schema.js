@@ -10,9 +10,9 @@ const Ajv = require('ajv');
 
 const ajv = new Ajv();
 
-const context = {
-  default: 'http://schema.org/',
+const vocab = {
   type: 'string',
+  default: 'http://schema.org/',
   readonly: true
 }
 
@@ -50,6 +50,8 @@ const id = {
   pattern: '^[A-Za-z0-9-_]{43}$'
 }
 
+const required = ['@context', '@type', '@id'];
+
 const url = {
   type: 'string',
   // from http://stackoverflow.com/a/3809435
@@ -61,7 +63,7 @@ const artist = {
   title: 'Artist',
   type: 'object',
   properties: {
-    '@context': context,
+    '@context': vocab,
     '@type': {
       enum: ['MusicGroup', 'Person']
     },
@@ -71,17 +73,17 @@ const artist = {
       pattern: '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'
       // /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
     },
-    isni: {
-      type: 'string',
-      pattern: '^[0-9]{15}[0-9X]$'
-    },
+    // isni: {
+    //  type: 'string',
+    //  pattern: '^[0-9]{15}[0-9X]$'
+    // },
     name: {
       type: 'string'
     },
-    publicKey: {
-      type: 'string',
-      pattern: '^[1-9A-HJ-NP-Za-km-z]{43,44}$'
-    },
+    // publicKey: {
+    //  type: 'string',
+    //  pattern: '^[1-9A-HJ-NP-Za-km-z]{43,44}$'
+    // },
     sameAs: {
       type: 'array',
       items: url,
@@ -99,7 +101,7 @@ const organization = {
   title: 'Organization',
   type: 'object',
   properties: {
-    '@context': context,
+    '@context': vocab,
     '@type': {
       enum: ['Organization'],
       readonly: true
@@ -111,10 +113,6 @@ const organization = {
     },
     name: {
       type: 'string'
-    },
-    publicKey: {
-      type: 'string',
-      pattern: '^[1-9A-HJ-NP-Za-km-z]{43,44}$'
     },
     sameAs: {
       type: 'array',
@@ -133,18 +131,29 @@ const composition = {
   title: 'Composition',
   type: 'object',
   properties: {
-    '@context': context,
+    '@context': {
+      type: 'object',
+      properties: {
+        '@vocab': vocab,
+        title: {
+          type: 'string',
+          default: 'http://schema.org/name'
+        }
+      },
+      readonly: true,
+      required: ['@vocab', 'title']
+    },
     '@type': {
       enum: ['MusicComposition'],
       readonly: true
     },
     '@id': id,
-    arranger: {
-      type: 'array',
-      items: artistHeader,
-      minItems: 1,
-      uniqueItems: true
-    },
+    // arranger: {
+    //  type: 'array',
+    //  items: artistHeader,
+    //  minItems: 1,
+    //  uniqueItems: true
+    // },
     composer: {
       type: 'array',
       items: artistHeader,
@@ -187,7 +196,18 @@ const recording = {
   title: 'Recording',
   type: 'object',
   properties: {
-    '@context': context,
+    '@context': {
+      type: 'object',
+      properties: {
+        '@vocab': vocab,
+        performer: {
+          type: 'string',
+          default: 'http://schema.org/byArtist'
+        }
+      },
+      readonly: true,
+      required: ['@vocab', 'performer']
+    },
     '@type': {
       enum: ['MusicRecording'],
       readonly: true
@@ -227,11 +247,7 @@ const album = {
   title: 'Album',
   type: 'object',
   properties: {
-    '@context': context,
-    '@type': {
-      enum: ['MusicAlbum'],
-      readonly: true
-    },
+    '@context': vocab,
     '@id': id,
     byArtist: artistHeader,
     track: {
@@ -244,42 +260,19 @@ const album = {
   }
 }
 
-const Artist = requireFields(
-  hideId(artist),
-  '@context', '@type', '@id',
-  'email', 'name'
-);
+const Artist = requireFields(hideId(artist), ...required);
+const Organization = requireFields(hideId(organization), ...required);
+const Composition = requireFields(hideId(composition), ...required);
+const Recording = requireFields(hideId(recording), ...required);
+const Album = requireFields(hideId(album), ...required);
 
-const Organization = requireFields(
-  hideId(organization),
-  '@context', '@type', '@id',
-  'email', 'name', 'url'
-);
-
-const Composition = requireFields(
-  hideId(composition),
-  '@context', '@type', '@id',
-  'composer', 'title', 'url'
-);
-
-const Recording = requireFields(
-  hideId(recording),
-  '@context', '@type', '@id',
-  'performer', 'producer', 'recordingOf', 'url'
-);
-
-const Album = requireFields(
-  hideId(album),
-  '@context', '@type', '@id',
-  'byArtist', 'track', 'url'
-);
-
-exports.context = context;
 exports.draft = draft;
-exports.validate = validate;
+exports.vocab = vocab;
 
 exports.Artist = Artist
 exports.Organization = Organization;
 exports.Composition= Composition;
 exports.Recording = Recording;
 exports.Album = Album;
+
+exports.validate = validate;

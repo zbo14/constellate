@@ -5,7 +5,7 @@ const util = require('./lib/util.js');
 
 const button = document.querySelector('button');
 const form = document.querySelector('form');
-const generateKeypair = document.getElementById('generate-keypair');
+// const generateKeypair = document.getElementById('generate-keypair');
 const ols = document.getElementsByTagName('ol');
 const password = document.querySelector('input[type="password"]');
 const pre = document.querySelector('pre');
@@ -62,14 +62,14 @@ function listModifiers() {
 
 select.addEventListener('change', () => {
   form.innerHTML = null;
-  generateKeypair.hidden = true;
+  // generateKeypair.hidden = true;
   switch(select.value) {
     case 'artist':
-      generateKeypair.hidden = false;
+      // generateKeypair.hidden = false;
       _schema = schema.Artist;
       break;
     case 'organization':
-      generateKeypair.hidden = false;
+      // generateKeypair.hidden = false;
       _schema = schema.Organization;
       break;
     case 'composition':
@@ -77,6 +77,9 @@ select.addEventListener('change', () => {
       break;
     case 'recording':
       _schema = schema.Recording;
+      break;
+    case 'album':
+      _schema = schema.Album;
       break;
     default:
       console.error('unexpected type:', select.value);

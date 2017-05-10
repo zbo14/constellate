@@ -3,6 +3,7 @@ const buffer = require('vinyl-buffer');
 const flow = require('gulp-flowtype');
 const gulp = require('gulp');
 const gutil = require('gulp-util');
+const prettify = require('gulp-jsbeautifier');
 const react = require('gulp-react');
 const rename = require('gulp-rename');
 const source = require('vinyl-source-stream');
@@ -21,6 +22,7 @@ gulp.task('typecheck', function() {
       abort: false
     }))
     .pipe(react({ stripTypes: true }))
+    .pipe(prettify())
     .pipe(gulp.dest('./lib/'));
 });
 
