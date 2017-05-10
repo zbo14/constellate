@@ -11,13 +11,13 @@ const { digestBase64, isArray, isBoolean, isNumber, isObject, isString, arrayFro
 * @module constellate/src/spec
 */
 
-function newInput(type        )              {
+function newInput(type: string): HTMLElement {
   const input = document.createElement('input');
   input.type = type;
   return input;
 }
 
-function generateElement(obj        , defs        )              {
+function generateElement(obj: Object, defs: Object): HTMLElement {
   if (obj.hasOwnProperty('enum') && isArray(obj.enum)) {
     const select = document.createElement('select');
     obj.enum.forEach((val) => {
@@ -60,7 +60,7 @@ function generateElement(obj        , defs        )              {
     throw new Error('unexpected type: ' + obj.type);
 }
 
-function evalElement(elem             )      {
+function evalElement(elem: HTMLElement): any {
   switch(elem.nodeName) {
     case 'FIELDSET':
       if (!elem.children.length) {
@@ -68,7 +68,7 @@ function evalElement(elem             )      {
       }
       return evalForm(Array.from(elem.children));
     case 'INPUT':
-      const input                   = (elem     );
+      const input: HTMLInputElement = (elem: any);
       switch(input.type) {
         case 'checkbox':
           if (!isBoolean(input.value)) {
@@ -97,14 +97,14 @@ function evalElement(elem             )      {
           return result.concat(evalElement(child.children[0]));
       }, []);
     case 'SELECT':
-      const select                    = (elem     );
+      const select: HTMLSelectElement = (elem: any);
       return select.value;
     default:
       throw new Error('unexpected nodeName: ' + elem.nodeName);
   }
 }
 
-function parseElement(elem             )         {
+function parseElement(elem: HTMLElement): Object {
   switch(elem.nodeName) {
     case 'FIELDSET':
       if (!elem.children.length) {
@@ -112,7 +112,7 @@ function parseElement(elem             )         {
       }
       return parseForm(Array.from(elem.children));
     case 'INPUT':
-      const input                   = (elem     );
+      const input: HTMLInputElement = (elem: any);
       switch(input.type) {
         case 'checkbox':
           return {type: 'boolean'};
@@ -132,7 +132,7 @@ function parseElement(elem             )         {
       if (!li.children.length) {
         throw new Error('<li> has no children');
       }
-      const firstChild              = (li.firstChild     );
+      const firstChild: HTMLElement = (li.firstChild: any);
       return {
         'type': 'array',
         'items': parseElement(firstChild),
@@ -143,7 +143,7 @@ function parseElement(elem             )         {
       if (!elem.children.length) {
         throw new Error('select has no children');
       }
-      const option                    = (elem.firstChild     );
+      const option: HTMLOptionElement = (elem.firstChild: any);
       return {
         'type': typeof option.value,
         'enum': Array.from(elem.children)
@@ -153,7 +153,7 @@ function parseElement(elem             )         {
   }
 }
 
-function getAttributes(elem             , obj        )         {
+function getAttributes(elem: HTMLElement, obj: Object): Object {
   if (elem.attributes == null) { return obj; }
   const result = Array.from(elem.attributes).reduce((result, attr) => {
     switch(attr.name) {
@@ -172,13 +172,13 @@ function getAttributes(elem             , obj        )         {
   if (elem.nodeName !== 'SELECT') { return result; }
   return Object.assign({}, result, {
     enum: Array.from(elem.children).map((child) => {
-      const option                    = (child     );
+      const option: HTMLOptionElement = (child: any);
       return option.value;
     })
   });
 }
 
-function setAttribute(elem                  , key        , val     )              {
+function setAttribute(elem: HTMLInputElement, key: string, val: any): HTMLElement {
   switch(key) {
     case 'default':
       elem.defaultValue = val;
@@ -197,7 +197,7 @@ function setAttribute(elem                  , key        , val     )            
   return elem;
 }
 
-function definition(obj        , defs        )         {
+function definition(obj: Object, defs: Object): Object {
   if (!isString(obj['$ref'])) {
     throw new Error('$ref should be non-empty string');
   }
@@ -208,15 +208,15 @@ function definition(obj        , defs        )         {
   return Object.assign({}, defs[match[1]]);
 }
 
-function isDescendant(parent             , child             )          {
+function isDescendant(parent: HTMLElement, child: HTMLElement): boolean {
   if (child == null) { return false; }
   if (parent == child) { return true; }
-  const _parent              = (child.parentElement     );
+  const _parent: HTMLElement = (child.parentElement: any);
   return isDescendant(parent, _parent);
 }
 
-function generateForm(_schema        )                {
-  let form                = [];
+function generateForm(_schema: Object): HTMLElement[] {
+  let form: HTMLElement[] = [];
   try {
     if (!isObject(_schema.properties)) {
       throw new Error('schema properties should be object');
@@ -247,18 +247,18 @@ function generateForm(_schema        )                {
   return form;
 }
 
-function addRequired(reqs          , elem             , label             )           {
+function addRequired(reqs: string[], elem: HTMLElement, label: HTMLElement): string[] {
     if (!elem.hasAttribute('required')) { return reqs; }
     return reqs.concat(label.textContent);
   }
 
-function addValue(obj        , elem             , label             )         {
+function addValue(obj: Object, elem: HTMLElement, label: HTMLElement): Object {
   const val = evalElement(elem);
   if (val == null || (isArray(val) && val.some((x) => x == null))) { return obj; }
   return Object.assign({}, obj, { [label.textContent]: val } );
 }
 
-function evalForm(form               )         {
+function evalForm(form: HTMLElement[]): Object {
   let values = {};
   try {
     values = form.reduce((result, div) => {
@@ -285,7 +285,7 @@ function evalForm(form               )         {
   return values;
 }
 
-function parseForm(form               )          {
+function parseForm(form: HTMLElement[]): Object  {
   let parsed = {};
   try {
     parsed = form.reduce((result, div) => {
@@ -325,17 +325,17 @@ function parseForm(form               )          {
   return parsed;
 }
 
-function setId(obj        )         {
+function setId(obj: Object): Object {
    return Object.assign({}, obj, {
      '@id': digestBase64(JSON.parse(orderStringify(withoutKeys(obj, '@id'))))
    });
  }
 
-function checkId(obj        )          {
+function checkId(obj: Object): boolean {
   return obj['@id'] === setId(obj)['@id'];
 }
 
-function validate(obj        , _schema        )          {
+function validate(obj: Object, _schema: Object): boolean {
   if (!checkId(obj)) {
     throw new Error('obj has invalid id: ' + obj['@id']);
   }
@@ -345,7 +345,7 @@ function validate(obj        , _schema        )          {
   return true;
 }
 
-function validateForm(form               )         {
+function validateForm(form: HTMLElement[]): Object {
   let valuesWithId = {};
   try {
     const result = form.reduce((result, div) => {
@@ -394,7 +394,7 @@ function validateForm(form               )         {
   return valuesWithId;
 }
 
-function getHeader(obj        )         {
+function getHeader(obj: Object): Object {
   let header = {};
   if (hasKeys(obj, '@type', '@id')) {
     header = {

@@ -42,46 +42,32 @@ exports.orderStringify = orderStringify;
 
 //--------------------------------------------------------------------------------
 
-function isNull(x: any): boolean {
-  return x == null
-};
-
 function isArray(arr: any): boolean {
-  return !isNull(arr) && Array.isArray(arr) && arr.length > 0;
+  return arr != null && Array.isArray(arr) && arr.length > 0;
 }
 
 function isBoolean(bool: any): boolean {
-  return !isNull(bool) && typeof bool === 'boolean';
+  return bool != null && typeof bool === 'boolean';
 }
 
 function isNumber(num: any): boolean {
-  return !isNull(num) && typeof num === 'number';
+  return num != null && typeof num === 'number';
 }
 
 function isObject(obj: any): boolean {
-  return !isNull(obj) && typeof obj === 'object' && obj.constructor === Object && Object.keys(obj).length > 0;
+  return obj != null && obj.constructor === Object && Object.keys(obj).length > 0;
 }
 
 function isString(str: any): boolean {
-  return !isNull(str) && typeof str === 'string' && str.length > 0;
+  return str != null && typeof str === 'string' && str.length > 0;
 }
 
 function isEqual(val1: any, val2: any): boolean {
   return orderStringify(val1) === orderStringify(val2);
 }
 
-function negate(pred: Function): Function {
-  return function(...args) {
-    return !pred(...args);
-  }
-}
-
-function orderObject(obj: Object): Object {
-  return JSON.parse(orderStringify(obj));
-}
-
-function merge(...objs: Object[]): Object {
-  return Object.assign({}, ...objs);
+function arrayFromObject(obj: Object): any[][] {
+  return Object.keys(obj).map((key) => [key, obj[key]]);
 }
 
 function hasKey(obj: Object, key: string): boolean {
@@ -95,10 +81,6 @@ function hasKeys(obj: Object, ...keys: string[]): boolean {
 
 function objectFromArray(arr: any[][]): Object {
   return arr.reduce((result, [key, val]) => merge(result, {[key]: val}), {});
-}
-
-function arrayFromObject(obj: Object): any[][] {
-  return Object.keys(obj).map((key) => [key, obj[key]]);
 }
 
 function recurse(x: any, fn: Function): any {
@@ -118,7 +100,6 @@ function withoutKeys(obj: Object, ...keys: string[]): Object {
   }, {});
 }
 
-exports.isNull = isNull;
 exports.isArray = isArray;
 exports.isBoolean = isBoolean;
 exports.isNumber = isNumber;
@@ -127,7 +108,7 @@ exports.isString = isString;
 
 exports.arrayFromObject = arrayFromObject;
 exports.hasKeys = hasKeys;
-exports.merge = merge;
-exports.orderObject = orderObject;
+exports.objectFromArray = objectFromArray;
+exports.orderStringify = orderStringify;
 exports.recurse = recurse;
 exports.withoutKeys = withoutKeys;

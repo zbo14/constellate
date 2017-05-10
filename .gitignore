@@ -1,5 +1,4 @@
 bundle.*
 .DS_Store
-.flowconfig
 *.log
 node_modules
