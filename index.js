@@ -44,19 +44,19 @@ function listModifiers() {
     remover.textContent = '-';
     remover.addEventListener('click', (event) => {
       event.preventDefault();
-      if (ol.lastChild.nodeName !== 'LI') { return; }
+      if (!ol.children.length) { return; }
       ol.removeChild(ol.lastChild);
     })
-    ol.prepend(remover);
+    form.insertBefore(remover, ol.parentElement);
     const adder = document.createElement('button');
     adder.className = 'adder';
     adder.id = 'adder-' + idx;
     adder.textContent = '+';
     adder.addEventListener('click', (event) => {
       event.preventDefault();
-      ol.appendChild(lis[idx]);
+      ol.appendChild(lis[idx].cloneNode(true));
     });
-    ol.prepend(adder);
+    form.insertBefore(adder, remover);
   });
 }
 
@@ -66,17 +66,17 @@ select.addEventListener('change', () => {
   switch(select.value) {
     case 'artist':
       generateKeypair.hidden = false;
-      _schema = schema.artist;
+      _schema = schema.Artist;
       break;
     case 'organization':
       generateKeypair.hidden = false;
-      _schema = schema.organization;
+      _schema = schema.Organization;
       break;
     case 'composition':
-      _schema = schema.composition;
+      _schema = schema.Composition;
       break;
     case 'recording':
-      _schema = schema.recording;
+      _schema = schema.Recording;
       break;
     default:
       console.error('unexpected type:', select.value);
@@ -87,15 +87,34 @@ select.addEventListener('change', () => {
   listModifiers();
 }, false);
 
+function includeElement(elem) {
+  switch (elem.nodeName) {
+    case 'INPUT':
+      if (elem.type === 'text' && !elem.value) { return false; }
+      return true;
+    case 'FIELDSET':
+      if (!elem.children.length) { return false; }
+      return Array.from(elem.children).map((div) => {
+        if (!div.children.length) { return false; }
+        return includeElement(div.lastChild);
+      }).every((bool) => bool);
+    case 'OL':
+      if (!elem.children.length) { return false; }
+      return Array.from(elem.children).map((li) => {
+        if (!li.children.length) { return false; }
+        return includeElement(li.firstChild);
+      }).every((bool) => bool);
+    case 'SELECT':
+      return true;
+    default:
+      return false;
+  }
+}
+
 form.addEventListener('submit', (event) => {
   event.preventDefault();
-  const divs = Array.from(form.children).slice(0, -1).filter((div) => {
-    const elem = div.children[1];
-    if (elem.nodeName === 'OL') {
-      if (elem.lastChild.nodeName !== 'LI') { return false; }
-    }
-    //..
-    return true;
+  const divs = Array.from(form.children).filter((div) => {
+    return div.nodeName === 'DIV' && includeElement(div.lastChild);
   });
   pre.textContent = JSON.stringify(spec.validateForm(divs), null, 2);
 }, false);

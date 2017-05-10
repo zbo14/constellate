@@ -11,15 +11,9 @@ const Ajv = require('ajv');
 const ajv = new Ajv();
 
 const context = {
-  type: 'object',
-  properties: {
-    '@vocab': {
-      default: 'http://schema.org',
-      type: 'string'
-    }
-  },
-  readonly: true,
-  required: ['@vocab']
+  default: 'http://schema.org/',
+  type: 'string',
+  readonly: true
 }
 
 const draft = 'http://json-schema.org/draft-06/schema#';
@@ -28,13 +22,33 @@ function validate(obj: Object, schema: Object): boolean {
   return ajv.compile(schema)(obj);
 }
 
-const id = {
-  default: 'null',
-  type: 'string',
-  pattern: '^[A-Za-z0-9-_]{43}$|^null$'
+function hideFields(obj: Object, ...keys: string[]): Object {
+  return keys.reduce((result, key) => {
+    if (!result.properties.hasOwnProperty(key) || !result.properties[key]) { return result; }
+    return Object.assign({}, result , {
+      properties: Object.assign({}, result.properties, {
+        [key]: Object.assign({}, result.properties[key], { readonly: true })
+      })
+    });
+  }, obj);
 }
 
-const required = ['@context', '@type', '@id']
+function hideId(obj: Object): Object {
+  return hideFields(obj, '@id');
+}
+
+function requireFields(obj: Object, ...keys: string[]): Object {
+  return Object.assign({}, obj, { required: keys });
+}
+
+function requireHeader(obj: Object): Object {
+  return requireFields(obj, '@type', '@id');
+}
+
+const id = {
+  type: 'string',
+  pattern: '^[A-Za-z0-9-_]{43}$'
+}
 
 const url = {
   type: 'string',
@@ -44,7 +58,7 @@ const url = {
 
 const artist = {
   $schema: draft,
-  title: 'artist',
+  title: 'Artist',
   type: 'object',
   properties: {
     '@context': context,
@@ -57,10 +71,10 @@ const artist = {
       pattern: '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'
       // /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
     },
-    // isni: {
-    //  type: 'string',
-    //  pattern: '^[0-9]{15}[0-9X]$'
-    // },
+    isni: {
+      type: 'string',
+      pattern: '^[0-9]{15}[0-9X]$'
+    },
     name: {
       type: 'string'
     },
@@ -75,13 +89,14 @@ const artist = {
       uniqueItems: true
     },
     url: url
-  },
-  required: required
+  }
 }
+
+const artistHeader = requireHeader(artist);
 
 const organization = {
   $schema: draft,
-  title: 'organization',
+  title: 'Organization',
   type: 'object',
   properties: {
     '@context': context,
@@ -108,13 +123,14 @@ const organization = {
       uniqueItems: true
     },
     url: url
-  },
-  required: required
+  }
 }
+
+const organizationHeader = requireHeader(organization);
 
 const composition = {
   $schema: draft,
-  title: 'composition',
+  title: 'Composition',
   type: 'object',
   properties: {
     '@context': context,
@@ -125,13 +141,13 @@ const composition = {
     '@id': id,
     arranger: {
       type: 'array',
-      items: artist,
+      items: artistHeader,
       minItems: 1,
       uniqueItems: true
     },
     composer: {
       type: 'array',
-      items: artist,
+      items: artistHeader,
       minItems: 1,
       uniqueItems: true
     },
@@ -141,13 +157,13 @@ const composition = {
     },
     lyricist: {
       type: 'array',
-      items: artist,
+      items: artistHeader,
       minItems: 1,
       uniqueItems: true
     },
     publisher: {
       type: 'array',
-      items: organization,
+      items: organizationHeader,
       minItems: 1,
       uniqueItems: true
     },
@@ -161,13 +177,14 @@ const composition = {
       type: 'string'
     },
     url: url
-  },
-  required: required
+  }
 }
+
+const compositionHeader = requireHeader(composition);
 
 const recording = {
   $schema: draft,
-  title: 'recording',
+  title: 'Recording',
   type: 'object',
   properties: {
     '@context': context,
@@ -182,31 +199,32 @@ const recording = {
     },
     performer: {
       type: 'array',
-      items: artist,
+      items:  artistHeader,
       minItems: 1,
       uniqueItems: true
     },
     producer: {
       type: 'array',
-      items: artist,
+      items: artistHeader,
       minItems: 1,
       uniqueItems: true
     },
-    recordingOf: composition,
+    recordingOf: compositionHeader,
     recordLabel: {
       type: 'array',
-      items: organization,
+      items: organizationHeader,
       minItems: 1,
       uniqueItems: true
     },
     url: url
-  },
-  required: required
+  }
 }
+
+const recordingHeader = requireHeader(recording);
 
 const album = {
   $schema: draft,
-  title: 'album',
+  title: 'Album',
   type: 'object',
   properties: {
     '@context': context,
@@ -215,24 +233,53 @@ const album = {
       readonly: true
     },
     '@id': id,
+    byArtist: artistHeader,
     track: {
       type: 'array',
-      items: recording,
+      items: recordingHeader,
       minItems: 1,
       uniqueItems: true
-    }
-  },
-  required: required
+    },
+    url: url
+  }
 }
+
+const Artist = requireFields(
+  hideId(artist),
+  '@context', '@type', '@id',
+  'email', 'name'
+);
+
+const Organization = requireFields(
+  hideId(organization),
+  '@context', '@type', '@id',
+  'email', 'name', 'url'
+);
+
+const Composition = requireFields(
+  hideId(composition),
+  '@context', '@type', '@id',
+  'composer', 'title', 'url'
+);
+
+const Recording = requireFields(
+  hideId(recording),
+  '@context', '@type', '@id',
+  'performer', 'producer', 'recordingOf', 'url'
+);
+
+const Album = requireFields(
+  hideId(album),
+  '@context', '@type', '@id',
+  'byArtist', 'track', 'url'
+);
 
 exports.context = context;
 exports.draft = draft;
-
-exports.artist = artist
-exports.organization = organization;
-
-exports.composition= composition;
-exports.recording = recording;
-// exports.album = album;
-
 exports.validate = validate;
+
+exports.Artist = Artist
+exports.Organization = Organization;
+exports.Composition= Composition;
+exports.Recording = Recording;
+exports.Album = Album;

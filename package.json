@@ -50,17 +50,13 @@
     "gulp-sourcemaps": "^2.6.0",
     "gulp-uglify": "^2.1.2",
     "gulp-util": "^3.0.8",
-    "http-server": "^0.10.0",
     "js-sha3": "^0.5.7",
     "mocha": "^3.2.0",
     "node-fetch": "^1.6.3",
-    "qrcode": "^0.8.1",
-    "qrcode-reader": "^1.0.0",
     "request": "^2.81.0",
     "unflowify": "^1.0.1",
     "urlsafe-base64": "^1.0.0",
     "vinyl-buffer": "^1.0.0",
-    "vinyl-source-stream": "^1.1.0",
-    "wrtc": "0.0.62"
+    "vinyl-source-stream": "^1.1.0"
   }
 }

@@ -40,13 +40,13 @@ const lyricist = spec.setId({
   url: 'http://lyricist.com'
 });
 
-const performer = spec.setId({
+const perspecer = spec.setId({
   '@context': context,
   '@type': 'MusicGroup',
-  email: 'performer@email.com',
-  name: 'performer',
+  email: 'perspecer@email.com',
+  name: 'perspecer',
   sameAs: ['http://bandcamp-page.com'],
-  url: 'http://performer.com'
+  url: 'http://perspecer.com'
 });
 
 const producer = spec.setId({
@@ -88,7 +88,7 @@ const composition = spec.setId({
 const recording = spec.setId({
   '@context': context,
   '@type': 'MusicRecording',
-  performer: getHeaders(performer),
+  perspecer: getHeaders(perspecer),
   producer: getHeaders(producer),
   recordingOf: spec.getHeader(composition),
   recordLabel: getHeaders(recordLabel),
