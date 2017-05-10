@@ -10,9 +10,7 @@ const keypair = generateKeypairFromPassword('passwerd');
 
 const getHeaders = (...objs) => objs.map(spec.getHeader);
 
-const context = {
-  '@vocab': 'http://schema.org'
-}
+const context = 'http://schema.org/';
 
 const arranger = spec.setId({
   '@context': context,
@@ -88,7 +86,7 @@ const composition = spec.setId({
 const recording = spec.setId({
   '@context': context,
   '@type': 'MusicRecording',
-  perspecer: getHeaders(perspecer),
+  performer: getHeaders(perspecer),
   producer: getHeaders(producer),
   recordingOf: spec.getHeader(composition),
   recordLabel: getHeaders(recordLabel),
@@ -98,25 +96,25 @@ const recording = spec.setId({
 describe('Spec', () => {
     it('validates an artist', () => {
       assert(
-        spec.validate(composer, schema.artist),
+        spec.validate(composer, schema.Artist),
         'should validate user'
       );
     });
     it('validates an organization', () => {
       assert(
-        spec.validate(recordLabel, schema.organization),
+        spec.validate(recordLabel, schema.Organization),
         'should validate an organization'
       );
     });
     it('validates a composition', () => {
       assert(
-        spec.validate(composition, schema.composition),
+        spec.validate(composition, schema.Composition),
         'should validate composition'
       );
     });
     it('validates a recording', () => {
       assert(
-        spec.validate(recording, schema.recording),
+        spec.validate(recording, schema.Recording),
         'should validate recording'
       );
     });
