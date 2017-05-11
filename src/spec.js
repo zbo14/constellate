@@ -134,10 +134,10 @@ function parseElement(elem: HTMLElement): Object {
       }
       const firstChild: HTMLElement = (li.firstChild: any);
       return {
-        'type': 'array',
-        'items': parseElement(firstChild),
-        'minItems': 1,
-        'uniqueItems': true
+        type: 'array',
+        items: parseElement(firstChild),
+        minItems: 1,
+        uniqueItems: true
       }
     case 'SELECT':
       if (!elem.children.length) {
@@ -178,7 +178,7 @@ function getAttributes(elem: HTMLElement, obj: Object): Object {
   });
 }
 
-function setAttribute(elem: HTMLInputElement, key: string, val: any): HTMLElement {
+function setAttribute(elem: HTMLInputElement, key: string, val?: string): HTMLElement {
   switch(key) {
     case 'default':
       elem.defaultValue = val;
@@ -187,11 +187,14 @@ function setAttribute(elem: HTMLInputElement, key: string, val: any): HTMLElemen
       elem.pattern = val;
       break;
     case 'readonly':
-      elem.disabled = val;
-      elem.hidden = val;
+      elem.disabled = true;
+      elem.hidden = true;
       break;
     case 'required':
-      elem.required = val;
+      elem.required = true;
+      if (!elem.hasAttribute('required')) {
+        elem.setAttribute('required', true);
+      }
       break;
   }
   return elem;
@@ -228,8 +231,10 @@ function generateForm(_schema: Object): HTMLElement[] {
       const elem = arrayFromObject(obj).reduce((result, [k, v]) => {
         return setAttribute(result, k, v);
       }, generateElement(obj, defs));
-      if (!isArray(reqs) || !reqs.includes(key)) { return elem; }
-      return setAttribute(elem, 'required', true);
+      if (!isArray(reqs) || !reqs.includes(key)) {
+        return elem;
+      }
+      return setAttribute(elem, 'required');
     });
     form = Object.keys(elems).reduce((result, key) => {
       if (elems[key] == null) { return result; }
@@ -248,7 +253,10 @@ function generateForm(_schema: Object): HTMLElement[] {
 }
 
 function addRequired(reqs: string[], elem: HTMLElement, label: HTMLElement): string[] {
-    if (!elem.hasAttribute('required')) { return reqs; }
+    if (!elem.hasAttribute('required')) {
+      console.log(elem);
+      return reqs;
+    }
     return reqs.concat(label.textContent);
   }
 
@@ -327,7 +335,7 @@ function parseForm(form: HTMLElement[]): Object  {
 
 function setId(obj: Object): Object {
    return Object.assign({}, obj, {
-     '@id': digestBase64(JSON.parse(orderStringify(withoutKeys(obj, '@id'))))
+     '@id': digestBase64(orderStringify(withoutKeys(obj, '@id')))
    });
  }
 
@@ -386,6 +394,7 @@ function validateForm(form: HTMLElement[]): Object {
         },
         values: {}
     });
+    console.log(result.schema.required);
     valuesWithId = setId(result.values);
     validate(valuesWithId, result.schema);
   } catch(err) {

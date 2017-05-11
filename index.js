@@ -1,11 +1,9 @@
-// const crypto = require('./lib/crypto.js');
 const schema = require('./lib/schema.js');
 const spec = require('./lib/spec.js');
 const util = require('./lib/util.js');
 
 const button = document.querySelector('button');
 const form = document.querySelector('form');
-// const generateKeypair = document.getElementById('generate-keypair');
 const ols = document.getElementsByTagName('ol');
 const password = document.querySelector('input[type="password"]');
 const pre = document.querySelector('pre');
@@ -14,24 +12,6 @@ let _schema;
 const select = document.querySelector('select');
 const submit = document.createElement('input');
 submit.type = 'submit';
-
-/*
-button.addEventListener('click', () => {
-  if (password.value == null) {
-    console.error('password required to generate keypair');
-    return;
-  }
-  const keypair = crypto.generateKeypairFromPassword(password.value);
-  if (keypair == null) {
-    console.error('failed to generate keypair');
-    return;
-  }
-  pre.textContent = JSON.stringify({
-    privateKey: util.encode_base58(keypair.privateKey),
-    publicKey: util.encode_base58(keypair.publicKey)
-  });
-})
-*/
 
 function listModifiers() {
   const lis = Array.from(document.getElementsByTagName('li')).map((li) => {
@@ -62,14 +42,11 @@ function listModifiers() {
 
 select.addEventListener('change', () => {
   form.innerHTML = null;
-  // generateKeypair.hidden = true;
   switch(select.value) {
     case 'artist':
-      // generateKeypair.hidden = false;
       _schema = schema.Artist;
       break;
     case 'organization':
-      // generateKeypair.hidden = false;
       _schema = schema.Organization;
       break;
     case 'composition':
@@ -90,21 +67,42 @@ select.addEventListener('change', () => {
   listModifiers();
 }, false);
 
-function includeElement(elem) {
+function includeElement(div) {
+  const elem = div.lastChild;
+  const label = div.firstChild;
+  if (elem == null || label == null) {
+    return false;
+  }
   switch (elem.nodeName) {
     case 'INPUT':
-      if (elem.type === 'text' && !elem.value) { return false; }
+      if (elem.type === 'text' && !elem.value) {
+        return false;
+      }
       return true;
     case 'FIELDSET':
-      if (!elem.children.length) { return false; }
+      if (!elem.children.length) {
+        return false;
+      }
       return Array.from(elem.children).map((div) => {
-        if (!div.children.length) { return false; }
+        if (!div.children.length) {
+          if (!elem.hasAttribute('required')) {
+            return false;
+          }
+          throw new Error(label.textContent + ' is required');
+        }
         return includeElement(div.lastChild);
       }).every((bool) => bool);
     case 'OL':
-      if (!elem.children.length) { return false; }
+      if (!elem.children.length) {
+        if (!elem.hasAttribute('required')) {
+          return false;
+        }
+        throw new Error(label.textContent + ' is required');
+      }
       return Array.from(elem.children).map((li) => {
-        if (!li.children.length) { return false; }
+        if (!li.children.length) {
+          return false;
+        }
         return includeElement(li.firstChild);
       }).every((bool) => bool);
     case 'SELECT':
@@ -115,9 +113,15 @@ function includeElement(elem) {
 }
 
 form.addEventListener('submit', (event) => {
-  event.preventDefault();
-  const divs = Array.from(form.children).filter((div) => {
-    return div.nodeName === 'DIV' && includeElement(div.lastChild);
-  });
-  pre.textContent = JSON.stringify(spec.validateForm(divs), null, 2);
+  try {
+    event.preventDefault();
+    const divs = Array.from(form.children).filter((div) => {
+      return div.nodeName === 'DIV'
+             && div.children.length === 2
+             && includeElement(div);
+    });
+    pre.textContent = JSON.stringify(spec.validateForm(divs), null, 2);
+  } catch(err) {
+    console.error(err);
+  }
 }, false);

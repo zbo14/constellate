@@ -1,7 +1,6 @@
 'use strict';
 
 const bs58 = require('bs58');
-const Buffer = require('buffer/').Buffer;
 const sha3_256 = require('js-sha3').sha3_256;
 const urlsafeBase64  = require('urlsafe-base64');
 
@@ -15,9 +14,12 @@ function clone(obj: Object): Object {
   return JSON.parse(JSON.stringify(obj));
 }
 
-function digestBase64(obj: Object): string {
-  let ab = sha3_256.buffer(orderStringify(obj));
-  return urlsafeBase64.encode(Buffer.from(ab)).toString('utf-8', 0, 3);
+function sha3Buffer(str: string): Buffer {
+  return Buffer.from(sha3_256.buffer(str));
+}
+
+function digestBase64(str: string): string {
+  return urlsafeBase64.encode(sha3Buffer(str)).toString('utf-8', 0, 3);
 }
 
 function encodeBase58(key: Buffer): string {
@@ -39,6 +41,7 @@ exports.encodeBase58 = encodeBase58;
 exports.digestBase64 = digestBase64;
 exports.clone = clone;
 exports.orderStringify = orderStringify;
+exports.sha3Buffer = sha3Buffer;
 
 //--------------------------------------------------------------------------------
 
@@ -71,7 +74,7 @@ function arrayFromObject(obj: Object): any[][] {
 }
 
 function hasKey(obj: Object, key: string): boolean {
-  return obj.hasOwnProperty(key) && !isNull(obj[key]);
+  return obj.hasOwnProperty(key) && obj[key] != null;
 }
 
 function hasKeys(obj: Object, ...keys: string[]): boolean {
@@ -80,7 +83,7 @@ function hasKeys(obj: Object, ...keys: string[]): boolean {
 }
 
 function objectFromArray(arr: any[][]): Object {
-  return arr.reduce((result, [key, val]) => merge(result, {[key]: val}), {});
+  return arr.reduce((result, [key, val]) => Object.assign({}, result, {[key]: val}), {});
 }
 
 function recurse(x: any, fn: Function): any {
@@ -88,7 +91,7 @@ function recurse(x: any, fn: Function): any {
     return x.map((y) => recurse(fn(y), fn));
   }
   if (isObject(x)) {
-    return merge(...Object.keys(x).map((k) => objectFromArray([[k, recurse(fn(x[k], k), fn)]])));
+    return Object.assign({}, ...Object.keys(x).map((k) => objectFromArray([[k, recurse(fn(x[k], k), fn)]])));
   }
   return x;
 }
@@ -96,7 +99,7 @@ function recurse(x: any, fn: Function): any {
 function withoutKeys(obj: Object, ...keys: string[]): Object {
   return Object.keys(obj).reduce((result, key) => {
     if (keys.includes(key)) { return result; }
-    return merge(result, objectFromArray([[key, obj[key]]]));
+    return Object.assign({}, result, objectFromArray([[key, obj[key]]]));
   }, {});
 }
 

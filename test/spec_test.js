@@ -1,83 +1,92 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
+import { Artist, Organization, Composition, Recording, Album } from '../lib/schema.js';
+import { getHeader, setId, validate } from '../lib/spec.js';
 import { encodeBase58, orderStringify } from '../lib/util.js';
-import { generateKeypairFromPassword } from '../lib/crypto.js';
 
-const schema = require('../lib/schema.js');
-const spec = require('../lib/spec.js');
+const getHeaders = (...objs) => objs.map(getHeader);
 
-const keypair = generateKeypairFromPassword('passwerd');
+const artistContext = {
+  schema: 'http://schema.org/',
+  homepage: 'schema:url',
+  profile: 'schema:sameAs'
+}
 
-const getHeaders = (...objs) => objs.map(spec.getHeader);
+const organizationContext = {
+  schema: 'http://schema.org/',
+  homepage: 'schema:url',
+  profile: 'schema:sameAs'
+}
 
-/*
-const arranger = spec.setId({
-  '@context': schema.vocabURL,
+const compositionContext = {
+  schema: 'http://schema.org/',
+  title: 'schema:name'
+}
+
+const recordingContext = {
+  schema: 'http://schema.org/',
+  performer: 'schema:performer'
+}
+
+const albumContext = {
+  schema: 'http://schema.org/',
+  artist: 'schema:byArtist',
+  recordLabel: 'schema:recordLabel'
+}
+
+const composer = setId({
+  '@context': artistContext,
   '@type': 'Person',
-  email: 'arranger@email.com',
-  name: 'arranger',
-  url: 'http://arranger.com'
-});
-*/
-
-const composer = spec.setId({
-  '@context': schema.vocabURL,
-  '@type': 'Person',
-  email: 'composer@email.com',
+  email: 'composer@example.com',
+  homepage: 'http://composer.com',
   name: 'composer',
-  publicKey: encodeBase58(keypair.publicKey),
-  sameAs: ['http://facebook-profile.com'],
-  url: 'http://composer.com'
+  profile: ['http://facebook-profile.com']
 });
 
-const lyricist = spec.setId({
-  '@context': schema.vocabURL,
+const lyricist = setId({
+  '@context': artistContext,
   '@type': 'Person',
-  email: 'lyricist@email.com',
-  name: 'lyricist',
-  url: 'http://lyricist.com'
+  email: 'lyricist@example.com',
+  homepage: 'http://lyricist.com',
+  name: 'lyricist'
 });
 
-const performer = spec.setId({
-  '@context': schema.vocabURL,
+const performer = setId({
+  '@context': artistContext,
   '@type': 'MusicGroup',
-  email: 'performer@email.com',
+  email: 'performer@example.com',
+  homepage: 'http://performer.com',
   name: 'performer',
-  sameAs: ['http://bandcamp-page.com'],
-  url: 'http://performer.com'
+  profile: ['http://bandcamp-page.com']
 });
 
-const producer = spec.setId({
-  '@context': schema.vocabURL,
+const producer = setId({
+  '@context': artistContext,
   '@type': 'Person',
+  homepage: 'http://producer.com',
   name: 'producer',
-  sameAs: ['http://soundcloud-page.com'],
-  url: 'http://producer.com'
+  profile: ['http://soundcloud-page.com']
 });
 
-const publisher = spec.setId({
-  '@context': schema.vocabURL,
+const publisher = setId({
+  '@context': organizationContext,
   '@type': 'Organization',
-  email: 'publisher@email.com',
-  name: 'publisher',
-  url: 'http://publisher.com'
+  email: 'publisher@example.com',
+  homepage: 'http://publisher.com',
+  name: 'publisher'
 });
 
-const recordLabel = spec.setId({
-  '@context': schema.vocabURL,
+const recordLabel = setId({
+  '@context': organizationContext,
   '@type': 'Organization',
-  email: 'recordLabel@email.com',
-  name: 'recordLabel',
-  url: 'http://recordLabel.com'
+  email: 'recordLabel@example.com',
+  homepage: 'http://recordLabel.com',
+  name: 'recordLabel'
 });
 
-const composition = spec.setId({
-  '@context': {
-    '@vocab': schema.vocabURL,
-    title: schema.titleURL
-  },
+const composition = setId({
+  '@context': compositionContext,
   '@type': 'MusicComposition',
-  // arranger: getHeaders(arranger),
   composer: getHeaders(composer),
   iswcCode: 'T-034.524.680-1',
   lyricist: getHeaders(lyricist),
@@ -86,23 +95,21 @@ const composition = spec.setId({
   url: 'http://composition.com'
 });
 
-const recording = spec.setId({
-  '@context': {
-    '@vocab': schema.vocabURL,
-    performer: schema.performerURL
-  },
+const recording = setId({
+  '@context': recordingContext,
   '@type': 'MusicRecording',
   performer: getHeaders(performer),
   producer: getHeaders(producer),
-  recordingOf: spec.getHeader(composition),
+  recordingOf: getHeader(composition),
   recordLabel: getHeaders(recordLabel),
   url: 'http://recording.com'
 });
 
-const album = spec.setId({
-  '@context': schema.vocabURL,
+const album = setId({
+  '@context': albumContext,
   '@type': 'MusicAlbum',
-  byArtist: performer,
+  artist: getHeaders(performer, producer),
+  recordLabel: getHeaders(recordLabel),
   track: getHeaders(recording),
   url: 'http://album.com'
 });
@@ -110,31 +117,31 @@ const album = spec.setId({
 describe('Spec', () => {
     it('validates an artist', () => {
       assert(
-        spec.validate(composer, schema.Artist),
+        validate(composer, Artist),
         'should validate user'
       );
     });
     it('validates an organization', () => {
       assert(
-        spec.validate(recordLabel, schema.Organization),
+        validate(recordLabel, Organization),
         'should validate an organization'
       );
     });
     it('validates a composition', () => {
       assert(
-        spec.validate(composition, schema.Composition),
+        validate(composition, Composition),
         'should validate composition'
       );
     });
     it('validates a recording', () => {
       assert(
-        spec.validate(recording, schema.Recording),
+        validate(recording, Recording),
         'should validate recording'
       );
     });
     it('validates an album', () => {
       assert(
-        spec.validate(album, schema.Album),
+        validate(album, Album),
         'should validate album'
       );
     });
