@@ -6,7 +6,7 @@ const button = document.querySelector('button');
 const form = document.querySelector('form');
 const ols = document.getElementsByTagName('ol');
 const password = document.querySelector('input[type="password"]');
-const pre = document.querySelector('pre');
+const p = document.querySelector('p');
 
 let _schema;
 const select = document.querySelector('select');
@@ -24,8 +24,10 @@ function listModifiers() {
     remover.textContent = '-';
     remover.addEventListener('click', (event) => {
       event.preventDefault();
-      if (!ol.children.length) { return; }
-      if (ol.hasAttribute('required') && ol.children.length === 1) {
+      if (!ol.children.length) return;
+      if (ol.hasAttribute('required')
+          && ol.hasAttribute('minimum')
+          && parseInt(ol.attributes.minimum.value) === ol.children.length) {
         const label = ol.previousElementSibling;
         alert(label.textContent + ' is required');
         return;
@@ -70,7 +72,7 @@ select.addEventListener('change', () => {
   spec.generateForm(_schema).forEach((div) => form.appendChild(div));
   form.appendChild(submit);
   listModifiers();
-  pre.textContent = null;
+  p.textContent = null;
 }, false);
 
 function includeElement(elem, label) {
@@ -121,7 +123,7 @@ form.addEventListener('submit', (event) => {
              && div.children.length === 2
              && includeElement(div.lastChild, div.firstChild);
     });
-    pre.textContent = JSON.stringify(spec.validateForm(divs), null, 2);
+    p.textContent = JSON.stringify(spec.validateForm(divs), null, 2);
   } catch(err) {
     console.error(err);
   }

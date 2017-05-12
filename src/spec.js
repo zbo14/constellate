@@ -55,7 +55,7 @@ function generateElement(obj: Object, defs: Object): HTMLElement {
         return newInput('text');
       default:
         const def = definition(obj, defs);
-        if (isObject(def)) { return generateElement(def, defs); }
+        if (isObject(def)) return generateElement(def, defs);
     }
     throw new Error('unexpected type: ' + obj.type);
 }
@@ -136,8 +136,8 @@ function parseElement(elem: HTMLElement): Object {
       return {
         type: 'array',
         items: parseElement(firstChild),
-        minItems: 1,
-        uniqueItems: true
+        minItems: parseInt(elem.attributes.minimum.value),
+        uniqueItems: elem.hasAttribute('unique')
       }
     case 'SELECT':
       if (!elem.children.length) {
@@ -154,14 +154,18 @@ function parseElement(elem: HTMLElement): Object {
 }
 
 function getAttributes(elem: HTMLElement, obj: Object): Object {
-  if (elem.attributes == null) { return obj; }
+  if (elem.attributes == null) return obj;
   const result = Array.from(elem.attributes).reduce((result, attr) => {
     switch(attr.name) {
       case 'disabled':
       case 'hidden':
         return Object.assign({}, result, { readonly: true });
+      case 'minimum':
+        return Object.assign({}, result, { minItems: parseInt(attr.value) });
       case 'pattern':
         return Object.assign({}, result, { pattern: attr.textContent });
+      case 'unique':
+        return Object.assign({}, result, { uniqueItems: true });
       case 'value':
         return Object.assign({}, result, { default: attr.textContent });
       //..
@@ -169,7 +173,7 @@ function getAttributes(elem: HTMLElement, obj: Object): Object {
         return result;
     }
   }, obj);
-  if (elem.nodeName !== 'SELECT') { return result; }
+  if (elem.nodeName !== 'SELECT') return result;
   return Object.assign({}, result, {
     enum: Array.from(elem.children).map((child) => {
       const option: HTMLOptionElement = (child: any);
@@ -178,10 +182,13 @@ function getAttributes(elem: HTMLElement, obj: Object): Object {
   });
 }
 
-function setAttribute(elem: HTMLInputElement, key: string, val?: string): HTMLElement {
+function setAttribute(elem: HTMLElement, key: string, val?: number|string): HTMLElement {
   switch(key) {
     case 'default':
       elem.defaultValue = val;
+      break;
+    case 'minItems':
+      elem.setAttribute('minimum', val);
       break;
     case 'pattern':
       elem.pattern = val;
@@ -195,6 +202,9 @@ function setAttribute(elem: HTMLInputElement, key: string, val?: string): HTMLEl
       if (!elem.hasAttribute('required')) {
         elem.setAttribute('required', true);
       }
+      break;
+    case 'uniqueItems':
+      elem.setAttribute('unique', true);
       break;
   }
   return elem;
@@ -212,8 +222,8 @@ function definition(obj: Object, defs: Object): Object {
 }
 
 function isDescendant(parent: HTMLElement, child: HTMLElement): boolean {
-  if (child == null) { return false; }
-  if (parent == child) { return true; }
+  if (child == null) return false;
+  if (parent == child) return true;
   const _parent: HTMLElement = (child.parentElement: any);
   return isDescendant(parent, _parent);
 }
@@ -231,17 +241,15 @@ function generateForm(_schema: Object): HTMLElement[] {
       const elem = arrayFromObject(obj).reduce((result, [k, v]) => {
         return setAttribute(result, k, v);
       }, generateElement(obj, defs));
-      if (!isArray(reqs) || !reqs.includes(key)) {
-        return elem;
-      }
+      if (!isArray(reqs) || !reqs.includes(key)) return elem;
       return setAttribute(elem, 'required');
     });
     form = Object.keys(elems).reduce((result, key) => {
-      if (elems[key] == null) { return result; }
+      if (elems[key] == null) return result;
       const div = document.createElement('div');
       const label = document.createElement('label');
       label.textContent = key;
-      if (elems[key].hasAttribute('hidden')) { label.hidden = true; }
+      if (elems[key].hasAttribute('hidden')) label.hidden = true;
       div.appendChild(label);
       div.appendChild(elems[key]);
       return result.concat(div);
@@ -253,16 +261,13 @@ function generateForm(_schema: Object): HTMLElement[] {
 }
 
 function addRequired(reqs: string[], elem: HTMLElement, label: HTMLElement): string[] {
-    if (!elem.hasAttribute('required')) {
-      console.log(elem);
-      return reqs;
-    }
+    if (!elem.hasAttribute('required')) return reqs;
     return reqs.concat(label.textContent);
   }
 
 function addValue(obj: Object, elem: HTMLElement, label: HTMLElement): Object {
   const val = evalElement(elem);
-  if (val == null || (isArray(val) && val.some((x) => x == null))) { return obj; }
+  if (val == null || (isArray(val) && val.some((x) => x == null))) return obj;
   return Object.assign({}, obj, { [label.textContent]: val } );
 }
 
@@ -372,7 +377,6 @@ function validateForm(form: HTMLElement[]): Object {
         throw new Error('expected label; got ' + label.nodeName);
       }
       const elem = children[1];
-      console.log(elem);
       const obj = parseElement(elem);
       if (!isObject(obj)) {
         throw new Error('expected non-empty object; got ' + JSON.stringify(obj));
@@ -389,13 +393,12 @@ function validateForm(form: HTMLElement[]): Object {
       });
     }, {
         schema: {
+          type: 'object',
           properties: {},
-          required: [],
-          type: 'object'
+          required: []
         },
         values: {}
     });
-    console.log(result.schema.required);
     valuesWithId = setId(result.values);
     validate(valuesWithId, result.schema);
   } catch(err) {
