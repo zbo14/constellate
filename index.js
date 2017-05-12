@@ -25,6 +25,11 @@ function listModifiers() {
     remover.addEventListener('click', (event) => {
       event.preventDefault();
       if (!ol.children.length) { return; }
+      if (ol.hasAttribute('required') && ol.children.length === 1) {
+        const label = ol.previousElementSibling;
+        alert(label.textContent + ' is required');
+        return;
+      }
       ol.removeChild(ol.lastChild);
     })
     form.insertBefore(remover, ol.parentElement);
@@ -65,14 +70,10 @@ select.addEventListener('change', () => {
   spec.generateForm(_schema).forEach((div) => form.appendChild(div));
   form.appendChild(submit);
   listModifiers();
+  pre.textContent = null;
 }, false);
 
-function includeElement(div) {
-  const elem = div.lastChild;
-  const label = div.firstChild;
-  if (elem == null || label == null) {
-    return false;
-  }
+function includeElement(elem, label) {
   switch (elem.nodeName) {
     case 'INPUT':
       if (elem.type === 'text' && !elem.value) {
@@ -118,7 +119,7 @@ form.addEventListener('submit', (event) => {
     const divs = Array.from(form.children).filter((div) => {
       return div.nodeName === 'DIV'
              && div.children.length === 2
-             && includeElement(div);
+             && includeElement(div.lastChild, div.firstChild);
     });
     pre.textContent = JSON.stringify(spec.validateForm(divs), null, 2);
   } catch(err) {

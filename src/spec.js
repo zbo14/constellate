@@ -372,6 +372,7 @@ function validateForm(form: HTMLElement[]): Object {
         throw new Error('expected label; got ' + label.nodeName);
       }
       const elem = children[1];
+      console.log(elem);
       const obj = parseElement(elem);
       if (!isObject(obj)) {
         throw new Error('expected non-empty object; got ' + JSON.stringify(obj));
