@@ -37,11 +37,29 @@ function orderStringify(obj: Object, space?: number): string {
   return JSON.stringify(obj, keys.sort(), space);
 }
 
+function stringToUint8(str: string): Uint8Array {
+  const ab = new ArrayBuffer(str.length);
+  const uint8 = new Uint8Array(ab);
+  Array.from(uint8).forEach((_, i) => {
+		uint8[i] = str.charCodeAt(i);
+	});
+  return uint8;
+}
+
+function stringFromUint8(uint8: Uint8Array): string {
+  return Array.from(uint8).reduce((result, x) => {
+    result += String.fromCharCode(x);
+    return result;
+  }, '');
+}
+
 exports.encodeBase58 = encodeBase58;
 exports.digestBase64 = digestBase64;
 exports.clone = clone;
 exports.orderStringify = orderStringify;
 exports.sha3Buffer = sha3Buffer;
+exports.stringFromUint8 = stringFromUint8
+exports.stringToUint8 = stringToUint8;
 
 //--------------------------------------------------------------------------------
 

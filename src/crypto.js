@@ -2,9 +2,12 @@
 
 const atob = require('atob');
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
 const Buffer = require('buffer/').Buffer;
-const ed25519 = require('ed25519');
+const crypto = require('crypto');
+const nacl = require('tweetnacl');
+const util = require('../lib/util.js');
+
+const { stringToUint8 } = util;
 
 // @flow
 
@@ -14,6 +17,22 @@ const ed25519 = require('ed25519');
 
 const saltRounds = 10;
 
+function generateKeypairFromPassword(password: string): Object {
+  const secret = generateSecret(password);
+  return generateKeypairFromSeed(secret);
+}
+
+function generateKeypairFromSeed(seed: ?Buffer): Object {
+  if (seed == null || seed.length !== 32) {
+    seed = crypto.randomBytes(32);
+  };
+  return nacl.sign.keyPair.fromSeed(seed);
+}
+
+function generateRandomKeypair(): Object {
+  return nacl.sign.keyPair();
+}
+
 function generateSecret(password: string): Buffer {
   const salt = bcrypt.genSaltSync(saltRounds);
   const hash = bcrypt.hashSync(password, salt)
@@ -21,33 +40,16 @@ function generateSecret(password: string): Buffer {
   return new Buffer(atob(hash).slice(-32), 'ascii');
 }
 
-function generateSeed(): Buffer {
-  return crypto.randomBytes(32);
+function signMessage(message: string, secretKey: Uint8Array): Object {
+  return nacl.sign.detached(stringToUint8(message), secretKey);
 }
 
-function generateKeypairFromSeed(seed: ?Buffer): Object {
-  if (seed == null || seed.length !== 32) {
-    seed = generateSeed();
-  };
-  return ed25519.MakeKeypair(seed);
+function verifySignature(message: string, publicKey: Uint8Array, signature: Uint8Array): boolean {
+  return nacl.sign.detached.verify(stringToUint8(message), signature, publicKey);
 }
 
-function generateKeypairFromPassword(password: string): Object {
-  // const hash = crypto.createHash('sha256').update(password).digest();
-  const secret = generateSecret(password);
-  return ed25519.MakeKeypair(secret);
-}
-
-function signMessage(message: string, privateKey: Buffer): Object {
-  return ed25519.Sign(new Buffer(message, 'utf-8'), privateKey);
-}
-
-function verifySignature(message: string, publicKey: Buffer, signature: Buffer): boolean {
-  return ed25519.Verify(new Buffer(message, 'utf-8'), signature, publicKey);
-}
-
-exports.generateSeed = generateSeed;
 exports.generateKeypairFromPassword = generateKeypairFromPassword;
 exports.generateKeypairFromSeed = generateKeypairFromSeed;
+exports.generateRandomKeypair = generateRandomKeypair;
 exports.signMessage = signMessage;
 exports.verifySignature = verifySignature;

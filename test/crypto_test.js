@@ -2,21 +2,19 @@ import { assert } from 'chai';
 import { describe, it } from 'mocha';
 
 import {
-  generateSeed,
-  generateKeypairFromSeed,
   generateKeypairFromPassword,
+  generateRandomKeypair,
   signMessage,
   verifySignature
 } from '../lib/crypto.js';
 
-const seed = generateSeed();
-const alice = generateKeypairFromSeed(seed);
+const alice = generateRandomKeypair();
 const bob = generateKeypairFromPassword('passwerd');
 
 const message = 'dreeming of elliptic curvez';
 
-const aliceSignature = signMessage(message, alice.privateKey);
-const bobSignature = signMessage(message, bob.privateKey);
+const aliceSignature = signMessage(message, alice.secretKey);
+const bobSignature = signMessage(message, bob.secretKey);
 
 describe('Crypto', () => {
   it('verifies a signature', () => {

@@ -6,7 +6,7 @@ const button = document.querySelector('button');
 const form = document.querySelector('form');
 const ols = document.getElementsByTagName('ol');
 const password = document.querySelector('input[type="password"]');
-const p = document.querySelector('p');
+const pre = document.querySelector('pre');
 
 let _schema;
 const select = document.querySelector('select');
@@ -72,7 +72,7 @@ select.addEventListener('change', () => {
   spec.generateForm(_schema).forEach((div) => form.appendChild(div));
   form.appendChild(submit);
   listModifiers();
-  p.textContent = null;
+  pre.textContent = null;
 }, false);
 
 function includeElement(elem, label) {
@@ -123,7 +123,7 @@ form.addEventListener('submit', (event) => {
              && div.children.length === 2
              && includeElement(div.lastChild, div.firstChild);
     });
-    p.textContent = JSON.stringify(spec.validateForm(divs), null, 2);
+    pre.textContent = JSON.stringify(spec.validateForm(divs), null, 2);
   } catch(err) {
     console.error(err);
   }

@@ -102,7 +102,7 @@ const recording = setId({
   producer: getHeaders(producer),
   recordingOf: getHeader(composition),
   recordLabel: getHeaders(recordLabel),
-  url: 'http://recording.com'
+  url: ['http://recording.com']
 });
 
 const album = setId({

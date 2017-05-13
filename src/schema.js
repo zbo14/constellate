@@ -245,7 +245,12 @@ const recording = {
       minItems: 1,
       uniqueItems: true
     },
-    url: url
+    url: {
+      type: 'array',
+      items: url,
+      minItems: 1,
+      uniqueItems: true
+    }
   }
 }
 

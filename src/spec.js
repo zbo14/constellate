@@ -1,7 +1,7 @@
 'use strict';
 
-const util = require('./util.js');
-const schema = require('./schema.js');
+const util = require('../lib/util.js');
+const schema = require('../lib/schema.js');
 
 const { digestBase64, isArray, isBoolean, isNumber, isObject, isString, arrayFromObject, hasKeys, orderStringify, recurse, withoutKeys } = util;
 
@@ -133,10 +133,11 @@ function parseElement(elem: HTMLElement): Object {
         throw new Error('<li> has no children');
       }
       const firstChild: HTMLElement = (li.firstChild: any);
+      const attributes: Object = (elem.attributes: any);
       return {
         type: 'array',
         items: parseElement(firstChild),
-        minItems: parseInt(elem.attributes.minimum.value),
+        minItems: parseInt(attributes.minimum.value),
         uniqueItems: elem.hasAttribute('unique')
       }
     case 'SELECT':
@@ -182,29 +183,30 @@ function getAttributes(elem: HTMLElement, obj: Object): Object {
   });
 }
 
-function setAttribute(elem: HTMLElement, key: string, val?: number|string): HTMLElement {
+function setAttribute(elem: HTMLElement, key: string, val : string): HTMLElement {
+  const input: HTMLInputElement = (elem: any);
   switch(key) {
     case 'default':
-      elem.defaultValue = val;
+      input.defaultValue = val;
       break;
     case 'minItems':
       elem.setAttribute('minimum', val);
       break;
     case 'pattern':
-      elem.pattern = val;
+      input.pattern = val;
       break;
     case 'readonly':
-      elem.disabled = true;
-      elem.hidden = true;
+      input.disabled = true;
+      input.hidden = true;
       break;
     case 'required':
-      elem.required = true;
-      if (!elem.hasAttribute('required')) {
-        elem.setAttribute('required', true);
+      input.required = true;
+      if (!input.hasAttribute('required')) {
+        elem.setAttribute('required', 'true');
       }
       break;
     case 'uniqueItems':
-      elem.setAttribute('unique', true);
+      elem.setAttribute('unique', 'true');
       break;
   }
   return elem;
@@ -242,7 +244,7 @@ function generateForm(_schema: Object): HTMLElement[] {
         return setAttribute(result, k, v);
       }, generateElement(obj, defs));
       if (!isArray(reqs) || !reqs.includes(key)) return elem;
-      return setAttribute(elem, 'required');
+      return setAttribute(elem, 'required', 'true');
     });
     form = Object.keys(elems).reduce((result, key) => {
       if (elems[key] == null) return result;
@@ -255,7 +257,7 @@ function generateForm(_schema: Object): HTMLElement[] {
       return result.concat(div);
     }, []);
   } catch(err) {
-    console.error(err.message);
+    console.error(err);
   }
   return form;
 }
@@ -293,7 +295,7 @@ function evalForm(form: HTMLElement[]): Object {
       return addValue(result, elem, label);
     }, {});
   } catch(err) {
-    console.error(err.message);
+    console.error(err);
   }
   return values;
 }
@@ -333,7 +335,7 @@ function parseForm(form: HTMLElement[]): Object  {
       type: 'object'
     });
   } catch(err) {
-    console.error(err.message);
+    console.error(err);
   }
   return parsed;
 }
@@ -359,7 +361,7 @@ function validate(obj: Object, _schema: Object): boolean {
 }
 
 function validateForm(form: HTMLElement[]): Object {
-  let valuesWithId = {};
+  let values = {};
   try {
     const result = form.reduce((result, div) => {
       if (div.nodeName !== 'DIV') {
@@ -399,12 +401,13 @@ function validateForm(form: HTMLElement[]): Object {
         },
         values: {}
     });
-    valuesWithId = setId(result.values);
-    validate(valuesWithId, result.schema);
+    values = setId(result.values);
+    validate(values, result.schema);
   } catch(err) {
-    console.error(err.message);
+    console.error(err);
+    values = {};
   }
-  return valuesWithId;
+  return values;
 }
 
 function getHeader(obj: Object): Object {
