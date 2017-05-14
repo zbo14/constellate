@@ -1,6 +1,7 @@
 'use strict';
 
 const bs58 = require('bs58');
+const sha256 = require('js-sha256').sha256;
 const sha3_256 = require('js-sha3').sha3_256;
 const urlsafeBase64  = require('urlsafe-base64');
 
@@ -12,6 +13,14 @@ const urlsafeBase64  = require('urlsafe-base64');
 
 function clone(obj: Object): Object {
   return JSON.parse(JSON.stringify(obj));
+}
+
+function decodeBase58(str: string): Array {
+  return bs58.decode(str)
+}
+
+function decodeBase64(str: string): Buffer {
+  return urlsafeBase64.decode(str);
 }
 
 function digestSHA256(str: string): Buffer {
@@ -49,11 +58,13 @@ function strFromUint8Array(uint8: Uint8Array): string {
 }
 
 exports.clone = clone;
+exports.decodeBase58 = decodeBase58;
+exports.decodeBase64 = decodeBase64;
+exports.digestSHA256 = digestSHA256;
+exports.digestSHA3 = digestSHA3;
 exports.encodeBase58 = encodeBase58;
 exports.encodeBase64 = encodeBase64;
 exports.orderStringify = orderStringify;
-exports.digestSHA256 = digestSHA256;
-exports.digestSHA3 = digestSHA3;
 exports.strFromUint8Array = strFromUint8Array;
 exports.strToUint8Array = strToUint8Array;
 
