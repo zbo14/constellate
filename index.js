@@ -1,17 +1,26 @@
+const crypto = require('./lib/crypto.js');
 const schema = require('./lib/schema.js');
 const spec = require('./lib/spec.js');
 const util = require('./lib/util.js');
 
-const button = document.querySelector('button');
+const btn = document.querySelector('button');
 const form = document.querySelector('form');
 const ols = document.getElementsByTagName('ol');
-const password = document.querySelector('input[type="password"]');
 const pre = document.querySelector('pre');
 
 let _schema;
 const select = document.querySelector('select');
 const submit = document.createElement('input');
 submit.type = 'submit';
+
+btn.addEventListener('click', () => {
+  const password = prompt('Please enter a password to generate keypair', 'passwerd');
+  const keypair = crypto.generateKeypairFromPassword(password);
+  pre.textContent = JSON.stringify({
+    publicKey: util.encodeBase64(Buffer.from(keypair.publicKey)),
+    secretKey: util.encodeBase64(Buffer.from(keypair.secretKey))
+  }, null, 2);
+});
 
 function listModifiers() {
   const lis = Array.from(document.getElementsByTagName('li')).map((li) => {
@@ -49,15 +58,21 @@ function listModifiers() {
 
 select.addEventListener('change', () => {
   form.innerHTML = null;
+  btn.hidden = true;
   switch(select.value) {
     case 'artist':
+      btn.hidden = false;
       _schema = schema.Artist;
       break;
     case 'organization':
+      btn.hidden = false;
       _schema = schema.Organization;
       break;
     case 'composition':
       _schema = schema.Composition;
+      break;
+    case 'audio':
+      _schema = schema.Audio;
       break;
     case 'recording':
       _schema = schema.Recording;
@@ -71,8 +86,8 @@ select.addEventListener('change', () => {
   }
   spec.generateForm(_schema).forEach((div) => form.appendChild(div));
   form.appendChild(submit);
-  listModifiers();
   pre.textContent = null;
+  listModifiers();
 }, false);
 
 function includeElement(elem, label) {

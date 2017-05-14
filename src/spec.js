@@ -1,9 +1,23 @@
 'use strict';
 
-const util = require('../lib/util.js');
+const crypto = require('../lib/crypto.js');
 const schema = require('../lib/schema.js');
+const util = require('../lib/util.js');
 
-const { digestBase64, isArray, isBoolean, isNumber, isObject, isString, arrayFromObject, hasKeys, orderStringify, recurse, withoutKeys } = util;
+const {
+  encodeBase64,
+  digestSHA256,
+  isArray,
+  isBoolean,
+  isNumber,
+  isObject,
+  isString,
+  arrayFromObject,
+  hasKeys,
+  orderStringify,
+  recurse,
+  withoutKeys
+} = util;
 
 // @flow
 
@@ -342,7 +356,7 @@ function parseForm(form: HTMLElement[]): Object  {
 
 function setId(obj: Object): Object {
    return Object.assign({}, obj, {
-     '@id': digestBase64(orderStringify(withoutKeys(obj, '@id')))
+     '@id': encodeBase64(digestSHA256(orderStringify(withoutKeys(obj, '@id'))))
    });
  }
 

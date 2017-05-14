@@ -14,30 +14,25 @@ function clone(obj: Object): Object {
   return JSON.parse(JSON.stringify(obj));
 }
 
-function sha3Buffer(str: string): Buffer {
+function digestSHA256(str: string): Buffer {
+  const hash = sha256.create();
+  hash.update(str);
+  return Buffer.from(hash.digest());
+}
+
+function digestSHA3(str: string): Buffer {
   return Buffer.from(sha3_256.buffer(str));
 }
 
-function digestBase64(str: string): string {
-  return urlsafeBase64.encode(sha3Buffer(str)).toString('utf-8', 0, 3);
+function encodeBase58(buf: Buffer): string {
+  return bs58.encode(buf);
 }
 
-function encodeBase58(key: Buffer): string {
-  return bs58.encode(key);
+function encodeBase64(buf: Buffer): string {
+  return urlsafeBase64.encode(buf).toString('utf-8', 0, 3);
 }
 
-// from http://stackoverflow.com/questions/16167581/sort-object-properties-and-json-stringify#comment73545624_40646557
-
-function orderStringify(obj: Object, space?: number): string {
-  const keys = [];
-  JSON.stringify(obj, (k, v) => {
-    keys.push(k);
-    return v;
-  });
-  return JSON.stringify(obj, keys.sort(), space);
-}
-
-function stringToUint8(str: string): Uint8Array {
+function strToUint8Array(str: string): Uint8Array {
   const ab = new ArrayBuffer(str.length);
   const uint8 = new Uint8Array(ab);
   Array.from(uint8).forEach((_, i) => {
@@ -46,20 +41,21 @@ function stringToUint8(str: string): Uint8Array {
   return uint8;
 }
 
-function stringFromUint8(uint8: Uint8Array): string {
+function strFromUint8Array(uint8: Uint8Array): string {
   return Array.from(uint8).reduce((result, x) => {
     result += String.fromCharCode(x);
     return result;
   }, '');
 }
 
-exports.encodeBase58 = encodeBase58;
-exports.digestBase64 = digestBase64;
 exports.clone = clone;
+exports.encodeBase58 = encodeBase58;
+exports.encodeBase64 = encodeBase64;
 exports.orderStringify = orderStringify;
-exports.sha3Buffer = sha3Buffer;
-exports.stringFromUint8 = stringFromUint8
-exports.stringToUint8 = stringToUint8;
+exports.digestSHA256 = digestSHA256;
+exports.digestSHA3 = digestSHA3;
+exports.strFromUint8Array = strFromUint8Array;
+exports.strToUint8Array = strToUint8Array;
 
 //--------------------------------------------------------------------------------
 
