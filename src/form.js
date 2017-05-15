@@ -1,28 +1,22 @@
 'use strict';
 
-const crypto = require('../lib/crypto.js');
-const schema = require('../lib/schema.js');
+const meta = require('../lib/meta.js');
 const util = require('../lib/util.js');
 
 const {
-  encodeBase64,
-  digestSHA256,
   isArray,
   isBoolean,
   isNumber,
   isObject,
   isString,
   arrayFromObject,
-  hasKeys,
-  orderStringify,
-  recurse,
-  withoutKeys
+  recurse
 } = util;
 
 // @flow
 
 /**
-* @module constellate/src/spec
+* @module constellate/src/form
 */
 
 function newInput(type: string): HTMLElement {
@@ -56,7 +50,7 @@ function generateElement(obj: Object, defs: Object): HTMLElement {
         return newInput('number');
       case 'object':
         const fieldset = document.createElement('fieldset');
-        const header = getHeader(obj.properties);
+        const header = meta.getHeader(obj.properties);
         if (isObject(header)) { obj = Object.assign({}, obj, { properties: header }); }
         const form = generateForm(obj);
         if (form != null) {
@@ -354,26 +348,6 @@ function parseForm(form: HTMLElement[]): Object  {
   return parsed;
 }
 
-function setId(obj: Object): Object {
-   return Object.assign({}, obj, {
-     '@id': encodeBase64(digestSHA256(orderStringify(withoutKeys(obj, '@id'))))
-   });
- }
-
-function checkId(obj: Object): boolean {
-  return obj['@id'] === setId(obj)['@id'];
-}
-
-function validate(obj: Object, _schema: Object): boolean {
-  if (!checkId(obj)) {
-    throw new Error('obj has invalid id: ' + obj['@id']);
-  }
-  if (!schema.validate(obj, _schema)) {
-    throw new Error('obj has invalid schema: ' + JSON.stringify(obj, null, 2));
-  }
-  return true;
-}
-
 function validateForm(form: HTMLElement[]): Object {
   let values = {};
   try {
@@ -415,30 +389,13 @@ function validateForm(form: HTMLElement[]): Object {
         },
         values: {}
     });
-    values = setId(result.values);
-    validate(values, result.schema);
+    values = meta.setId(result.values);
+    if (!jsonschema.validate(values, result.schema)) values = {};
   } catch(err) {
     console.error(err);
-    values = {};
   }
   return values;
 }
-
-function getHeader(obj: Object): Object {
-  let header = {};
-  if (hasKeys(obj, '@type', '@id')) {
-    header = {
-      '@type': obj['@type'],
-      '@id': obj['@id']
-    }
-  }
-  return header;
-}
-
-exports.checkId = checkId;
-exports.getHeader = getHeader;
-exports.setId = setId;
-exports.validate = validate;
 
 exports.evalForm = evalForm;
 exports.generateForm = generateForm;

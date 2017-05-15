@@ -15,8 +15,8 @@ function clone(obj: Object): Object {
   return JSON.parse(JSON.stringify(obj));
 }
 
-function decodeBase58(str: string): Array {
-  return bs58.decode(str)
+function decodeBase58(str: string): Buffer {
+  return Buffer.from(bs58.decode(str));
 }
 
 function decodeBase64(str: string): Buffer {
@@ -41,6 +41,17 @@ function encodeBase64(buf: Buffer): string {
   return urlsafeBase64.encode(buf).toString('utf-8', 0, 3);
 }
 
+// from http://stackoverflow.com/questions/16167581/sort-object-properties-and-json-stringify#comment73545624_40646557
+
+function orderStringify(obj: Object, space?: number) {
+  const keys = [];
+  JSON.stringify(obj, (k, v) => {
+    keys.push(k);
+    return v;
+  });
+  return JSON.stringify(obj, keys.sort(), space);
+}
+
 function strToUint8Array(str: string): Uint8Array {
   const ab = new ArrayBuffer(str.length);
   const uint8 = new Uint8Array(ab);
@@ -57,6 +68,10 @@ function strFromUint8Array(uint8: Uint8Array): string {
   }, '');
 }
 
+function timestamp(): number {
+  return Date.now() / 1000 | 0;
+}
+
 exports.clone = clone;
 exports.decodeBase58 = decodeBase58;
 exports.decodeBase64 = decodeBase64;
@@ -67,6 +82,7 @@ exports.encodeBase64 = encodeBase64;
 exports.orderStringify = orderStringify;
 exports.strFromUint8Array = strFromUint8Array;
 exports.strToUint8Array = strToUint8Array;
+exports.timestamp = timestamp;
 
 //--------------------------------------------------------------------------------
 

@@ -1,6 +1,6 @@
 const crypto = require('./lib/crypto.js');
-const schema = require('./lib/schema.js');
-const spec = require('./lib/spec.js');
+const schema = require('./lib/meta.js');
+const { generateForm, validateForm } = require('./lib/form.js');
 const util = require('./lib/util.js');
 
 const btn = document.querySelector('button');
@@ -16,10 +16,7 @@ submit.type = 'submit';
 btn.addEventListener('click', () => {
   const password = prompt('Please enter a password to generate keypair', 'passwerd');
   const keypair = crypto.generateKeypairFromPassword(password);
-  pre.textContent = JSON.stringify({
-    publicKey: util.encodeBase64(Buffer.from(keypair.publicKey)),
-    secretKey: util.encodeBase64(Buffer.from(keypair.secretKey))
-  }, null, 2);
+  pre.textContent = JSON.stringify(crypto.encodeKeypair(keypair), null, 2);
 });
 
 function listModifiers() {
@@ -62,29 +59,29 @@ select.addEventListener('change', () => {
   switch(select.value) {
     case 'artist':
       btn.hidden = false;
-      _schema = schema.Artist;
+      _schema = meta.Artist;
       break;
     case 'organization':
       btn.hidden = false;
-      _schema = schema.Organization;
+      _schema = meta.Organization;
       break;
     case 'composition':
-      _schema = schema.Composition;
+      _schema = meta.Composition;
       break;
     case 'audio':
-      _schema = schema.Audio;
+      _schema = meta.Audio;
       break;
     case 'recording':
-      _schema = schema.Recording;
+      _schema = meta.Recording;
       break;
     case 'album':
-      _schema = schema.Album;
+      _schema = meta.Album;
       break;
     default:
       console.error('unexpected type:', select.value);
       return;
   }
-  spec.generateForm(_schema).forEach((div) => form.appendChild(div));
+  generateForm(_schema).forEach((div) => form.appendChild(div));
   form.appendChild(submit);
   pre.textContent = null;
   listModifiers();
@@ -138,7 +135,7 @@ form.addEventListener('submit', (event) => {
              && div.children.length === 2
              && includeElement(div.lastChild, div.firstChild);
     });
-    pre.textContent = JSON.stringify(spec.validateForm(divs), null, 2);
+    pre.textContent = JSON.stringify(validateForm(divs), null, 2);
   } catch(err) {
     console.error(err);
   }
