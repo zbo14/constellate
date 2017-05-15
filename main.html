@@ -5,13 +5,23 @@
   <body>
     <select>
       <option selected disabled>type</option>
-      <option value='artist'>artist</option>
-      <option value='organization'>organization</option>
-      <option value='composition'>composition</option>
-      <option value='recording'>recording</option>
-      <option value='album'>album</option>
+      <optgroup label='meta'>
+        <option value='album'>album</option>
+        <option value='artist'>artist</option>
+        <option value='audio'>audio</option>
+        <option value='composition'>composition</option>
+        <option value='organization'>organization</option>
+        <option value='recording'>recording</option>
+      </optgroup>
+      <optgroup label='claims'>
+        <option value='compose'>compose</option>
+        <option value='license'>license</option>
+        <option value='record'>record</option>
+      </optgroup>
     </select><br>
-    <button>generate keypair</button><hr>
+    <button id='new-keypair-btn' hidden>new keypair</button>
+    <button id='sign-claims-btn' hidden>sign claims</button>
+    <hr>
     <form></form>
     <pre></pre>
   </body>

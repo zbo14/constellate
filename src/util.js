@@ -41,6 +41,10 @@ function encodeBase64(buf: Buffer): string {
   return urlsafeBase64.encode(buf).toString('utf-8', 0, 3);
 }
 
+function now(): number {
+  return Date.now() / 1000 | 0;
+}
+
 // from http://stackoverflow.com/questions/16167581/sort-object-properties-and-json-stringify#comment73545624_40646557
 
 function orderStringify(obj: Object, space?: number) {
@@ -68,10 +72,6 @@ function strFromUint8Array(uint8: Uint8Array): string {
   }, '');
 }
 
-function timestamp(): number {
-  return Date.now() / 1000 | 0;
-}
-
 exports.clone = clone;
 exports.decodeBase58 = decodeBase58;
 exports.decodeBase64 = decodeBase64;
@@ -79,10 +79,10 @@ exports.digestSHA256 = digestSHA256;
 exports.digestSHA3 = digestSHA3;
 exports.encodeBase58 = encodeBase58;
 exports.encodeBase64 = encodeBase64;
+exports.now = now;
 exports.orderStringify = orderStringify;
 exports.strFromUint8Array = strFromUint8Array;
 exports.strToUint8Array = strToUint8Array;
-exports.timestamp = timestamp;
 
 //--------------------------------------------------------------------------------
 

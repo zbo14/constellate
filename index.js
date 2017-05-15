@@ -1,23 +1,34 @@
 const crypto = require('./lib/crypto.js');
-const schema = require('./lib/meta.js');
-const { generateForm, validateForm } = require('./lib/form.js');
+const { generateForm, parseForm } = require('./lib/form.js');
+const jwt = require('./lib/jwt.js');
+const meta = require('./lib/meta.js');
 const util = require('./lib/util.js');
 
-const btn = document.querySelector('button');
 const form = document.querySelector('form');
+const newKeypairBtn = document.getElementById('new-keypair-btn');
 const ols = document.getElementsByTagName('ol');
 const pre = document.querySelector('pre');
-
-let _schema;
 const select = document.querySelector('select');
+const signClaimsBtn = document.getElementById('sign-claims-btn');
 const submit = document.createElement('input');
 submit.type = 'submit';
 
-btn.addEventListener('click', () => {
-  const password = prompt('Please enter a password to generate keypair', 'passwerd');
-  const keypair = crypto.generateKeypairFromPassword(password);
-  pre.textContent = JSON.stringify(crypto.encodeKeypair(keypair), null, 2);
-});
+let mode, schema, values;
+
+newKeypairBtn.addEventListener('click', () => {
+  if (mode === 'meta') {
+    const password = prompt('Please enter a password to generate keypair', 'passwerd');
+    const keypair = crypto.generateKeypairFromPassword(password);
+    pre.textContent = JSON.stringify(crypto.encodeKeypair(keypair), null, 2);
+  }
+}, false);
+
+signClaimsBtn.addEventListener('click', () => {
+  if (mode === 'claims' && values) {
+    const secretKey = prompt('Please enter your secret key to sign claims', '');
+    pre.textContent += jwt.sign(values, new Uint8Array(decodeBase64(secretKey)));
+  }
+}, false);
 
 function listModifiers() {
   const lis = Array.from(document.getElementsByTagName('li')).map((li) => {
@@ -55,33 +66,49 @@ function listModifiers() {
 
 select.addEventListener('change', () => {
   form.innerHTML = null;
-  btn.hidden = true;
+  mode = select.selectedOptions[0].parentNode.label;
+  console.log(mode);
+  newKeypairBtn.hidden = true;
+  signClaimsBtn.hidden = true;
   switch(select.value) {
+    case 'album':
+      schema = meta.Album;
+      break;
     case 'artist':
-      btn.hidden = false;
-      _schema = meta.Artist;
-      break;
-    case 'organization':
-      btn.hidden = false;
-      _schema = meta.Organization;
-      break;
-    case 'composition':
-      _schema = meta.Composition;
+      schema = meta.Artist;
+      newKeypairBtn.hidden = false;
       break;
     case 'audio':
-      _schema = meta.Audio;
+      schema = meta.Audio;
+      break;
+    case 'composition':
+      schema = meta.Composition;
+      break;
+    case 'organization':
+      schema = meta.Organization;
+      newKeypairBtn.hidden = false;
       break;
     case 'recording':
-      _schema = meta.Recording;
+      schema = meta.Recording;
       break;
-    case 'album':
-      _schema = meta.Album;
+    //------------------------------
+    case 'compose':
+      schema = jwt.Compose;
+      signClaimsBtn.hidden = false;
+      break;
+    case 'license':
+      schema = jwt.License;
+      signClaimsBtn.hidden = false;
+      break;
+    case 'record':
+      schema = jwt.Record;
+      signClaimsBtn.hidden = false;
       break;
     default:
-      console.error('unexpected type:', select.value);
+      console.error('unexpected type: ' + select.value);
       return;
   }
-  generateForm(_schema).forEach((div) => form.appendChild(div));
+  generateForm(schema).forEach((div) => form.appendChild(div));
   form.appendChild(submit);
   pre.textContent = null;
   listModifiers();
@@ -135,8 +162,29 @@ form.addEventListener('submit', (event) => {
              && div.children.length === 2
              && includeElement(div.lastChild, div.firstChild);
     });
-    pre.textContent = JSON.stringify(validateForm(divs), null, 2);
+    if (mode === 'meta') {
+      values = parseForm(divs);
+      if (values) {
+        values = meta.setId(values);
+        if (meta.validate(values, schema)) {
+          pre.textContent = JSON.stringify(values, null, 2);
+          return;
+        }
+      }
+    } else if (mode === 'claims') {
+      values = parseForm(divs);
+      if (values) {
+        values = jwt.setTimestamp(values);
+        if (jwt.validate(values, schema)) {
+          pre.textContent = JSON.stringify(values, null, 2);
+          return;
+        }
+      }
+    } else {
+      throw new Error('unexpected mode: ' + mode);
+    }
   } catch(err) {
     console.error(err);
   }
+  pre.textContent = null;
 }, false);
