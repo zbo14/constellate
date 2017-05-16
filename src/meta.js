@@ -1,13 +1,15 @@
 'use strict';
 
-const Ajv = require('ajv');
 const util = require('../lib/util.js');
 
 const {
+  calcId,
   digestSHA256,
   encodeBase64,
+  getId, getIds,
   hasKeys,
   orderStringify,
+  validateSchema,
   withoutKeys
 } = util;
 
@@ -17,8 +19,6 @@ const {
 * @module constellate/src/meta
 */
 
-const ajv = new Ajv();
-
 const draft = 'http://json-schema.org/draft-06/schema#';
 
 const schema = {
@@ -27,30 +27,22 @@ const schema = {
   readonly: true
 }
 
-function calcId(obj: Object): string {
-  return encodeBase64(digestSHA256(orderStringify(withoutKeys(obj, '@id'))));
-}
-
-function checkId(obj: Object, publicKey: ?Buffer): boolean {
-  return obj['@id'] === setId(obj, publicKey)['@id'];
-}
-
-function getHeader(obj: Object): Object {
-  let header = {};
-  if (hasKeys(obj, '@type', '@id')) {
-    header = {
-      '@type': obj['@type'],
-      '@id': obj['@id']
-    }
+function calcMetaId(meta: Object, publicKey: ?Buffer): string {
+  if (publicKey && publicKey.length === 32) {
+    return encodeBase64(publicKey);
   }
-  return header;
+  return calcId('@id', meta);
 }
 
-function getHeaders(...objs: Object[]): Object[] {
-  return objs.map(getHeader);
+function getMetaId(meta: Object): Object {
+  return getId('@id', meta);
 }
 
-function hideFields(obj: Object, ...keys: string[]): Object {
+function getMetaIds(...metas: Object[]): Object[] {
+  return getIds('@id', ...metas);
+}
+
+function hideFields(meta: Object, ...keys: string[]): Object {
   return keys.reduce((result, key) => {
     if (!result.properties.hasOwnProperty(key) || !result.properties[key]) { return result; }
     return Object.assign({}, result , {
@@ -58,19 +50,19 @@ function hideFields(obj: Object, ...keys: string[]): Object {
         [key]: Object.assign({}, result.properties[key], { readonly: true })
       })
     });
-  }, obj);
+  }, meta);
 }
 
-function hideId(obj: Object): Object {
-  return hideFields(obj, '@id');
+function hideId(meta: Object): Object {
+  return hideFields(meta, '@id');
 }
 
-function requireFields(obj: Object, ...keys: string[]): Object {
-  return Object.assign({}, obj, { required: keys });
+function requireFields(meta: Object, ...keys: string[]): Object {
+  return Object.assign({}, meta, { required: keys });
 }
 
-function requireHeader(obj: Object): Object {
-  return requireFields(obj, '@type', '@id');
+function requireId(meta: Object): Object {
+  return requireFields(meta, '@id');
 }
 
 function schemaPrefix(field: string) {
@@ -80,34 +72,28 @@ function schemaPrefix(field: string) {
   }
 }
 
-function setId(obj: Object, publicKey: ?Buffer): Object {
-  if (publicKey && publicKey.length === 32) {
-    return Object.assign({}, obj, {
-      '@id': encodeBase64(publicKey)
-    });
-  }
-  return Object.assign({}, obj, {
-    '@id': calcId(obj)
-  });
+function setMetaId(meta: Object, publicKey: ?Buffer): Object {
+  return Object.assign({}, meta, { '@id': calcMetaId(meta, publicKey) });
 }
 
-function validate(meta: Object, schema: Object, publicKey: ?Buffer): boolean {
+function validateMeta(meta: Object, schema: Object, publicKey: ?Buffer): boolean {
   let valid = false;
   try {
-    if (!checkId(meta, publicKey)) {
-      throw new Error('meta has invalid id: ' + meta['@id']);
-    }
-    if (!ajv.compile(schema)(meta)) {
+    if (!validateSchema(meta, schema)) {
       throw new Error('meta has invalid schema: ' + JSON.stringify(meta, null, 2));
+    }
+    const id = calcMetaId(meta, publicKey);
+    if (meta['@id'] !== id) {
+      throw new Error(`expected metaId=${meta['@id']}; got ` + id);
     }
     valid = true;
   } catch(err) {
-    console.error(err.message);
+    console.error(err);
   }
   return valid;
 }
 
-const id = {
+const metaId = {
   type: 'string',
   pattern: '^[A-Za-z0-9-_]{43}$'
 }
@@ -149,7 +135,7 @@ const artist = {
       enum: ['Artist'],
       readonly: true
     },
-    '@id': id,
+    '@id': metaId,
     email: {
       type: 'string',
       pattern: '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'
@@ -167,7 +153,7 @@ const artist = {
   }
 }
 
-const artistHeader = requireHeader(artist);
+const artistId = requireId(artist);
 
 const organizationContext = {
   type: 'object',
@@ -200,7 +186,7 @@ const organization = {
       enum: ['Organization'],
       readonly: true
     },
-    '@id': id,
+    '@id': metaId,
     email: {
       type: 'string',
       pattern: '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'
@@ -218,7 +204,7 @@ const organization = {
   }
 }
 
-const organizationHeader = requireHeader(organization);
+const organizationId = requireId(organization);
 
 const compositionContext = {
   type: 'object',
@@ -253,10 +239,10 @@ const composition = {
       enum: ['Composition'],
       readonly: true
     },
-    '@id': id,
+    '@id': metaId,
     composer: {
       type: 'array',
-      items: artistHeader,
+      items: artistId,
       minItems: 1,
       uniqueItems: true
     },
@@ -266,13 +252,13 @@ const composition = {
     },
     lyricist: {
       type: 'array',
-      items: artistHeader,
+      items: artistId,
       minItems: 1,
       uniqueItems: true
     },
     publisher: {
       type: 'array',
-      items: organizationHeader,
+      items: organizationId,
       minItems: 1,
       uniqueItems: true
     },
@@ -282,7 +268,7 @@ const composition = {
   }
 }
 
-const compositionHeader = requireHeader(composition);
+const compositionId = requireId(composition);
 
 const audioContext = {
   type: 'object',
@@ -310,7 +296,7 @@ const audio = {
       enum: ['Audio'],
       readonly: true
     },
-    '@id': id,
+    '@id': metaId,
     contentUrl: {
       type: 'string',
       pattern: '^https?:\/\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%_\\+.~#?&\/\/=]*)$'
@@ -321,7 +307,7 @@ const audio = {
   }
 }
 
-const audioHeader = requireHeader(audio);
+const audioId = requireId(audio);
 
 const recordingContext = {
   type: 'object',
@@ -358,10 +344,10 @@ const recording = {
       enum: ['Recording'],
       readonly: true
     },
-    '@id': id,
+    '@id': metaId,
     audio: {
       type: 'array',
-      items: audioHeader,
+      items: audioId,
       minItems: 1,
       uniqueItems: true
     },
@@ -371,27 +357,27 @@ const recording = {
     },
     performer: {
       type: 'array',
-      items:  artistHeader,
+      items:  artistId,
       minItems: 1,
       uniqueItems: true
     },
     producer: {
       type: 'array',
-      items: artistHeader,
+      items: artistId,
       minItems: 1,
       uniqueItems: true
     },
-    recordingOf: compositionHeader,
+    recordingOf: compositionId,
     recordLabel: {
       type: 'array',
-      items: organizationHeader,
+      items: organizationId,
       minItems: 1,
       uniqueItems: true
     }
   }
 }
 
-const recordingHeader = requireHeader(recording);
+const recordingId = requireId(recording);
 
 const albumContext =  {
   type: 'object',
@@ -426,18 +412,18 @@ const album = {
       enum: ['Album'],
       readonly: true
     },
-    '@id': id,
+    '@id': metaId,
     artist: {
       type: 'array',
-      items: artistHeader,
+      items: artistId,
       minItems: 1,
       uniqueItems: true
     },
     productionType: {
       enum: [
         'CompilationAlbum',
-        'DJMixAlbum',
         'DemoAlbum',
+        'DJMixAlbum',
         'LiveAlbum',
         'MixtapeAlbum',
         'RemixAlbum',
@@ -448,7 +434,7 @@ const album = {
     },
     recordLabel: {
       type: 'array',
-      items: organizationHeader,
+      items: organizationId,
       minItems: 1,
       uniqueItems: true
     },
@@ -462,7 +448,7 @@ const album = {
     },
     track: {
       type: 'array',
-      items: recordingHeader,
+      items: recordingId,
       minItems: 1,
       uniqueItems: true
     }
@@ -512,11 +498,10 @@ exports.Composition = Composition;
 exports.Organization = Organization;
 exports.Recording = Recording;
 
-exports.calcId = calcId;
-exports.checkId = checkId;
-exports.getHeader = getHeader;
-exports.getHeaders = getHeaders;
-exports.id = id;
+exports.calcMetaId = calcMetaId;
+exports.getMetaId = getMetaId;
+exports.getMetaIds = getMetaIds;
+exports.metaId = metaId;
 exports.schemaPrefix = schemaPrefix;
-exports.setId = setId;
-exports.validate = validate;
+exports.setMetaId = setMetaId;
+exports.validateMeta = validateMeta;

@@ -1,19 +1,12 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
-import { encodeKeypair, generateKeypairFromPassword, generateRandomKeypair } from '../lib/crypto.js';
-import { getHeader, getHeaders, setId } from '../lib/meta.js';
-import { encodeBase64, timestamp } from '../lib/util.js';
+import { encodeKeypair, keypairFromPassword, randomKeypair } from '../lib/crypto.js';
+import { Compose, License, Record, setClaimsId, signClaims, timestamp, verifyClaims } from '../lib/jwt.js';
+import { Composition, Recording, getMetaId, getMetaIds, setMetaId } from '../lib/meta.js';
+import { encodeBase64, now } from '../lib/util.js';
 
-import {
-  Compose,
-  License,
-  Record,
-  sign,
-  verify
-} from '../lib/jwt.js';
-
-const artistKeypair = generateKeypairFromPassword('muzaq');
-const curatorKeypair = generateRandomKeypair();
+const artistKeypair = keypairFromPassword('muzaq');
+const curatorKeypair = randomKeypair();
 
 const artistContext = {
   schema: 'http://schema.org/',
@@ -41,9 +34,11 @@ const compositionContext = {
   title: 'schema:name'
 }
 
+const curatorContext = artistContext;
+
 const recordingContext = {
   schema: 'http://schema.org/',
-  audio: 'schema:AudioObject',
+  audio: 'schema:audio',
   isrc: 'schema:isrcCode',
   performer: 'schema:performer',
   producer: 'schema:producer',
@@ -52,9 +47,7 @@ const recordingContext = {
   recordLabel: 'schema:recordLabel'
 }
 
-const curatorContext = artistContext;
-
-const artist = setId({
+const artist = setMetaId({
   '@context': artistContext,
   '@type': 'Artist',
   email: 'artist@example.com',
@@ -63,7 +56,7 @@ const artist = setId({
   profile: ['http://facebook-profile.com'],
 }, artistKeypair.publicKey);
 
-const curator = setId({
+const curator = setMetaId({
   '@context': curatorContext,
   '@type': 'Organization',
   email: 'curator@example.com',
@@ -71,73 +64,76 @@ const curator = setId({
   name: 'curator'
 }, curatorKeypair.publicKey);
 
-const audio = setId({
+const audio = setMetaId({
   '@context': audioContext,
   '@type': 'Audio',
   contentUrl: 'http://audio-file.com'
 });
 
-const composition = setId({
+const composition = setMetaId({
   '@context': compositionContext,
   '@type': 'Composition',
-  composer: getHeaders(artist),
-  lyricist: getHeaders(artist),
+  composer: getMetaIds(artist),
+  lyricist: getMetaIds(artist),
   title: 'beep-bop-boop'
 });
 
-const recording = setId({
+const recording = setMetaId({
   '@context': recordingContext,
-  '@types': 'MusicRecording',
-  audio: getHeaders(audio),
-  performer: getHeaders(artist),
-  producer: getHeaders(artist),
-  recordingOf: getHeader(composition)
+  '@type': 'Recording',
+  audio: getMetaIds(audio),
+  performer: getMetaIds(artist),
+  producer: getMetaIds(artist),
+  recordingOf: getMetaId(composition)
 });
 
-const composeClaims = {
-  iat: timestamp(),
-  iss: artist['@id'],
-  sub: composition['@id'],
-  typ: 'Compose'
-}
+const composeClaims = setClaimsId(
+  timestamp({
+    iss: artist['@id'],
+    sub: composition['@id'],
+    typ: 'Compose'
+  })
+);
 
-const licenseClaims  = {
-  aud: [curator['@id']],
-  exp: timestamp() + 1000,
-  iat: timestamp(),
-  iss: artist['@id'],
-  sub: composition['@id'],
-  typ: 'License'
-}
+const licenseClaims = setClaimsId(
+  timestamp({
+    aud: [curator['@id']],
+    exp: now() + 1000,
+    iss: artist['@id'],
+    sub: composition['@id'],
+    typ: 'License'
+  })
+);
 
-const recordClaims = {
-  iat: timestamp(),
-  iss: artist['@id'],
-  sub: recording['@id'],
-  typ: 'Record'
-}
+const recordClaims = setClaimsId(
+  timestamp({
+    iss: artist['@id'],
+    sub: recording['@id'],
+    typ: 'Record'
+  })
+);
 
-const composeSignature = sign(composeClaims, Compose, artistKeypair.secretKey);
-const licenseSignature = sign(licenseClaims, License, artistKeypair.secretKey);
-const recordSignature = sign(recordClaims, Record, artistKeypair.secretKey);
+const composeSignature = signClaims(composeClaims, artistKeypair.secretKey);
+const licenseSignature = signClaims(licenseClaims, artistKeypair.secretKey);
+const recordSignature = signClaims(recordClaims, artistKeypair.secretKey);
 
 describe('JWT', () => {
-  it('verifies signature on compose claims', () => {
+  it('verify compose claims', () => {
     assert.isOk(
-      verify(composeClaims, Compose, composeSignature),
-      'should verify signature on compose claims'
+      verifyClaims(composeClaims, composition, Compose, Composition, composeSignature),
+      'should verify compose claims'
     );
   });
-  it('verifies signature on license claims', () => {
+  it('verify license claims', () => {
     assert.isOk(
-      verify(licenseClaims, License, licenseSignature),
-      'should verify signature on license claims'
+      verifyClaims(licenseClaims, composition, License, Composition, licenseSignature),
+      'should verify license claims'
     );
   });
-  it('verifies signature on record claims', () => {
+  it('verify record claims', () => {
     assert.isOk(
-      verify(recordClaims, Record, recordSignature),
-      'should verify signature on record claims'
+      verifyClaims(recordClaims, recording, Record, Recording, recordSignature),
+      'should verify record claims'
     );
   });
 });

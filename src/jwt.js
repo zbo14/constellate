@@ -1,7 +1,15 @@
 const Ajv = require('ajv');
 const crypto = require('../lib/crypto.js');
-const { id } = require('../lib/meta.js');
-const { decodeBase64, encodeBase64, now } = require('../lib/util.js');
+const { calcMetaId, metaId, validateMeta } = require('../lib/meta.js');
+
+const {
+  calcId,
+  decodeBase64,
+  encodeBase64,
+  getId, getIds,
+  now,
+  validateSchema
+} = require('../lib/util.js');
 
 // @flow
 
@@ -12,6 +20,22 @@ const { decodeBase64, encodeBase64, now } = require('../lib/util.js');
 const ajv = new Ajv();
 
 const draft = 'http://json-schema.org/draft-06/schema#';
+
+function calcClaimsId(claims: Object): string {
+  return calcId('jti', claims);
+}
+
+function getClaimsId(claims: Object): Object {
+  return getId('jti', claims);
+}
+
+function getClaimsIds(...claims: Object[]): Object[] {
+  return getIds('jti', ...claims);
+}
+
+function setClaimsId(claims: Object): Object {
+  return Object.assign({}, claims, { 'jti': calcClaimsId(claims) });
+}
 
 const publicKey = {
   type: 'object',
@@ -58,16 +82,19 @@ const intDate = {
   type: 'integer'
 }
 
-const timestamp = Object.assign({}, intDate, { readonly: true });
+const iat = Object.assign({}, intDate, { readonly: true });
+
+const jti = Object.assign({}, metaId, { readonly: true });
 
 const Compose = {
   $schema: draft,
   type: 'object',
   title: 'Compose',
   properties: {
-    iat: timestamp,
-    iss: id,
-    sub: id,
+    iat: iat,
+    iss: metaId,
+    jti: jti,
+    sub: metaId,
     typ: {
       enum: ['Compose'],
       readonly: true
@@ -76,6 +103,7 @@ const Compose = {
   required: [
     'iat',
     'iss',
+    'jti',
     'sub',
     'typ'
   ]
@@ -88,15 +116,16 @@ const License = {
   properties: {
     aud: {
       type: 'array',
-      items: id,
+      items: metaId,
       minItems: 1,
       uniqueItems: true
     },
     exp: intDate,
-    iat: timestamp,
-    iss: id,
+    iat: iat,
+    iss: metaId,
+    jti: jti,
     nbf: intDate,
-    sub: id,
+    sub: metaId,
     typ: {
       enum: ['License'],
       readonly: true
@@ -107,6 +136,7 @@ const License = {
     'exp',
     'iat',
     'iss',
+    'jti',
     'sub',
     'typ'
   ]
@@ -117,9 +147,10 @@ const Record = {
   type: 'object',
   title: 'Record',
   properties: {
-    iat: timestamp,
-    iss: id,
-    sub: id,
+    iat: iat,
+    iss: metaId,
+    jti: jti,
+    sub: metaId,
     typ: {
       enum: ['Record'],
       readonly: true
@@ -128,12 +159,13 @@ const Record = {
   required: [
     'iat',
     'iss',
+    'jti',
     'sub',
     'typ'
   ]
 }
 
-function setTimestamp(claims: Object): Object {
+function timestamp(claims: Object): Object {
   return Object.assign({}, claims, { iat: now() });
 }
 
@@ -141,47 +173,60 @@ const encodedHeader = encodeBase64({
   alg: 'EdDsa', typ: 'JWT'
 });
 
-function sign(claims: Object, secretKey: Buffer): Buffer {
+function signClaims(claims: Object, secretKey: Buffer): Buffer {
   const encodedPayload = encodeBase64(claims);
   return crypto.sign(encodedHeader + '.' + encodedPayload, secretKey);
 }
 
-function validate(claims: Object, schema: Object): boolean {
+function validateClaims(claims: Object, meta: Object, schemaClaims: Object, schemaMeta: Object): boolean {
   let valid = false;
   try {
-    if (!ajv.compile(schema)(claims)) {
-      throw new Error('has invalid schema: ' + JSON.stringify(claims, null, 2));
-    }
-    if (claims.iat > now()) {
-      throw new Error('timestamp cannot be later than now');
-    }
-    if (claims.aud && claims.aud.some((aud) => aud === claims.iss)) {
-      throw new Error('audience cannot contain issuer');
-    }
-    if (claims.exp) {
-      if (claims.exp < claims.iat) {
-        throw new Error('expire time cannot be earlier than timestamp');
+    if (validateMeta(meta, schemaMeta)) {
+      if (!validateSchema(claims, schemaClaims)) {
+        throw new Error('claims has invalid schema: ' + JSON.stringify(claims, null, 2));
       }
-      if (claims.nbf && claims.exp < claims.nbf) {
-        throw new Error('expire time cannot be earlier than start time');
+      if (claims.iat > now()) {
+        throw new Error('iat cannot be later than now');
       }
+      if (claims.aud && claims.aud.some((aud) => aud === claims.iss)) {
+        throw new Error('audience cannot contain issuer');
+      }
+      if (claims.exp) {
+        if (claims.exp < claims.iat) {
+          throw new Error('expire time cannot be earlier than iat');
+        }
+        if (claims.nbf && claims.exp < claims.nbf) {
+          throw new Error('expire time cannot be earlier than start time');
+        }
+      }
+      const claimsId = calcClaimsId(claims);
+      if (claims.jti !== claimsId) {
+        throw new Error(`expected jti=${claims.jti}; got ` + claimsId);
+      }
+      const metaId = calcMetaId(meta);
+      if (claims.sub !== metaId) {
+        throw new Error(`expected sub=${claims.sub}; got ` + metaId);
+      }
+      //..
+      valid = true;
     }
-    valid = true;
   } catch(err) {
     console.error(err.message);
   }
   return valid;
 }
 
-function verify(claims: Object, schema: Object, signature: Buffer): boolean {
+function verifyClaims(claims: Object, meta: Object, schemaClaims: Object, schemaMeta: Object, signature: Buffer): boolean {
   let verified = false;
   try {
-    const encodedPayload = encodeBase64(claims);
-    const publicKey = decodeBase64(claims.iss);
-    if (!crypto.verify(encodedHeader + '.' + encodedPayload, publicKey, signature)) {
-      throw new Error('invalid signature: ' + encodeBase64(signature));
+    if (validateClaims(claims, meta, schemaClaims, schemaMeta)) {
+      const encodedPayload = encodeBase64(claims);
+      const publicKey = decodeBase64(claims.iss);
+      if (!crypto.verify(encodedHeader + '.' + encodedPayload, publicKey, signature)) {
+        throw new Error('invalid signature: ' + encodeBase64(signature));
+      }
+      verified = true;
     }
-    verified = true;
   } catch(err) {
     console.error(err);
   }
@@ -202,7 +247,11 @@ exports.Compose = Compose;
 exports.License = License;
 exports.Record = Record;
 
-exports.setTimestamp = setTimestamp;
-exports.sign = sign;
-exports.validate = validate;
-exports.verify = verify;
+exports.calcClaimsId = calcClaimsId;
+exports.getClaimsId = getClaimsId;
+exports.getClaimsIds = getClaimsIds;
+exports.setClaimsId = setClaimsId;
+exports.signClaims = signClaims;
+exports.timestamp = timestamp;
+exports.validateClaims = validateClaims;
+exports.verifyClaims = verifyClaims;

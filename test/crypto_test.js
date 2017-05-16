@@ -2,13 +2,13 @@ import { assert } from 'chai';
 import { describe, it } from 'mocha';
 
 import {
-  generateKeypairFromPassword,
-  generateRandomKeypair,
+  keypairFromPassword,
+  randomKeypair,
   sign, verify
 } from '../lib/crypto.js';
 
-const alice = generateRandomKeypair();
-const bob = generateKeypairFromPassword('passwerd');
+const alice = randomKeypair();
+const bob = keypairFromPassword('passwerd');
 
 const message = 'dreeming of elliptic curvez';
 

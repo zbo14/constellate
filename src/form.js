@@ -5,6 +5,7 @@ const util = require('../lib/util.js');
 
 const {
   arrayFromObject,
+  getId,
   isArray,
   isBoolean,
   isNumber,
@@ -50,8 +51,8 @@ function generateElement(obj: Object, defs: Object): HTMLElement {
         return newInput('number');
       case 'object':
         const fieldset = document.createElement('fieldset');
-        const header = meta.getHeader(obj.properties);
-        if (isObject(header)) { obj = Object.assign({}, obj, { properties: header }); }
+        const id = getId(obj.properties);
+        if (isObject(id)) { obj = Object.assign({}, obj, { properties: id }); }
         const form = generateForm(obj);
         if (form != null) {
           form.forEach((div) => {

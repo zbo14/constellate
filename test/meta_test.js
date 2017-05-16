@@ -1,6 +1,6 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
-import { generateKeypairFromPassword } from '../lib/crypto.js';
+import { keypairFromPassword } from '../lib/crypto.js';
 import { encodeBase58, orderStringify } from '../lib/util.js';
 
 import {
@@ -10,12 +10,13 @@ import {
   Composition,
   Organization,
   Recording,
-  getHeader,
-  getHeaders,
+  getMetaId,
+  getMetaIds,
   schemaPrefix,
-  setId,
-  validate
+  setMetaId,
+  validateMeta
 } from '../lib/meta.js';
+
 
 const artistContext = {
   schema: 'http://schema.org/',
@@ -54,7 +55,7 @@ const audioContext = {
 
 const recordingContext = {
   schema: 'http://schema.org/',
-  audio: 'schema:AudioObject',
+  audio: 'schema:audio',
   isrc: 'schema:isrcCode',
   performer: 'schema:performer',
   producer: 'schema:producer',
@@ -73,7 +74,7 @@ const albumContext = {
   track: 'schema:track'
 }
 
-const composer = setId({
+const composer = setMetaId({
   '@context': artistContext,
   '@type': 'Artist',
   email: 'composer@example.com',
@@ -82,7 +83,7 @@ const composer = setId({
   profile: ['http://facebook-profile.com'],
 });
 
-const lyricist = setId({
+const lyricist = setMetaId({
   '@context': artistContext,
   '@type': 'Artist',
   email: 'lyricist@example.com',
@@ -90,7 +91,7 @@ const lyricist = setId({
   name: 'lyricist'
 });
 
-const performer = setId({
+const performer = setMetaId({
   '@context': artistContext,
   '@type': 'Artist',
   email: 'performer@example.com',
@@ -99,7 +100,7 @@ const performer = setId({
   profile: ['http://bandcamp-page.com']
 });
 
-const producer = setId({
+const producer = setMetaId({
   '@context': artistContext,
   '@type': 'Artist',
   homepage: 'http://producer.com',
@@ -107,7 +108,7 @@ const producer = setId({
   profile: ['http://soundcloud-page.com']
 });
 
-const publisher = setId({
+const publisher = setMetaId({
   '@context': organizationContext,
   '@type': 'Organization',
   email: 'publisher@example.com',
@@ -115,7 +116,7 @@ const publisher = setId({
   name: 'publisher'
 });
 
-const recordLabel = setId({
+const recordLabel = setMetaId({
   '@context': organizationContext,
   '@type': 'Organization',
   email: 'recordLabel@example.com',
@@ -123,78 +124,78 @@ const recordLabel = setId({
   name: 'recordLabel'
 });
 
-const composition = setId({
+const composition = setMetaId({
   '@context': compositionContext,
   '@type': 'Composition',
-  composer: getHeaders(composer),
+  composer: getMetaIds(composer),
   iswcCode: 'T-034.524.680-1',
-  lyricist: getHeaders(lyricist),
-  publisher: getHeaders(publisher),
+  lyricist: getMetaIds(lyricist),
+  publisher: getMetaIds(publisher),
   title: 'fire-song'
 });
 
-const audio = setId({
+const audio = setMetaId({
   '@context': audioContext,
   '@type': 'Audio',
   contentUrl: 'http://audio-file.com',
   encodingFormat: 'mp3'
 });
 
-const recording = setId({
+const recording = setMetaId({
   '@context': recordingContext,
   '@type': 'Recording',
-  audio: getHeaders(audio),
-  performer: getHeaders(performer),
-  producer: getHeaders(producer),
-  recordingOf: getHeader(composition),
-  recordLabel: getHeaders(recordLabel)
+  audio: getMetaIds(audio),
+  performer: getMetaIds(performer),
+  producer: getMetaIds(producer),
+  recordingOf: getMetaId(composition),
+  recordLabel: getMetaIds(recordLabel)
 });
 
-const album = setId({
+const album = setMetaId({
   '@context': albumContext,
   '@type': 'Album',
-  artist: getHeaders(performer, producer),
+  artist: getMetaIds(performer, producer),
   productionType: 'DemoAlbum',
-  recordLabel: getHeaders(recordLabel),
+  recordLabel: getMetaIds(recordLabel),
   releaseType: 'SingleRelease',
-  track: getHeaders(recording)
+  track: getMetaIds(recording)
 });
 
-describe('Spec', () => {
-    it('validates an artist', () => {
+describe('Meta', () => {
+    it('validates artist metadata', () => {
       assert(
-        validate(composer, Artist),
-        'should validate user'
+        validateMeta(composer, Artist),
+        'should validate artist metadata'
       );
     });
-    it('validates an organization', () => {
+    it('validates organization metadata', () => {
       assert(
-        validate(recordLabel, Organization),
-        'should validate an organization'
+        validateMeta(recordLabel, Organization),
+        'should validate organization metadata'
       );
     });
-    it('validates a composition', () => {
+    it('validates composition metadata', () => {
       assert(
-        validate(composition, Composition),
-        'should validate composition'
+        validateMeta(composition, Composition),
+        'should validate composition metadata'
       );
     });
-    it('validates audio', () => {
+    it('validates audio metadata', () => {
       assert(
-        validate(audio, Audio),
-        'should validate audio'
+        validateMeta(audio, Audio),
+        'should validate audio metadata'
       );
     });
-    it('validates a recording', () => {
+    it('validates recording metadata', () => {
       assert(
-        validate(recording, Recording),
-        'should validate recording'
+        validateMeta(recording, Recording),
+        'should validate recording metadata'
       );
     });
-    it('validates an album', () => {
+    it('validates album metadata', () => {
       assert(
-        validate(album, Album),
-        'should validate album'
+        validateMeta(album, Album),
+        'should validate album metadata'
       );
     });
 });

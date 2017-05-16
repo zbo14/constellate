@@ -1,12 +1,30 @@
 const crypto = require('./lib/crypto.js');
 const { generateForm, parseForm } = require('./lib/form.js');
-const jwt = require('./lib/jwt.js');
-const meta = require('./lib/meta.js');
-const { encodeBase64, decodeBase64 } = require('./lib/util.js');
+const { encodeBase64, decodeBase64, setId } = require('./lib/util.js');
+
+const {
+  Compose,
+  License,
+  Record,
+  signClaims,
+  timestamp,
+  validateClaims,
+  verifyClaims
+} = require('./lib/jwt.js');
+
+const {
+  Album,
+  Artist,
+  Audio,
+  Composition,
+  Organization,
+  Recording,
+  validateMeta
+} = require('./lib/meta.js');
 
 const claims = document.getElementById('claims');
 const form = document.querySelector('form');
-const _meta = document.getElementById('meta');
+const meta = document.getElementById('meta');
 const newKeypairBtn = document.getElementById('new-keypair-btn');
 const ols = document.getElementsByTagName('ol');
 const select = document.querySelector('select');
@@ -23,21 +41,21 @@ newKeypairBtn.addEventListener('click', () => {
     const password = prompt('Please enter a password to generate keypair', 'passwerd');
     const keypair = crypto.keypairFromPassword(password);
     publicKey = keypair.publicKey;
-    _meta.textContent = JSON.stringify(crypto.encodeKeypair(keypair), null, 2);
+    meta.textContent = JSON.stringify(crypto.encodeKeypair(keypair), null, 2);
   }
 }, false);
 
 signClaimsBtn.addEventListener('click', () => {
   if (mode === 'claims' && claimsObj) {
     const secretKey = prompt('Please enter your secret key to sign claims', '');
-    sig.innerHTML = encodeBase64(jwt.sign(claimsObj, decodeBase64(secretKey)));
+    sig.innerHTML = encodeBase64(signClaims(claimsObj, decodeBase64(secretKey)));
   }
 }, false);
 
 verifySigBtn.addEventListener('click', () => {
   if (mode === 'claims' && claimsObj && schema) {
     const signature = decodeBase64(sig.innerHTML);
-    console.log(jwt.verify(claimsObj, schema, signature));
+    console.log(verifyClaims(claimsObj, schema, signature));
   }
 }, false);
 
@@ -83,34 +101,34 @@ select.addEventListener('change', () => {
   verifySigBtn.hidden = true;
   switch(select.value) {
     case 'album':
-      schema = meta.Album;
+      schema = Album;
       break;
     case 'artist':
-      schema = meta.Artist;
+      schema = Artist;
       newKeypairBtn.hidden = false;
       break;
     case 'audio':
-      schema = meta.Audio;
+      schema = Audio;
       break;
     case 'composition':
-      schema = meta.Composition;
+      schema = Composition;
       break;
     case 'organization':
-      schema = meta.Organization;
+      schema = Organization;
       newKeypairBtn.hidden = false;
       break;
     case 'recording':
-      schema = meta.Recording;
+      schema = Recording;
       break;
     //------------------------------
     case 'compose':
-      schema = jwt.Compose;
+      schema = Compose;
       break;
     case 'license':
-      schema = jwt.License;
+      schema = License;
       break;
     case 'record':
-      schema = jwt.Record;
+      schema = Record;
       break;
     default:
       console.error('unexpected type: ' + select.value);
@@ -131,29 +149,21 @@ function includeElement(elem, label) {
       if (!elem.value) return false;
       return true;
     case 'FIELDSET':
-      if (!elem.children.length) {
-        return false;
-      }
+      if (!elem.children.length) return false;
       return Array.from(elem.children).map((div) => {
         if (!div.children.length) {
-          if (!elem.hasAttribute('required')) {
-            return false;
-          }
+          if (!elem.hasAttribute('required')) return false;
           throw new Error(label.textContent + ' is required');
         }
         return includeElement(div.lastChild);
       }).every((bool) => bool);
     case 'OL':
       if (!elem.children.length) {
-        if (!elem.hasAttribute('required')) {
-          return false;
-        }
+        if (!elem.hasAttribute('required')) return false;
         throw new Error(label.textContent + ' is required');
       }
       return Array.from(elem.children).map((li) => {
-        if (!li.children.length) {
-          return false;
-        }
+        if (!li.children.length) return false;
         return includeElement(li.firstChild);
       }).every((bool) => bool);
     case 'SELECT':
@@ -179,17 +189,17 @@ form.addEventListener('submit', (event) => {
         } else if (!publicKey || publicKey.length !== 32) {
           throw new Error(`invalid public key: ${publicKey}`);
         }
-        metaObj = meta.setId(metaObj, publicKey)
-        if (meta.validate(metaObj, schema, publicKey)) {
-          _meta.textContent = JSON.stringify(metaObj, null, 2);
+        metaObj = setId('@id', metaObj, publicKey)
+        if (validateMeta(metaObj, schema, publicKey)) {
+          meta.textContent = JSON.stringify(metaObj, null, 2);
           return;
         }
       }
     } else if (mode === 'claims') {
       claimsObj = parseForm(divs);
       if (claimsObj) {
-        claimsObj = jwt.setTimestamp(claimsObj);
-        if (jwt.validate(claimsObj, schema)) {
+        claimsObj = setId('jti', timestamp(claimsObj));
+        if (validateClaims(claimsObj, schema)) {
           claims.textContent = JSON.stringify(claimsObj, null, 2);
           return;
         }
@@ -200,6 +210,6 @@ form.addEventListener('submit', (event) => {
   } catch(err) {
     console.error(err);
   }
-  // _meta.textContent = null;
+  // meta.textContent = null;
   // claims.textContent = null;
 }, false);
