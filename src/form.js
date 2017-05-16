@@ -68,13 +68,13 @@ function generateElement(obj: Object, defs: Object): HTMLElement {
     throw new Error('unexpected type: ' + obj.type);
 }
 
-function evalElement(elem: HTMLElement): any {
+function parseElement(elem: HTMLElement): any {
   switch(elem.nodeName) {
     case 'FIELDSET':
       if (!elem.children.length) {
         throw new Error('fieldset has no children');
       }
-      return evalForm(Array.from(elem.children));
+      return parseForm(Array.from(elem.children));
     case 'INPUT':
       const input: HTMLInputElement = (elem: any);
       switch(input.type) {
@@ -84,10 +84,10 @@ function evalElement(elem: HTMLElement): any {
           }
           return input.value;
         case 'number':
-          if (!isNumber(input.value)) {
+          if (!isNumber(input.valueAsNumber)) {
             throw new Error('input[type="number"] has non-number value');
           }
-          return input.value;
+          return input.valueAsNumber;
         case 'text':
           if (!isString(input.value)) {
             throw new Error('input[type="text"] has non-string value');
@@ -102,7 +102,7 @@ function evalElement(elem: HTMLElement): any {
       }
       return Array.from(elem.children).reduce((result, child) => {
           if (child.nodeName !== 'LI') { return result; }
-          return result.concat(evalElement(child.children[0]));
+          return result.concat(parseElement(child.children[0]));
       }, []);
     case 'SELECT':
       const select: HTMLSelectElement = (elem: any);
@@ -112,13 +112,14 @@ function evalElement(elem: HTMLElement): any {
   }
 }
 
-function parseElement(elem: HTMLElement): Object {
+
+function schemafyElement(elem: HTMLElement): Object {
   switch(elem.nodeName) {
     case 'FIELDSET':
       if (!elem.children.length) {
         throw new Error('fieldset has no children');
       }
-      return parseForm(Array.from(elem.children));
+      return schemafyForm(Array.from(elem.children));
     case 'INPUT':
       const input: HTMLInputElement = (elem: any);
       switch(input.type) {
@@ -144,7 +145,7 @@ function parseElement(elem: HTMLElement): Object {
       const attributes: Object = (elem.attributes: any);
       return {
         type: 'array',
-        items: parseElement(firstChild),
+        items: schemafyElement(firstChild),
         minItems: parseInt(attributes.minimum.value),
         uniqueItems: elem.hasAttribute('unique')
       }
@@ -238,15 +239,15 @@ function isDescendant(parent: HTMLElement, child: HTMLElement): boolean {
   return isDescendant(parent, _parent);
 }
 
-function generateForm(_schema: Object): HTMLElement[] {
+function generateForm(schema: Object): HTMLElement[] {
   let form: HTMLElement[] = [];
   try {
-    if (!isObject(_schema.properties)) {
+    if (!isObject(schema.properties)) {
       throw new Error('schema properties should be object');
     }
-    const defs = _schema.definitions;
-    const props = _schema.properties;
-    const reqs = _schema.required;
+    const defs = schema.definitions;
+    const props = schema.properties;
+    const reqs = schema.required;
     const elems = recurse(props, (obj, key) => {
       const elem = arrayFromObject(obj).reduce((result, [k, v]) => {
         return setAttribute(result, k, v);
@@ -271,15 +272,15 @@ function generateForm(_schema: Object): HTMLElement[] {
 }
 
 function addValue(obj: Object, elem: HTMLElement, label: HTMLElement): Object {
-  const val = evalElement(elem);
-  if (val == null || (isArray(val) && val.some((x) => !x))) return obj;
+  const val = parseElement(elem);
+  if (val == null || (isArray(val) && val.some((x) => x == null))) return obj;
   return Object.assign({}, obj, { [label.textContent]: val } );
 }
 
 function parseForm(form: HTMLElement[]): Object {
-  let values = {};
+  let obj = {};
   try {
-    values = form.reduce((result, div) => {
+    obj = form.reduce((result, div) => {
       if (div.nodeName !== 'DIV') {
         throw new Error('expected <div>; got ' + div.nodeName);
       }
@@ -300,8 +301,49 @@ function parseForm(form: HTMLElement[]): Object {
   } catch(err) {
     console.error(err);
   }
-  return values;
+  return obj;
+}
+
+function schemafyForm(form: HTMLElement[]): Object  {
+  let schema = {};
+  try {
+    schema = form.reduce((result, div) => {
+      if (div.nodeName !== 'DIV') {
+        throw new Error('expected <div>; got ' + div.nodeName);
+      }
+      if (!div.children.length) {
+        throw new Error('<div> has no children');
+      }
+      const children = Array.from(div.children);
+      if (children.length !== 2) {
+        throw new Error('<div> should have 2 children; has ' + children.length);
+      }
+      const label = children[0];
+      if (label.nodeName !== 'LABEL') {
+        throw new Error('expected label; got ' + label.nodeName);
+      }
+      const elem = children[1];
+      const obj = parseElement(elem);
+      if (!isObject(obj)) {
+        throw new Error('expected valid object; got ' + JSON.stringify(obj));
+      }
+      return Object.assign({}, result, {
+        properties: Object.assign({}, result.properties,
+          { [label.textContent]: getAttributes(elem, obj) }
+        ),
+        required: addRequired(result.required, elem, label)
+      });
+    }, {
+      properties: {},
+      required: [],
+      type: 'object'
+    });
+  } catch(err) {
+    console.error(err);
+  }
+  return schema;
 }
 
 exports.generateForm = generateForm;
 exports.parseForm = parseForm;
+exports.schemafyForm = schemafyForm;

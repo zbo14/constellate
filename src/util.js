@@ -95,7 +95,7 @@ function isBoolean(bool: any): boolean {
 }
 
 function isNumber(num: any): boolean {
-  return num != null && typeof num === 'number';
+  return num != null && typeof num === 'number' &&  num !== NaN;
 }
 
 function isObject(obj: any): boolean {

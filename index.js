@@ -2,31 +2,42 @@ const crypto = require('./lib/crypto.js');
 const { generateForm, parseForm } = require('./lib/form.js');
 const jwt = require('./lib/jwt.js');
 const meta = require('./lib/meta.js');
-const util = require('./lib/util.js');
+const { encodeBase64, decodeBase64 } = require('./lib/util.js');
 
+const claims = document.getElementById('claims');
 const form = document.querySelector('form');
+const _meta = document.getElementById('meta');
 const newKeypairBtn = document.getElementById('new-keypair-btn');
 const ols = document.getElementsByTagName('ol');
-const pre = document.querySelector('pre');
 const select = document.querySelector('select');
+const sig = document.getElementById('sig');
 const signClaimsBtn = document.getElementById('sign-claims-btn');
 const submit = document.createElement('input');
 submit.type = 'submit';
+const verifySigBtn = document.getElementById('verify-sig-btn');
 
-let mode, schema, values;
+let claimsObj, metaObj, mode, publicKey, schema;
 
 newKeypairBtn.addEventListener('click', () => {
   if (mode === 'meta') {
     const password = prompt('Please enter a password to generate keypair', 'passwerd');
-    const keypair = crypto.generateKeypairFromPassword(password);
-    pre.textContent = JSON.stringify(crypto.encodeKeypair(keypair), null, 2);
+    const keypair = crypto.keypairFromPassword(password);
+    publicKey = keypair.publicKey;
+    _meta.textContent = JSON.stringify(crypto.encodeKeypair(keypair), null, 2);
   }
 }, false);
 
 signClaimsBtn.addEventListener('click', () => {
-  if (mode === 'claims' && values) {
+  if (mode === 'claims' && claimsObj) {
     const secretKey = prompt('Please enter your secret key to sign claims', '');
-    pre.textContent += jwt.sign(values, new Uint8Array(decodeBase64(secretKey)));
+    sig.innerHTML = encodeBase64(jwt.sign(claimsObj, decodeBase64(secretKey)));
+  }
+}, false);
+
+verifySigBtn.addEventListener('click', () => {
+  if (mode === 'claims' && claimsObj && schema) {
+    const signature = decodeBase64(sig.innerHTML);
+    console.log(jwt.verify(claimsObj, schema, signature));
   }
 }, false);
 
@@ -67,9 +78,9 @@ function listModifiers() {
 select.addEventListener('change', () => {
   form.innerHTML = null;
   mode = select.selectedOptions[0].parentNode.label;
-  console.log(mode);
   newKeypairBtn.hidden = true;
   signClaimsBtn.hidden = true;
+  verifySigBtn.hidden = true;
   switch(select.value) {
     case 'album':
       schema = meta.Album;
@@ -94,32 +105,30 @@ select.addEventListener('change', () => {
     //------------------------------
     case 'compose':
       schema = jwt.Compose;
-      signClaimsBtn.hidden = false;
       break;
     case 'license':
       schema = jwt.License;
-      signClaimsBtn.hidden = false;
       break;
     case 'record':
       schema = jwt.Record;
-      signClaimsBtn.hidden = false;
       break;
     default:
       console.error('unexpected type: ' + select.value);
       return;
   }
+  if (mode === 'claims') {
+    signClaimsBtn.hidden = false;
+    verifySigBtn.hidden = false;
+  }
   generateForm(schema).forEach((div) => form.appendChild(div));
   form.appendChild(submit);
-  pre.textContent = null;
   listModifiers();
 }, false);
 
 function includeElement(elem, label) {
   switch (elem.nodeName) {
     case 'INPUT':
-      if (elem.type === 'text' && !elem.value) {
-        return false;
-      }
+      if (!elem.value) return false;
       return true;
     case 'FIELDSET':
       if (!elem.children.length) {
@@ -163,20 +172,25 @@ form.addEventListener('submit', (event) => {
              && includeElement(div.lastChild, div.firstChild);
     });
     if (mode === 'meta') {
-      values = parseForm(divs);
-      if (values) {
-        values = meta.setId(values);
-        if (meta.validate(values, schema)) {
-          pre.textContent = JSON.stringify(values, null, 2);
+      metaObj = parseForm(divs);
+      if (metaObj) {
+        if (select.value !== 'artist' && select.value !== 'organization') {
+          publicKey = null;
+        } else if (!publicKey || publicKey.length !== 32) {
+          throw new Error(`invalid public key: ${publicKey}`);
+        }
+        metaObj = meta.setId(metaObj, publicKey)
+        if (meta.validate(metaObj, schema, publicKey)) {
+          _meta.textContent = JSON.stringify(metaObj, null, 2);
           return;
         }
       }
     } else if (mode === 'claims') {
-      values = parseForm(divs);
-      if (values) {
-        values = jwt.setTimestamp(values);
-        if (jwt.validate(values, schema)) {
-          pre.textContent = JSON.stringify(values, null, 2);
+      claimsObj = parseForm(divs);
+      if (claimsObj) {
+        claimsObj = jwt.setTimestamp(claimsObj);
+        if (jwt.validate(claimsObj, schema)) {
+          claims.textContent = JSON.stringify(claimsObj, null, 2);
           return;
         }
       }
@@ -186,5 +200,6 @@ form.addEventListener('submit', (event) => {
   } catch(err) {
     console.error(err);
   }
-  pre.textContent = null;
+  // _meta.textContent = null;
+  // claims.textContent = null;
 }, false);

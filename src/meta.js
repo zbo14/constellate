@@ -31,7 +31,7 @@ function calcId(obj: Object): string {
   return encodeBase64(digestSHA256(orderStringify(withoutKeys(obj, '@id'))));
 }
 
-function checkId(obj: Object, publicKey?: Uint8Array): boolean {
+function checkId(obj: Object, publicKey: ?Buffer): boolean {
   return obj['@id'] === setId(obj, publicKey)['@id'];
 }
 
@@ -80,10 +80,10 @@ function schemaPrefix(field: string) {
   }
 }
 
-function setId(obj: Object, publicKey?: Uint8Array): Object {
+function setId(obj: Object, publicKey: ?Buffer): Object {
   if (publicKey && publicKey.length === 32) {
     return Object.assign({}, obj, {
-      '@id': encodeBase64(Buffer.from(publicKey))
+      '@id': encodeBase64(publicKey)
     });
   }
   return Object.assign({}, obj, {
@@ -91,7 +91,7 @@ function setId(obj: Object, publicKey?: Uint8Array): Object {
   });
 }
 
-function validate(meta: Object, schema: Object, publicKey?: Uint8Array): boolean {
+function validate(meta: Object, schema: Object, publicKey: ?Buffer): boolean {
   let valid = false;
   try {
     if (!checkId(meta, publicKey)) {
@@ -516,6 +516,7 @@ exports.calcId = calcId;
 exports.checkId = checkId;
 exports.getHeader = getHeader;
 exports.getHeaders = getHeaders;
+exports.id = id;
 exports.schemaPrefix = schemaPrefix;
 exports.setId = setId;
 exports.validate = validate;
