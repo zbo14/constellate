@@ -1,11 +1,13 @@
-const crypto = require('./lib/crypto.js');
+const { encodeKeypair } = require('./lib/crypto.js');
+const ed25519 = require('./lib/ed25519.js');
 const { generateForm, parseForm } = require('./lib/form.js');
-const { encodeBase64, decodeBase64, setId } = require('./lib/util.js');
+const { encodeBase64, decodeBase64 } = require('./lib/util.js');
 
 const {
   Compose,
   License,
   Record,
+  setClaimsId,
   signClaims,
   timestamp,
   validateClaims,
@@ -19,6 +21,7 @@ const {
   Composition,
   Organization,
   Recording,
+  setMetaId,
   validateMeta
 } = require('./lib/meta.js');
 
@@ -34,14 +37,14 @@ const submit = document.createElement('input');
 submit.type = 'submit';
 const verifySigBtn = document.getElementById('verify-sig-btn');
 
-let claimsObj, metaObj, mode, publicKey, schema;
+let claimsObj, metaObj, mode, publicKey, schemaClaims, schemaMeta;
 
 newKeypairBtn.addEventListener('click', () => {
   if (mode === 'meta') {
     const password = prompt('Please enter a password to generate keypair', 'passwerd');
-    const keypair = crypto.keypairFromPassword(password);
+    const keypair = ed25519.keypairFromPassword(password);
     publicKey = keypair.publicKey;
-    meta.textContent = JSON.stringify(crypto.encodeKeypair(keypair), null, 2);
+    meta.textContent = JSON.stringify(encodeKeypair(keypair), null, 2);
   }
 }, false);
 
@@ -53,9 +56,11 @@ signClaimsBtn.addEventListener('click', () => {
 }, false);
 
 verifySigBtn.addEventListener('click', () => {
-  if (mode === 'claims' && claimsObj && schema) {
+  if (mode === 'claims'
+      && claimsObj && metaObj
+      && schemaClaims && schemaMeta) {
     const signature = decodeBase64(sig.innerHTML);
-    console.log(verifyClaims(claimsObj, schema, signature));
+    console.log(verifyClaims(claimsObj, metaObj, schemaClaims, schemaMeta, signature));
   }
 }, false);
 
@@ -79,7 +84,8 @@ function listModifiers() {
         return;
       }
       ol.removeChild(ol.lastChild);
-    })
+    });
+    console.log(ol, ol.parentElement);
     form.insertBefore(remover, ol.parentElement);
     const adder = document.createElement('button');
     adder.className = 'adder';
@@ -101,44 +107,47 @@ select.addEventListener('change', () => {
   verifySigBtn.hidden = true;
   switch(select.value) {
     case 'album':
-      schema = Album;
+      schemaMeta = Album;
       break;
     case 'artist':
-      schema = Artist;
+      schemaMeta = Artist;
       newKeypairBtn.hidden = false;
       break;
     case 'audio':
-      schema = Audio;
+      schemaMeta = Audio;
       break;
     case 'composition':
-      schema = Composition;
+      schemaMeta = Composition;
       break;
     case 'organization':
-      schema = Organization;
+      schemaMeta = Organization;
       newKeypairBtn.hidden = false;
       break;
     case 'recording':
-      schema = Recording;
+      schemaMeta = Recording;
       break;
     //------------------------------
     case 'compose':
-      schema = Compose;
+      schemaClaims = Compose;
       break;
     case 'license':
-      schema = License;
+      schemaClaims = License;
       break;
     case 'record':
-      schema = Record;
+      schemaClaims = Record;
       break;
     default:
       console.error('unexpected type: ' + select.value);
       return;
   }
+  if (mode === 'meta') {
+    generateForm(schemaMeta).forEach((div) => form.appendChild(div));
+  }
   if (mode === 'claims') {
     signClaimsBtn.hidden = false;
     verifySigBtn.hidden = false;
+    generateForm(schemaClaims).forEach((div) => form.appendChild(div));
   }
-  generateForm(schema).forEach((div) => form.appendChild(div));
   form.appendChild(submit);
   listModifiers();
 }, false);
@@ -189,8 +198,8 @@ form.addEventListener('submit', (event) => {
         } else if (!publicKey || publicKey.length !== 32) {
           throw new Error(`invalid public key: ${publicKey}`);
         }
-        metaObj = setId('@id', metaObj, publicKey)
-        if (validateMeta(metaObj, schema, publicKey)) {
+        metaObj = setMetaId(metaObj, publicKey)
+        if (validateMeta(metaObj, schemaMeta, publicKey)) {
           meta.textContent = JSON.stringify(metaObj, null, 2);
           return;
         }
@@ -198,8 +207,8 @@ form.addEventListener('submit', (event) => {
     } else if (mode === 'claims') {
       claimsObj = parseForm(divs);
       if (claimsObj) {
-        claimsObj = setId('jti', timestamp(claimsObj));
-        if (validateClaims(claimsObj, schema)) {
+        claimsObj = setClaimsId(timestamp(claimsObj));
+        if (validateClaims(claimsObj, metaObj, schemaClaims, schemaMeta)) {
           claims.textContent = JSON.stringify(claimsObj, null, 2);
           return;
         }

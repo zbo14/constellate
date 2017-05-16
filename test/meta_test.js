@@ -4,78 +4,19 @@ import { keypairFromPassword } from '../lib/crypto.js';
 import { encodeBase58, orderStringify } from '../lib/util.js';
 
 import {
-  Album,
-  Artist,
-  Audio,
-  Composition,
-  Organization,
-  Recording,
-  getMetaId,
-  getMetaIds,
-  schemaPrefix,
+  Album, AlbumContext,
+  Artist, ArtistContext,
+  Audio, AudioContext,
+  Composition, CompositionContext,
+  Organization, OrganizationContext,
+  Recording, RecordingContext,
+  getMetaId, getMetaIds,
   setMetaId,
   validateMeta
 } from '../lib/meta.js';
 
-
-const artistContext = {
-  schema: 'http://schema.org/',
-  Artist: 'schema:MusicGroup',
-  email: 'schema:email',
-  homepage: 'schema:url',
-  name: 'schema:name',
-  profile: 'schema:sameAs'
-}
-
-const organizationContext = {
-  schema: 'http://schema.org/',
-  email: 'schema:email',
-  homepage: 'schema:url',
-  name: 'schema:name',
-  Organization: 'schema:Organization',
-  profile: 'schema:sameAs'
-}
-
-const compositionContext = {
-  schema: 'http://schema.org/',
-  composer: 'schema:composer',
-  Composition: 'schema:MusicComposition',
-  iswc: 'schema:iswcCode',
-  lyricist: 'schema:lyricist',
-  publisher: 'schema:publisher',
-  title: 'schema:name'
-}
-
-const audioContext = {
-  schema: 'http://schema.org/',
-  Audio: 'schema:AudioObject',
-  contentUrl: 'schema:contentUrl',
-  encodingFormat: 'schema:encodingFormat'
-}
-
-const recordingContext = {
-  schema: 'http://schema.org/',
-  audio: 'schema:audio',
-  isrc: 'schema:isrcCode',
-  performer: 'schema:performer',
-  producer: 'schema:producer',
-  Recording: 'schema:MusicRecording',
-  recordingOf: 'schema:recordingOf',
-  recordLabel: 'schema:recordLabel'
-}
-
-const albumContext = {
-  schema: 'http://schema.org/',
-  Album: 'schema:MusicAlbum',
-  artist: 'schema:byArtist',
-  productionType: 'schema:albumProductionType',
-  recordLabel: 'schema:recordLabel',
-  releaseType: 'schema:albumReleaseType',
-  track: 'schema:track'
-}
-
 const composer = setMetaId({
-  '@context': artistContext,
+  '@context': ArtistContext,
   '@type': 'Artist',
   email: 'composer@example.com',
   homepage: 'http://composer.com',
@@ -84,7 +25,7 @@ const composer = setMetaId({
 });
 
 const lyricist = setMetaId({
-  '@context': artistContext,
+  '@context': ArtistContext,
   '@type': 'Artist',
   email: 'lyricist@example.com',
   homepage: 'http://lyricist.com',
@@ -92,7 +33,7 @@ const lyricist = setMetaId({
 });
 
 const performer = setMetaId({
-  '@context': artistContext,
+  '@context': ArtistContext,
   '@type': 'Artist',
   email: 'performer@example.com',
   homepage: 'http://performer.com',
@@ -101,7 +42,7 @@ const performer = setMetaId({
 });
 
 const producer = setMetaId({
-  '@context': artistContext,
+  '@context': ArtistContext,
   '@type': 'Artist',
   homepage: 'http://producer.com',
   name: 'producer',
@@ -109,7 +50,7 @@ const producer = setMetaId({
 });
 
 const publisher = setMetaId({
-  '@context': organizationContext,
+  '@context': OrganizationContext,
   '@type': 'Organization',
   email: 'publisher@example.com',
   homepage: 'http://publisher.com',
@@ -117,7 +58,7 @@ const publisher = setMetaId({
 });
 
 const recordLabel = setMetaId({
-  '@context': organizationContext,
+  '@context': OrganizationContext,
   '@type': 'Organization',
   email: 'recordLabel@example.com',
   homepage: 'http://recordLabel.com',
@@ -125,7 +66,7 @@ const recordLabel = setMetaId({
 });
 
 const composition = setMetaId({
-  '@context': compositionContext,
+  '@context': CompositionContext,
   '@type': 'Composition',
   composer: getMetaIds(composer),
   iswcCode: 'T-034.524.680-1',
@@ -135,14 +76,14 @@ const composition = setMetaId({
 });
 
 const audio = setMetaId({
-  '@context': audioContext,
+  '@context': AudioContext,
   '@type': 'Audio',
   contentUrl: 'http://audio-file.com',
   encodingFormat: 'mp3'
 });
 
 const recording = setMetaId({
-  '@context': recordingContext,
+  '@context': RecordingContext,
   '@type': 'Recording',
   audio: getMetaIds(audio),
   performer: getMetaIds(performer),
@@ -152,7 +93,7 @@ const recording = setMetaId({
 });
 
 const album = setMetaId({
-  '@context': albumContext,
+  '@context': AlbumContext,
   '@type': 'Album',
   artist: getMetaIds(performer, producer),
   productionType: 'DemoAlbum',

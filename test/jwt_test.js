@@ -1,54 +1,24 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
-import { encodeKeypair, keypairFromPassword, randomKeypair } from '../lib/crypto.js';
+import { encodeKeypair } from '../lib/crypto.js';
+import { keypairFromPassword, randomKeypair } from '../lib/ed25519.js';
 import { Compose, License, Record, setClaimsId, signClaims, timestamp, verifyClaims } from '../lib/jwt.js';
-import { Composition, Recording, getMetaId, getMetaIds, setMetaId } from '../lib/meta.js';
 import { encodeBase64, now } from '../lib/util.js';
+
+import {
+  AudioContext, ArtistContext,
+  Composition, CompositionContext,
+  Recording, RecordingContext,
+  OrganizationContext,
+  getMetaId, getMetaIds,
+  setMetaId
+} from '../lib/meta.js';
 
 const artistKeypair = keypairFromPassword('muzaq');
 const curatorKeypair = randomKeypair();
 
-const artistContext = {
-  schema: 'http://schema.org/',
-  Artist: 'schema:MusicGroup',
-  email: 'schema:email',
-  homepage: 'schema:url',
-  name: 'schema:name',
-  profile: 'schema:sameAs'
-}
-
-const audioContext = {
-  schema: 'http://schema.org/',
-  Audio: 'schema:AudioObject',
-  contentUrl: 'schema:contentUrl',
-  encodingFormat: 'schema:encodingFormat'
-}
-
-const compositionContext = {
-  schema: 'http://schema.org/',
-  composer: 'schema:composer',
-  Composition: 'schema:MusicComposition',
-  iswc: 'schema:iswcCode',
-  lyricist: 'schema:lyricist',
-  publisher: 'schema:publisher',
-  title: 'schema:name'
-}
-
-const curatorContext = artistContext;
-
-const recordingContext = {
-  schema: 'http://schema.org/',
-  audio: 'schema:audio',
-  isrc: 'schema:isrcCode',
-  performer: 'schema:performer',
-  producer: 'schema:producer',
-  Recording: 'schema:MusicRecording',
-  recordingOf: 'schema:recordingOf',
-  recordLabel: 'schema:recordLabel'
-}
-
 const artist = setMetaId({
-  '@context': artistContext,
+  '@context': ArtistContext,
   '@type': 'Artist',
   email: 'artist@example.com',
   homepage: 'http://artist.com',
@@ -57,7 +27,7 @@ const artist = setMetaId({
 }, artistKeypair.publicKey);
 
 const curator = setMetaId({
-  '@context': curatorContext,
+  '@context': OrganizationContext,
   '@type': 'Organization',
   email: 'curator@example.com',
   homepage: 'http://curator.com',
@@ -65,13 +35,13 @@ const curator = setMetaId({
 }, curatorKeypair.publicKey);
 
 const audio = setMetaId({
-  '@context': audioContext,
+  '@context': AudioContext,
   '@type': 'Audio',
   contentUrl: 'http://audio-file.com'
 });
 
 const composition = setMetaId({
-  '@context': compositionContext,
+  '@context': CompositionContext,
   '@type': 'Composition',
   composer: getMetaIds(artist),
   lyricist: getMetaIds(artist),
@@ -79,7 +49,7 @@ const composition = setMetaId({
 });
 
 const recording = setMetaId({
-  '@context': recordingContext,
+  '@context': RecordingContext,
   '@type': 'Recording',
   audio: getMetaIds(audio),
   performer: getMetaIds(artist),

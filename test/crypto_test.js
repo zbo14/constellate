@@ -1,29 +1,26 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
 
-import {
-  keypairFromPassword,
-  randomKeypair,
-  sign, verify
-} from '../lib/crypto.js';
+const ed25519 = require('../lib/ed25519.js');
+const secp256k1 = require('../lib/secp256k1.js');
 
-const alice = randomKeypair();
-const bob = keypairFromPassword('passwerd');
+const alice = ed25519.keypairFromPassword('passwerd');
+const bob = secp256k1.randomKeypair();
 
 const message = 'dreeming of elliptic curvez';
 
-const aliceSignature = sign(message, alice.secretKey);
-const bobSignature = sign(message, bob.secretKey);
+const aliceSignature = ed25519.sign(message, alice.secretKey);
+const bobSignature = secp256k1.sign(message, bob.privateKey);
 
 describe('Crypto', () => {
-  it('verifies a signature', () => {
+  it('verifies ed25519 signature', () => {
     assert.isOk(
-    verify(message, alice.publicKey, aliceSignature),
-    'should verify signature');
+    ed25519.verify(message, alice.publicKey, aliceSignature),
+    'should verify ed25519 signature');
   });
-  it('verifies another signature', () => {
+  it('verifies secp256k1 signature', () => {
     assert.isOk(
-      verify(message, bob.publicKey, bobSignature),
-      'should verify signature');
+      secp256k1.verify(message, bob.publicKey, bobSignature),
+      'should verify secp256k1 signature');
   });
 });

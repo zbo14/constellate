@@ -54,6 +54,7 @@
     "mocha": "^3.2.0",
     "node-fetch": "^1.6.3",
     "request": "^2.81.0",
+    "secp256k1": "^3.2.5",
     "tweetnacl": "^1.0.0-rc.1",
     "unflowify": "^1.0.1",
     "urlsafe-base64": "^1.0.0",

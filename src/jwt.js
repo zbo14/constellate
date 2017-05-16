@@ -1,5 +1,5 @@
 const Ajv = require('ajv');
-const crypto = require('../lib/crypto.js');
+const ed25519 = require('../lib/ed25519.js');
 const { calcMetaId, metaId, validateMeta } = require('../lib/meta.js');
 
 const {
@@ -25,11 +25,11 @@ function calcClaimsId(claims: Object): string {
   return calcId('jti', claims);
 }
 
-function getClaimsId(claims: Object): Object {
+function getClaimsId(claims: Object): string {
   return getId('jti', claims);
 }
 
-function getClaimsIds(...claims: Object[]): Object[] {
+function getClaimsIds(...claims: Object[]): string[] {
   return getIds('jti', ...claims);
 }
 
@@ -175,7 +175,7 @@ const encodedHeader = encodeBase64({
 
 function signClaims(claims: Object, secretKey: Buffer): Buffer {
   const encodedPayload = encodeBase64(claims);
-  return crypto.sign(encodedHeader + '.' + encodedPayload, secretKey);
+  return ed25519.sign(encodedHeader + '.' + encodedPayload, secretKey);
 }
 
 function validateClaims(claims: Object, meta: Object, schemaClaims: Object, schemaMeta: Object): boolean {
@@ -222,7 +222,7 @@ function verifyClaims(claims: Object, meta: Object, schemaClaims: Object, schema
     if (validateClaims(claims, meta, schemaClaims, schemaMeta)) {
       const encodedPayload = encodeBase64(claims);
       const publicKey = decodeBase64(claims.iss);
-      if (!crypto.verify(encodedHeader + '.' + encodedPayload, publicKey, signature)) {
+      if (!ed25519.verify(encodedHeader + '.' + encodedPayload, publicKey, signature)) {
         throw new Error('invalid signature: ' + encodeBase64(signature));
       }
       verified = true;

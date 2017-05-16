@@ -52,15 +52,15 @@ function encodeBase64(buf: Buffer): string {
   return urlsafeBase64.encode(buf).toString('utf-8', 0, 3);
 }
 
-function getId(key: string, obj: Object): Object {
-  let id = {}
-  if (obj.hasOwnProperty(key) && obj[key]) {
-    id = { [key]: obj[key] };
+function getId(key: string, obj: Object): string {
+  let id = '';
+  if (obj && obj.hasOwnProperty(key) && obj[key]) {
+    id = obj[key];
   }
   return id;
 }
 
-function getIds(key: string, ...objs: Object[]): Object[] {
+function getIds(key: string, ...objs: Object[]): string[] {
   return objs.map((obj) => getId(key, obj));
 }
 
