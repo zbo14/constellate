@@ -2,10 +2,11 @@ import { assert } from 'chai';
 import { describe, it } from 'mocha';
 import { encodeKeypair } from '../lib/crypto.js';
 import { keypairFromPassword, randomKeypair } from '../lib/ed25519.js';
-import { Compose, License, Record, setClaimsId, signClaims, timestamp, verifyClaims } from '../lib/jwt.js';
+import { Create, License, setClaimsId, signClaims, timestamp, verifyClaims } from '../lib/jwt.js';
 import { encodeBase64, now } from '../lib/util.js';
 
 import {
+  Album, AlbumContext,
   AudioContext, ArtistContext,
   Composition, CompositionContext,
   Recording, RecordingContext,
@@ -57,53 +58,111 @@ const recording = setMetaId({
   recordingOf: getMetaId(composition)
 });
 
-const composeClaims = setClaimsId(
+const album = setMetaId({
+  '@context': AlbumContext,
+  '@type': 'Album',
+  artist: getMetaIds(artist),
+  releaseType: 'SingleRelease',
+  track: getMetaIds(recording)
+});
+
+const createComposition = setClaimsId(
   timestamp({
-    iss: artist['@id'],
-    sub: composition['@id'],
-    typ: 'Compose'
+    iss: getMetaId(artist),
+    sub: getMetaId(composition),
+    typ: 'Create'
   })
 );
 
-const licenseClaims = setClaimsId(
+const createRecording = setClaimsId(
   timestamp({
-    aud: [curator['@id']],
+    iss: getMetaId(artist),
+    sub: getMetaId(recording),
+    typ: 'Create'
+  })
+);
+
+const createAlbum = setClaimsId(
+  timestamp({
+    iss: getMetaId(artist),
+    sub: getMetaId(album),
+    typ: 'Create'
+  })
+);
+
+const licenseComposition = setClaimsId(
+  timestamp({
+    aud: getMetaIds(curator),
     exp: now() + 1000,
-    iss: artist['@id'],
-    sub: composition['@id'],
+    iss: getMetaId(artist),
+    sub: getMetaId(composition),
     typ: 'License'
   })
 );
 
-const recordClaims = setClaimsId(
+const licenseRecording = setClaimsId(
   timestamp({
-    iss: artist['@id'],
-    sub: recording['@id'],
-    typ: 'Record'
+    aud: getMetaIds(curator),
+    exp: now() + 2000,
+    iss: getMetaId(artist),
+    sub: getMetaId(recording),
+    typ: 'License'
   })
 );
 
-const composeSignature = signClaims(composeClaims, artistKeypair.secretKey);
-const licenseSignature = signClaims(licenseClaims, artistKeypair.secretKey);
-const recordSignature = signClaims(recordClaims, artistKeypair.secretKey);
+const licenseAlbum = setClaimsId(
+  timestamp({
+    aud: getMetaIds(curator),
+    exp: now() + 3000,
+    iss: getMetaId(artist),
+    sub: getMetaId(album),
+    typ: 'License'
+  })
+);
+
+const createCompositionSig = signClaims(createComposition, artistKeypair.secretKey);
+const createRecordingSig = signClaims(createRecording, artistKeypair.secretKey);
+const createAlbumSig = signClaims(createAlbum, artistKeypair.secretKey);
+
+const licenseCompositionSig = signClaims(licenseComposition, artistKeypair.secretKey);
+const licenseRecordingSig = signClaims(licenseRecording, artistKeypair.secretKey);
+const licenseAlbumSig = signClaims(licenseAlbum, artistKeypair.secretKey);
 
 describe('JWT', () => {
-  it('verify compose claims', () => {
+  it('verify create composition claims', () => {
     assert.isOk(
-      verifyClaims(composeClaims, composition, Compose, Composition, composeSignature),
-      'should verify compose claims'
+      verifyClaims(createComposition, composition, Create, Composition, createCompositionSig),
+      'should verify create composition claims'
     );
   });
-  it('verify license claims', () => {
+  it('verify create recording claims', () => {
     assert.isOk(
-      verifyClaims(licenseClaims, composition, License, Composition, licenseSignature),
-      'should verify license claims'
+      verifyClaims(createRecording, recording, Create, Recording, createRecordingSig),
+      'should verify create recording claims'
     );
   });
-  it('verify record claims', () => {
+  it('verify create album claims', () => {
     assert.isOk(
-      verifyClaims(recordClaims, recording, Record, Recording, recordSignature),
-      'should verify record claims'
+      verifyClaims(createAlbum, album, Create, Album, createAlbumSig),
+      'should verify create album claims'
+    );
+  });
+  it('verify license composition claims', () => {
+    assert.isOk(
+      verifyClaims(licenseComposition, composition, License, Composition, licenseCompositionSig),
+      'should verify license composition claims'
+    );
+  });
+  it('verify license recording claims', () => {
+    assert.isOk(
+      verifyClaims(licenseRecording, recording, License, Recording, licenseRecordingSig),
+      'should verify license recording claims'
+    );
+  });
+  it('verify license album claims', () => {
+    assert.isOk(
+      verifyClaims(licenseAlbum, album, License, Album, licenseAlbumSig),
+      'should verify license album claims'
     );
   });
 });

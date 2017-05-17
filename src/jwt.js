@@ -1,6 +1,6 @@
 const Ajv = require('ajv');
 const ed25519 = require('../lib/ed25519.js');
-const { calcMetaId, metaId, validateMeta } = require('../lib/meta.js');
+const { calcMetaId, getMetaId, metaId, validateMeta } = require('../lib/meta.js');
 
 const {
   calcId,
@@ -86,17 +86,17 @@ const iat = Object.assign({}, intDate, { readonly: true });
 
 const jti = Object.assign({}, metaId, { readonly: true });
 
-const Compose = {
+const Create = {
   $schema: draft,
   type: 'object',
-  title: 'Compose',
+  title: 'Create',
   properties: {
     iat: iat,
     iss: metaId,
     jti: jti,
     sub: metaId,
     typ: {
-      enum: ['Compose'],
+      enum: ['Create'],
       readonly: true
     }
   },
@@ -142,21 +142,29 @@ const License = {
   ]
 }
 
-const Record = {
+/*
+const Transfer = {
   $schema: draft,
   type: 'object',
-  title: 'Record',
+  title: 'Transfer',
   properties: {
+    aud: {
+      type: 'array',
+      items: metaId,
+      minItems: 1,
+      uniqueItems: true
+    },
     iat: iat,
     iss: metaId,
     jti: jti,
     sub: metaId,
     typ: {
-      enum: ['Record'],
+      enum: ['Transfer'],
       readonly: true
     }
   },
   required: [
+    'aud',
     'iat',
     'iss',
     'jti',
@@ -164,6 +172,7 @@ const Record = {
     'typ'
   ]
 }
+*/
 
 function timestamp(claims: Object): Object {
   return Object.assign({}, claims, { iat: now() });
@@ -191,12 +200,24 @@ function validateClaims(claims: Object, meta: Object, schemaClaims: Object, sche
       if (claims.aud && claims.aud.some((aud) => aud === claims.iss)) {
         throw new Error('audience cannot contain issuer');
       }
+      const rightNow = now();
       if (claims.exp) {
-        if (claims.exp < claims.iat) {
-          throw new Error('expire time cannot be earlier than iat');
+        if (claims.exp <= claims.iat) {
+          throw new Error('exp cannot be earlier than/same as iat');
         }
-        if (claims.nbf && claims.exp < claims.nbf) {
-          throw new Error('expire time cannot be earlier than start time');
+        if (claims.nbf && claims.exp <= claims.nbf) {
+          throw new Error('exp cannot be earlier than/same as nbf');
+        }
+        if (claims.exp < rightNow) {
+          throw new Error('claims expired');
+        }
+      }
+      if (claims.nbf) {
+        if (claims.nbf <= claims.iat) {
+          throw new Error('nbf cannot be earlier than/same as iat');
+        }
+        if (claims.nbf > rightNow) {
+          throw new Error('claims not yet valid');
         }
       }
       const claimsId = calcClaimsId(claims);
@@ -206,6 +227,25 @@ function validateClaims(claims: Object, meta: Object, schemaClaims: Object, sche
       const metaId = calcMetaId(meta);
       if (claims.sub !== metaId) {
         throw new Error(`expected sub=${claims.sub}; got ` + metaId);
+      }
+      switch(meta['@type']) {
+        case 'Album':
+          if (!meta.artist.some((id) => {
+            return claims.iss === id;
+          })) throw new Error('iss should be artist on album');
+          break;
+        case 'Composition':
+          if (!meta.composer.concat(meta.lyricist).some((id) => {
+            return claims.iss === id;
+          })) throw new Error('iss should be composer or lyricist of composition');
+          break;
+        case 'Recording':
+          if (!meta.performer.concat(meta.producer).some((id) => {
+            return claims.iss === id;
+          })) throw new Error('iss should be performer or producer on recording');
+          break;
+        default:
+          throw new Error('unexpected @type: ' + meta['@type']);
       }
       //..
       valid = true;
@@ -233,19 +273,8 @@ function verifyClaims(claims: Object, meta: Object, schemaClaims: Object, schema
   return verified;
 }
 
-/*
-if (!composition.composer.concat(composition.lyricist).some((artist) => {
-  return compose.iss === artist['@id'];
-})) throw new Error('issuer is not composer or lyricist of composition');
-
-if (!recording.performer.concat(recording.producer).some((artist) => {
-  return record.iss === artist['@id'];
-})) throw new Error('issuer is not performer or producer on recording');
-*/
-
-exports.Compose = Compose;
+exports.Create = Create;
 exports.License = License;
-exports.Record = Record;
 
 exports.calcClaimsId = calcClaimsId;
 exports.getClaimsId = getClaimsId;

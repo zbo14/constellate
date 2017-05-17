@@ -8,6 +8,8 @@ const { digestSHA256 } = require('../lib/util.js');
 * @module constellate/src/secp256k1
 */
 
+// https://www.npmjs.com/package/secp256k1
+
 function randomKeypair(): Object {
   let privateKey;
   do {
