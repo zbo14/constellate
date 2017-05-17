@@ -1,7 +1,7 @@
 'use strict';
 
-const Ajv = require('ajv');
 const bs58 = require('bs58');
+const RIPEMD160 = require('ripemd160');
 const sha256 = require('js-sha256').sha256;
 const sha3_256 = require('js-sha3').sha3_256;
 const urlsafeBase64  = require('urlsafe-base64');
@@ -11,10 +11,6 @@ const urlsafeBase64  = require('urlsafe-base64');
 /**
 * @module constellate/src/util
 */
-
-const ajv = new Ajv();
-
-const draft = 'http://json-schema.org/draft-06/schema#';
 
 function arrayFromObject(obj: Object): any[][] {
   return Object.keys(obj).map((key) => [key, obj[key]]);
@@ -34,6 +30,10 @@ function decodeBase58(str: string): Buffer {
 
 function decodeBase64(str: string): Buffer {
   return urlsafeBase64.decode(str);
+}
+
+function digestRIPEMD160(str: string): Buffer {
+  return new RIPEMD160().update(str).digest();
 }
 
 function digestSHA256(str: string): Buffer {
@@ -60,10 +60,6 @@ function getId(key: string, obj: Object): string {
     id = obj[key];
   }
   return id;
-}
-
-function getIds(key: string, ...objs: Object[]): string[] {
-  return objs.map((obj) => getId(key, obj));
 }
 
 function hasKey(obj: Object, key: string): boolean {
@@ -128,26 +124,6 @@ function recurse(x: any, fn: Function): any {
   return x;
 }
 
-function strToUint8Array(str: string): Uint8Array {
-  const ab = new ArrayBuffer(str.length);
-  const uint8 = new Uint8Array(ab);
-  Array.from(uint8).forEach((_, i) => {
-		uint8[i] = str.charCodeAt(i);
-	});
-  return uint8;
-}
-
-function strFromUint8Array(uint8: Uint8Array): string {
-  return Array.from(uint8).reduce((result, x) => {
-    result += String.fromCharCode(x);
-    return result;
-  }, '');
-}
-
-function validateSchema(obj: Object, schema: Object): boolean {
-  return ajv.compile(schema)(obj);
-}
-
 function withoutKeys(obj: Object, ...keys: string[]): Object {
   return Object.keys(obj).reduce((result, key) => {
     if (keys.includes(key)) { return result; }
@@ -160,13 +136,12 @@ exports.calcId = calcId;
 exports.clone = clone;
 exports.decodeBase58 = decodeBase58;
 exports.decodeBase64 = decodeBase64;
+exports.digestRIPEMD160 = digestRIPEMD160;
 exports.digestSHA256 = digestSHA256;
 exports.digestSHA3 = digestSHA3;
-exports.draft = draft;
 exports.encodeBase58 = encodeBase58;
 exports.encodeBase64 = encodeBase64;
 exports.getId = getId;
-exports.getIds = getIds;
 exports.hasKeys = hasKeys;
 exports.isArray = isArray;
 exports.isBoolean = isBoolean;
@@ -177,7 +152,4 @@ exports.now = now;
 exports.objectFromArray = objectFromArray;
 exports.orderStringify = orderStringify;
 exports.recurse = recurse;
-exports.strFromUint8Array = strFromUint8Array;
-exports.strToUint8Array = strToUint8Array;
-exports.validateSchema = validateSchema;
 exports.withoutKeys = withoutKeys;

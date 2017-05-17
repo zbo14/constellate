@@ -1,18 +1,21 @@
 'use strict';
 
-const util = require('../lib/util.js');
+const { Addr } = require('../lib/party.js');
+
+const {
+  Draft, Url,
+  contextIRI,
+  contextPrefix,
+  validateSchema
+} = require('../lib/schema.js');
 
 const {
   calcId,
+  digestRIPEMD160,
   digestSHA256,
-  draft,
   encodeBase64,
-  getId, getIds,
-  hasKeys,
-  orderStringify,
-  validateSchema,
-  withoutKeys
-} = util;
+  getId
+} = require('../lib/util.js');
 
 // @flow
 
@@ -20,16 +23,7 @@ const {
 * @module constellate/src/meta
 */
 
-const schema = {
-  type: 'string',
-  default: 'http://schema.org/',
-  readonly: true
-}
-
-function calcMetaId(meta: Object, publicKey: ?Buffer): string {
-  if (publicKey && publicKey.length === 32) { // check @type
-    return encodeBase64(publicKey);
-  }
+function calcMetaId(meta: Object): string {
   return calcId('@id', meta);
 }
 
@@ -37,67 +31,19 @@ function getMetaId(meta: Object): string {
   return getId('@id', meta);
 }
 
-function getMetaIds(...metas: Object[]): string[] {
-  return getIds('@id', ...metas);
+function setMetaId(meta: Object): Object {
+  return Object.assign({}, meta, { '@id': calcMetaId(meta) });
 }
 
-function hideKeys(meta: Object, ...keys: string[]): Object {
-  return keys.reduce((result, key) => {
-    if (!result.properties.hasOwnProperty(key) || !result.properties[key]) { return result; }
-    return Object.assign({}, result , {
-      properties: Object.assign({}, result.properties, {
-        [key]: Object.assign({}, result.properties[key], { readonly: true })
-      })
-    });
-  }, meta);
-}
-
-function hideId(meta: Object): Object {
-  return hideKeys(meta, '@id');
-}
-
-function requireKeys(meta: Object, ...keys: string[]): Object {
-  return Object.assign({}, meta, { required: keys });
-}
-
-function requireId(meta: Object): Object {
-  return requireKeys(meta, '@id');
-}
-
-function schemaPrefix(key: string) {
-  return {
-    type: 'string',
-    default: 'schema:' + key
-  }
-}
-
-function schemaIRI(key: string) {
-  return {
-    type: 'object',
-    properties: {
-      '@id': schemaPrefix(key),
-      '@type': {
-        type: 'string',
-        default: '@id'
-      }
-    },
-    required: ['@id', '@type']
-  }
-}
-
-function setMetaId(meta: Object, publicKey: ?Buffer): Object {
-  return Object.assign({}, meta, { '@id': calcMetaId(meta, publicKey) });
-}
-
-function validateMeta(meta: Object, schema: Object, publicKey: ?Buffer): boolean {
+function validateMeta(meta: Object, schema: Object): boolean {
   let valid = false;
   try {
     if (!validateSchema(meta, schema)) {
       throw new Error('meta has invalid schema: ' + JSON.stringify(meta, null, 2));
     }
-    const id = calcMetaId(meta, publicKey);
-    if (meta['@id'] !== id) {
-      throw new Error(`expected metaId=${meta['@id']}; got ` + id);
+    const metaId = calcMetaId(meta);
+    if (meta['@id'] !== metaId) {
+      throw new Error(`expected metaId=${meta['@id']}; got ` + metaId);
     }
     valid = true;
   } catch(err) {
@@ -106,320 +52,51 @@ function validateMeta(meta: Object, schema: Object, publicKey: ?Buffer): boolean
   return valid;
 }
 
-const metaId = {
+const MetaId = {
   type: 'string',
-  pattern: '^[A-Za-z0-9-_]{43}$'
+  pattern: '^[A-Za-z0-9-_]{43,44}$'
 }
 
-const url = {
-  type: 'string',
-  // from http://stackoverflow.com/a/3809435
-  pattern: '^https?:\/\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%_\\+.~#?&\/\/=]*)$'
-}
-
-const artistContext = {
-  type: 'object',
-  properties: {
-    schema: schema,
-    Artist: schemaPrefix('MusicGroup'),
-    email: schemaPrefix('email'),
-    homepage: schemaPrefix('url'),
-    name: schemaPrefix('name'),
-    profile: schemaPrefix('sameAs')
-  },
-  readonly: true,
-  required: [
-    'schema',
-    'Artist',
-    'email',
-    'homepage',
-    'name',
-    'profile'
-  ]
-}
-
-const artist = {
-  $schema: draft,
-  title: 'Artist',
-  type: 'object',
-  properties: {
-    '@context': artistContext,
-    '@type': {
-      enum: ['Artist'],
-      readonly: true
-    },
-    '@id': metaId,
-    email: {
-      type: 'string',
-      pattern: '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'
-    },
-    homepage: url,
-    name: {
-      type: 'string'
-    },
-    profile: {
-      type: 'array',
-      items: url,
-      minItems: 1,
-      uniqueItems: true
-    }
-  }
-}
-
-const organizationContext = {
-  type: 'object',
-  properties: {
-    schema: schema,
-    email: schemaPrefix('email'),
-    homepage: schemaPrefix('url'),
-    name: schemaPrefix('name'),
-    Organization: schemaPrefix('Organization'),
-    profile: schemaPrefix('sameAs')
-  },
-  readonly: true,
-  required: [
-    'schema',
-    'email',
-    'homepage',
-    'name',
-    'Organization',
-    'profile'
-  ]
-}
-
-const organization = {
-  $schema: draft,
-  title: 'Organization',
-  type: 'object',
-  properties: {
-    '@context': organizationContext,
-    '@type': {
-      enum: ['Organization'],
-      readonly: true
-    },
-    '@id': metaId,
-    email: {
-      type: 'string',
-      pattern: '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'
-    },
-    homepage: url,
-    name: {
-      type: 'string'
-    },
-    profile: {
-      type: 'array',
-      items: url,
-      minItems: 1,
-      uniqueItems: true
-    }
-  }
-}
-
-const compositionContext = {
-  type: 'object',
-  properties: {
-    schema: schema,
-    composer: schemaIRI('composer'),
-    Composition: schemaPrefix('MusicComposition'),
-    iswc: schemaPrefix('iswcCode'),
-    lyricist: schemaIRI('lyricist'),
-    publisher: schemaIRI('publisher'),
-    title: schemaPrefix('name')
-  },
-  readonly: true,
-  required: [
-    'schema',
-    'composer',
-    'Composition',
-    'iswc',
-    'lyricist',
-    'publisher',
-    'title'
-  ]
-}
-
-const composition = {
-  $schema: draft,
-  title: 'Composition',
-  type: 'object',
-  properties: {
-    '@context': compositionContext,
-    '@type': {
-      enum: ['Composition'],
-      readonly: true
-    },
-    '@id': metaId,
-    composer: {
-      type: 'array',
-      items: metaId,
-      minItems: 1,
-      uniqueItems: true
-    },
-    iswc: {
-      type: 'string',
-      pattern: 'T-[0-9]{3}.[0-9]{3}.[0-9]{3}-[0-9]'
-    },
-    lyricist: {
-      type: 'array',
-      items: metaId,
-      minItems: 1,
-      uniqueItems: true
-    },
-    publisher: {
-      type: 'array',
-      items: metaId,
-      minItems: 1,
-      uniqueItems: true
-    },
-    title: {
-      type: 'string'
-    }
-  }
-}
-
-const audioContext = {
-  type: 'object',
-  properties: {
-    schema: schema,
-    Audio: schemaPrefix('AudioObject'),
-    contentUrl: schemaPrefix('contentUrl'),
-    encodingFormat: schemaPrefix('encodingFormat')
-  },
-  readonly: true,
-  required: [
-    'Audio',
-    'contentUrl',
-    'encodingFormat'
-  ]
-}
-
-const audio = {
-  $schema: draft,
-  title: 'Audio',
-  type: 'object',
-  properties: {
-    '@context': audioContext,
-    '@type': {
-      enum: ['Audio'],
-      readonly: true
-    },
-    '@id': metaId,
-    contentUrl: {
-      type: 'string',
-      pattern: '^https?:\/\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%_\\+.~#?&\/\/=]*)$'
-    },
-    encodingFormat: {
-      enum: ['mp3', 'mpeg4']
-    }
-  }
-}
-
-const recordingContext = {
-  type: 'object',
-  properties: {
-    schema: schema,
-    audio: schemaIRI('audio'),
-    isrc: schemaPrefix('isrcCode'),
-    performer: schemaIRI('performer'),
-    producer: schemaIRI('producer'),
-    Recording: schemaPrefix('MusicRecording'),
-    recordingOf: schemaIRI('recordingOf'),
-    recordLabel: schemaIRI('recordLabel')
-  },
-  readonly: true,
-  required: [
-    'schema',
-    'audio',
-    'isrc',
-    'performer',
-    'producer',
-    'Recording',
-    'recordingOf',
-    'recordLabel'
-  ]
-}
-
-const recording = {
-  $schema: draft,
-  title: 'Recording',
-  type: 'object',
-  properties: {
-    '@context': recordingContext,
-    '@type': {
-      enum: ['Recording'],
-      readonly: true
-    },
-    '@id': metaId,
-    audio: {
-      type: 'array',
-      items: metaId,
-      minItems: 1,
-      uniqueItems: true
-    },
-    isrc: {
-      type: 'string',
-      pattern: '^[A-Z]{2}-[A-Z0-9]{3}-[7890][0-9]-[0-9]{5}$'
-    },
-    performer: {
-      type: 'array',
-      items:  metaId,
-      minItems: 1,
-      uniqueItems: true
-    },
-    producer: {
-      type: 'array',
-      items: metaId,
-      minItems: 1,
-      uniqueItems: true
-    },
-    recordingOf: metaId,
-    recordLabel: {
-      type: 'array',
-      items: metaId,
-      minItems: 1,
-      uniqueItems: true
-    }
-  }
-}
-
-const albumContext =  {
-  type: 'object',
-  properties: {
-    schema: schema,
-    Album: schemaPrefix('MusicAlbum'),
-    artist: schemaIRI('byArtist'),
-    productionType: schemaPrefix('albumProductionType'),
-    recordLabel: schemaIRI('recordLabel'),
-    releaseType: schemaPrefix('albumReleaseType'),
-    title: schemaPrefix('name'),
-    track: schemaIRI('track')
-  },
-  readonly: true,
-  required: [
-    'schema',
-    'Album',
-    'artist',
-    'productionType',
-    'recordLabel',
-    'releaseType',
-    'track'
-  ]
-}
-
-const album = {
-  $schema: draft,
+const Album = {
+  $schema: Draft,
   title: 'Album',
   type: 'object',
   properties: {
-    '@context': albumContext,
+    '@context': {
+      type: 'object',
+      properties: {
+        schema: {
+          type: 'string',
+          default: 'http://schema.org/'
+        },
+        Album: contextPrefix('schema', 'MusicAlbum'),
+        artist: contextIRI('schema', 'byArtist'),
+        productionType: contextPrefix('schema', 'albumProductionType'),
+        recordLabel: contextIRI('schema', 'recordLabel'),
+        releaseType: contextPrefix('schema', 'albumReleaseType'),
+        title: contextPrefix('schema', 'name'),
+        track: contextIRI('schema', 'track')
+      },
+      readonly: true,
+      required: [
+        'schema',
+        'Album',
+        'artist',
+        'productionType',
+        'recordLabel',
+        'releaseType',
+        'title',
+        'track'
+      ]
+    },
     '@type': {
       enum: ['Album'],
       readonly: true
     },
-    '@id': metaId,
+    '@id': Object.assign({}, MetaId, { readonly: true }),
     artist: {
       type: 'array',
-      items: metaId,
+      items: Addr,
       minItems: 1,
       uniqueItems: true
     },
@@ -438,7 +115,7 @@ const album = {
     },
     recordLabel: {
       type: 'array',
-      items: metaId,
+      items: Addr,
       minItems: 1,
       uniqueItems: true
     },
@@ -455,48 +132,13 @@ const album = {
     },
     track: {
       type: 'array',
-      items: metaId,
+      items: MetaId,
       minItems: 1,
       uniqueItems: true
     }
-  }
+  },
+  required: ['@context', '@id', '@type', 'artist', 'title', 'track']
 }
-
-const Album = requireKeys(
-  hideId(album),
-  '@context', '@type', '@id',
-  'artist', 'track'
-);
-
-const Artist = requireKeys(
-  hideId(artist),
-  '@context', '@type', '@id',
-  'email', 'name'
-);
-
-const Audio = requireKeys(
-  hideId(audio),
-  '@context', '@type', '@id',
-  'contentUrl'
-);
-
-const Composition = requireKeys(
-  hideId(composition),
-  '@context', '@type', '@id',
-  'composer', 'title'
-);
-
-const Organization = requireKeys(
-  hideId(organization),
-  '@context', '@type', '@id',
-  'email', 'name'
-);
-
-const Recording = requireKeys(
-  hideId(recording),
-  '@context', '@type', '@id',
-  'audio', 'performer', 'recordingOf'
-);
 
 const AlbumContext = {
   schema: 'http://schema.org/',
@@ -511,19 +153,49 @@ const AlbumContext = {
     '@type': '@id'
   },
   releaseType: 'schema:albumReleaseType',
+  title: 'schema:name',
   track: {
     '@id': 'schema:track',
     '@type': '@id'
   }
 }
 
-const ArtistContext = {
-  schema: 'http://schema.org/',
-  Artist: 'schema:MusicGroup',
-  email: 'schema:email',
-  homepage: 'schema:url',
-  name: 'schema:name',
-  profile: 'schema:sameAs'
+const Audio = {
+  $schema: Draft,
+  title: 'Audio',
+  type: 'object',
+  properties: {
+    '@context': {
+      type: 'object',
+      properties: {
+        schema: {
+          type: 'string',
+          default: 'http://schema.org/'
+        },
+        Audio: contextPrefix('schema', 'AudioObject'),
+        contentUrl: contextPrefix('schema', 'contentUrl'),
+        encodingFormat: contextPrefix('schema', 'encodingFormat')
+        //..
+      },
+      readonly: true,
+      required: [
+        'Audio',
+        'contentUrl',
+        'encodingFormat'
+      ]
+    },
+    '@type': {
+      enum: ['Audio'],
+      readonly: true
+    },
+    '@id': Object.assign({}, MetaId, { readonly: true }),
+    contentUrl: Url,
+    encodingFormat: {
+      enum: ['mp3', 'mpeg4']
+    }
+    //..
+  },
+  require: ['@context', '@id', '@type', 'contentUrl']
 }
 
 const AudioContext = {
@@ -531,6 +203,70 @@ const AudioContext = {
   Audio: 'schema:AudioObject',
   contentUrl: 'schema:contentUrl',
   encodingFormat: 'schema:encodingFormat'
+}
+
+const Composition = {
+  $schema: Draft,
+  title: 'Composition',
+  type: 'object',
+  properties: {
+    '@context': {
+      type: 'object',
+      properties: {
+        schema: {
+          type: 'string',
+          default: 'http://schema.org/'
+        },
+        composer: contextIRI('schema', 'composer'),
+        Composition: contextPrefix('schema', 'MusicComposition'),
+        iswc: contextPrefix('schema', 'iswcCode'),
+        lyricist: contextIRI('schema', 'lyricist'),
+        publisher: contextIRI('schema', 'publisher'),
+        title: contextPrefix('schema', 'name')
+      },
+      readonly: true,
+      required: [
+        'schema',
+        'composer',
+        'Composition',
+        'iswc',
+        'lyricist',
+        'publisher',
+        'title'
+      ]
+    },
+    '@type': {
+      enum: ['Composition'],
+      readonly: true
+    },
+    '@id': Object.assign({}, MetaId, { readonly: true }),
+    composer: {
+      type: 'array',
+      items: Addr,
+      minItems: 1,
+      uniqueItems: true
+    },
+    iswc: {
+      type: 'string',
+      pattern: 'T-[0-9]{3}.[0-9]{3}.[0-9]{3}-[0-9]'
+    },
+    lyricist: {
+      type: 'array',
+      items: Addr,
+      minItems: 1,
+      uniqueItems: true
+    },
+    publisher: {
+      type: 'array',
+      items: Addr,
+      minItems: 1,
+      uniqueItems: true
+    },
+    title: {
+      type: 'string'
+    }
+  },
+  required: ['@context', '@id', '@type', 'composer', 'title']
 }
 
 const CompositionContext = {
@@ -552,13 +288,79 @@ const CompositionContext = {
   title: 'schema:name'
 }
 
-const OrganizationContext = {
-  schema: 'http://schema.org/',
-  email: 'schema:email',
-  homepage: 'schema:url',
-  name: 'schema:name',
-  Organization: 'schema:Organization',
-  profile: 'schema:sameAs'
+const Recording = {
+  $schema: Draft,
+  title: 'Recording',
+  type: 'object',
+  properties: {
+    '@context': {
+      type: 'object',
+      properties: {
+        schema: {
+          type: 'string',
+          default: 'http://schema.org/'
+        },
+        audio: contextIRI('schema', 'audio'),
+        isrc: contextPrefix('schema', 'isrcCode'),
+        performer: contextIRI('schema', 'performer'),
+        producer: contextIRI('schema', 'producer'),
+        Recording: contextPrefix('schema', 'MusicRecording'),
+        recordingOf: contextIRI('schema', 'recordingOf'),
+        recordLabel: contextIRI('schema', 'recordLabel'),
+        title: contextPrefix('schema', 'name')
+      },
+      readonly: true,
+      required: [
+        'schema',
+        'audio',
+        'isrc',
+        'performer',
+        'producer',
+        'Recording',
+        'recordingOf',
+        'recordLabel',
+        'title'
+      ]
+    },
+    '@type': {
+      enum: ['Recording'],
+      readonly: true
+    },
+    '@id': Object.assign({}, MetaId, { readonly: true }),
+    audio: {
+      type: 'array',
+      items: MetaId,
+      minItems: 1,
+      uniqueItems: true
+    },
+    isrc: {
+      type: 'string',
+      pattern: '^[A-Z]{2}-[A-Z0-9]{3}-[7890][0-9]-[0-9]{5}$'
+    },
+    performer: {
+      type: 'array',
+      items:  Addr,
+      minItems: 1,
+      uniqueItems: true
+    },
+    producer: {
+      type: 'array',
+      items: Addr,
+      minItems: 1,
+      uniqueItems: true
+    },
+    recordingOf: MetaId,
+    recordLabel: {
+      type: 'array',
+      items: Addr,
+      minItems: 1,
+      uniqueItems: true
+    },
+    title: {
+      type: 'string'
+    }
+  },
+  required: ['@context', '@id', '@type', 'audio', 'performer', 'recordingOf']
 }
 
 const RecordingContext = {
@@ -584,26 +386,21 @@ const RecordingContext = {
   recordLabel: {
     '@id': 'schema:recordLabel',
     '@type': '@id'
-  }
+  },
+  title: 'schema:name'
 }
 
 exports.Album = Album;
-exports.Artist = Artist;
-exports.Audio = Audio;
-exports.Composition = Composition;
-exports.Organization = Organization;
-exports.Recording = Recording;
-
 exports.AlbumContext = AlbumContext;
-exports.ArtistContext = ArtistContext;
+exports.Audio = Audio;
 exports.AudioContext = AudioContext;
+exports.Composition = Composition;
 exports.CompositionContext = CompositionContext;
-exports.OrganizationContext = OrganizationContext;
+exports.MetaId = MetaId;
+exports.Recording = Recording;
 exports.RecordingContext = RecordingContext;
 
 exports.calcMetaId = calcMetaId;
 exports.getMetaId = getMetaId;
-exports.getMetaIds = getMetaIds;
-exports.metaId = metaId;
 exports.setMetaId = setMetaId;
 exports.validateMeta = validateMeta;

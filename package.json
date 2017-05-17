@@ -13,7 +13,7 @@
     "gulp": "gulp",
     "prepublish": "npm run build",
     "remove-types:file": "read -p 'Enter filename: ' filename && export FILENAME=$filename && flow-remove-types src/${FILENAME} > lib/${FILENAME}",
-    "test": "mocha --compilers js:babel-core/register --require babel-polyfill --recursive './test/*_test.js'",
+    "test": "mocha --compilers js:babel-core/register --require babel-polyfill --recursive './test/meta_test.js'",
     "_comment": "test command from https://github.com/Envoke-org/envokeJS/blob/master/package.json"
   },
   "babel": {
@@ -57,6 +57,7 @@
     "mocha": "^3.2.0",
     "node-fetch": "^1.6.3",
     "request": "^2.81.0",
+    "ripemd160": "^2.0.1",
     "secp256k1": "^3.2.5",
     "tweetnacl": "^1.0.0-rc.1",
     "unflowify": "^1.0.1",

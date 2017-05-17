@@ -63,6 +63,7 @@ writeTagsBtn.addEventListener('click', () => {
 newKeypairBtn.addEventListener('click', () => {
   if (mode === 'meta') {
     const password = prompt('Please enter a password to generate keypair', 'passwerd');
+    if (!password) return;
     const keypair = ed25519.keypairFromPassword(password);
     publicKey = keypair.publicKey;
     meta.textContent = JSON.stringify(encodeKeypair(keypair), null, 2);
@@ -72,6 +73,7 @@ newKeypairBtn.addEventListener('click', () => {
 signClaimsBtn.addEventListener('click', () => {
   if (mode === 'claims' && claimsObj) {
     const secretKey = prompt('Please enter your secret key to sign claims', '');
+    if (!secretKey) return;
     sig.innerHTML = encodeBase64(signClaims(claimsObj, decodeBase64(secretKey)));
   }
 }, false);
@@ -106,7 +108,6 @@ function listModifiers() {
       }
       ol.removeChild(ol.lastChild);
     });
-    console.log(ol, ol.parentElement);
     form.insertBefore(remover, ol.parentElement);
     const adder = document.createElement('button');
     adder.className = 'adder';

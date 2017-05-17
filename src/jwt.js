@@ -1,15 +1,25 @@
 const Ajv = require('ajv');
 const ed25519 = require('../lib/ed25519.js');
-const { calcMetaId, getMetaId, metaId, validateMeta } = require('../lib/meta.js');
+const secp256k1 = require('../lib/secp256k1.js');
+const { Addr } = require('../lib/party.js');
+
+const {
+  MetaId,
+  calcMetaId,
+  validateMeta
+} = require('../lib/meta.js');
+
+const {
+  Draft,
+  validateSchema
+} = require('../lib/schema.js');
 
 const {
   calcId,
   decodeBase64,
-  draft,
+  digestSHA256,
   encodeBase64,
-  getId, getIds,
-  now,
-  validateSchema
+  getId, now
 } = require('../lib/util.js');
 
 // @flow
@@ -26,10 +36,6 @@ function getClaimsId(claims: Object): string {
   return getId('jti', claims);
 }
 
-function getClaimsIds(...claims: Object[]): string[] {
-  return getIds('jti', ...claims);
-}
-
 function setClaimsId(claims: Object): Object {
   return Object.assign({}, claims, { 'jti': calcClaimsId(claims) });
 }
@@ -38,22 +44,41 @@ function timestamp(claims: Object): Object {
   return Object.assign({}, claims, { iat: now() });
 }
 
-const publicKey = {
+const PublicKey = {
+  $schema: Draft,
   type: 'object',
-  properties: {
-    crv: {
-      enum: ['Ed25519'],
-      readonly: true
+  title: 'PublicKey',
+  allOf: [
+    {
+      properties: {
+        x: {
+          type: 'string',
+          pattern: '^[A-Za-z0-9-_]{43}$'
+        }
+      }
     },
-    kty: {
-      enum: ['OKP'],
-      readonly: true
-    },
-    x: {
-      type: 'string',
-      pattern: '^[A-Za-z0-9-_]{43}$'
+    {
+      oneOf: [
+        {
+          properties: {
+            crv: { enum: ['Ed25519'] },
+            kty: { enum: ['OKP'] }
+          }
+        },
+        {
+          properties: {
+            crv: { enum: ['P-256'] },
+            kty: { enum: ['EC'] },
+            y: {
+              type: 'string',
+              pattern: '^[A-Za-z0-9-_]{43}$'
+            }
+          },
+          required: ['y']
+        }
+      ]
     }
-  },
+  ],
   required: [
     'crv',
     'kty',
@@ -61,13 +86,13 @@ const publicKey = {
   ]
 }
 
-const header =  {
-  $schema: draft,
+const Header =  {
+  $schema: Draft,
   type: 'object',
   title: 'JWTHeader',
   properties: {
     alg: {
-      enum: ['EdDsa']
+      enum: ['EdDsa', 'ES256']
     },
     typ: {
       enum: ['JWT']
@@ -79,27 +104,23 @@ const header =  {
   ]
 }
 
-const encodedHeader = encodeBase64({
-  alg: 'EdDsa', typ: 'JWT'
-});
-
 const intDate = {
   type: 'integer'
 }
 
 const iat = Object.assign({}, intDate, { readonly: true });
 
-const jti = Object.assign({}, metaId, { readonly: true });
+const jti = Object.assign({}, MetaId, { readonly: true });
 
 const Create = {
-  $schema: draft,
+  $schema: Draft,
   type: 'object',
   title: 'Create',
   properties: {
     iat: iat,
-    iss: metaId,
+    iss: Addr,
     jti: jti,
-    sub: metaId,
+    sub: MetaId,
     typ: {
       enum: ['Create'],
       readonly: true
@@ -115,22 +136,22 @@ const Create = {
 }
 
 const License = {
-  $schema: draft,
+  $schema: Draft,
   type: 'object',
   title: 'License',
   properties: {
     aud: {
       type: 'array',
-      items: metaId,
+      items: Addr,
       minItems: 1,
       uniqueItems: true
     },
     exp: intDate,
     iat: iat,
-    iss: metaId,
+    iss: Addr,
     jti: jti,
     nbf: intDate,
-    sub: metaId,
+    sub: MetaId,
     typ: {
       enum: ['License'],
       readonly: true
@@ -147,43 +168,17 @@ const License = {
   ]
 }
 
-/*
-const Transfer = {
-  $schema: draft,
-  type: 'object',
-  title: 'Transfer',
-  properties: {
-    aud: {
-      type: 'array',
-      items: metaId,
-      minItems: 1,
-      uniqueItems: true
-    },
-    iat: iat,
-    iss: metaId,
-    jti: jti,
-    sub: metaId,
-    typ: {
-      enum: ['Transfer'],
-      readonly: true
-    }
-  },
-  required: [
-    'aud',
-    'iat',
-    'iss',
-    'jti',
-    'sub',
-    'typ'
-  ]
-}
-*/
-
-const typs = ['Create', 'License'];
-
-function signClaims(claims: Object, secretKey: Buffer): Buffer {
+function signClaims(claims: Object, header: Object, secretKey: Buffer): Buffer {
+  let sig = new Buffer([]);
+  const encodedHeader = encodeBase64(header);
   const encodedPayload = encodeBase64(claims);
-  return ed25519.sign(encodedHeader + '.' + encodedPayload, secretKey);
+  if (header.alg === 'EdDsa') {
+    sig = ed25519.sign(encodedHeader + '.' + encodedPayload, secretKey);
+  }
+  if (header.alg === 'ES256') {
+    sig = secp256k1.sign(encodedHeader + '.' + encodedPayload, secretKey);
+  }
+  return sig;
 }
 
 function validateClaims(claims: Object, meta: Object, schemaClaims: Object, schemaMeta: Object): boolean {
@@ -193,7 +188,7 @@ function validateClaims(claims: Object, meta: Object, schemaClaims: Object, sche
       if (!validateSchema(claims, schemaClaims)) {
         throw new Error('claims has invalid schema: ' + JSON.stringify(claims, null, 2));
       }
-      if (!typs.includes(claims.typ)) {
+      if (!['Create', 'License'].includes(claims.typ)) {
         throw new Error('unexpected typ: ' + claims.typ);
       }
       if (claims.iat > now()) {
@@ -258,14 +253,25 @@ function validateClaims(claims: Object, meta: Object, schemaClaims: Object, sche
   return valid;
 }
 
-function verifyClaims(claims: Object, meta: Object, schemaClaims: Object, schemaMeta: Object, signature: Buffer): boolean {
+function verifyClaims(claims: Object, header: Object, meta: Object, schemaClaims: Object, schemaMeta: Object, signature: Buffer): boolean {
   let verified = false;
   try {
+    if (!validateSchema(header, Header)) {
+      throw new Error('header has invalid schema: ' + JSON.stringify(header, null, 2));
+    }
     if (validateClaims(claims, meta, schemaClaims, schemaMeta)) {
+      const encodedHeader = encodeBase64(header);
       const encodedPayload = encodeBase64(claims);
       const publicKey = decodeBase64(claims.iss);
-      if (!ed25519.verify(encodedHeader + '.' + encodedPayload, publicKey, signature)) {
-        throw new Error('invalid signature: ' + encodeBase64(signature));
+      if (header.alg === 'EdDsa') {
+        if (!ed25519.verify(encodedHeader + '.' + encodedPayload, publicKey, signature)) {
+          throw new Error('invalid ed25519 signature: ' + encodeBase64(signature));
+        }
+      }
+      if (header.alg === 'ES256') {
+        if (!secp256k1.verify(encodedHeader + '.' + encodedPayload, publicKey, signature)) {
+          throw new Error('invalid secp256k1 signature: ' + encodeBase64(signature));
+        }
       }
       verified = true;
     }
@@ -280,7 +286,6 @@ exports.License = License;
 
 exports.calcClaimsId = calcClaimsId;
 exports.getClaimsId = getClaimsId;
-exports.getClaimsIds = getClaimsIds;
 exports.setClaimsId = setClaimsId;
 exports.signClaims = signClaims;
 exports.timestamp = timestamp;

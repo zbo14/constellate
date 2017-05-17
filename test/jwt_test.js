@@ -1,7 +1,6 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
 import { encodeKeypair } from '../lib/crypto.js';
-import { keypairFromPassword, randomKeypair } from '../lib/ed25519.js';
 import { Create, License, setClaimsId, signClaims, timestamp, verifyClaims } from '../lib/jwt.js';
 import { encodeBase64, now } from '../lib/util.js';
 
@@ -15,17 +14,30 @@ import {
   setMetaId
 } from '../lib/meta.js';
 
-const artistKeypair = keypairFromPassword('muzaq');
-const curatorKeypair = randomKeypair();
+const ed25519 = require('../lib/ed25519.js');
+const secp256k1 = require('../lib/secp256k1.js');
 
-const artist = setMetaId({
+const composerKeypair = ed25519.keypairFromPassword('muzaq');
+const performerKeypair = secp256k1.randomKeypair();
+const curatorKeypair = ed25519.randomKeypair();
+
+const composer = setMetaId({
   '@context': ArtistContext,
   '@type': 'Artist',
-  email: 'artist@example.com',
-  homepage: 'http://artist.com',
-  name: 'artist',
+  email: 'composer@example.com',
+  homepage: 'http://composer.com',
+  name: 'composer',
   profile: ['http://facebook-profile.com'],
-}, artistKeypair.publicKey);
+}, composerKeypair.publicKey);
+
+const performer = setMetaId({
+  '@context': ArtistContext,
+  '@type': 'Artist',
+  email: 'performer@example.com',
+  homepage: 'http://performer.com',
+  name: 'performer',
+  profile: ['http://bandcamp-page.com']
+}, performerKeypair.publicKey);
 
 const curator = setMetaId({
   '@context': OrganizationContext,
@@ -44,8 +56,7 @@ const audio = setMetaId({
 const composition = setMetaId({
   '@context': CompositionContext,
   '@type': 'Composition',
-  composer: getMetaIds(artist),
-  lyricist: getMetaIds(artist),
+  composer: getMetaIds(composer),
   title: 'beep-bop-boop'
 });
 
@@ -53,22 +64,22 @@ const recording = setMetaId({
   '@context': RecordingContext,
   '@type': 'Recording',
   audio: getMetaIds(audio),
-  performer: getMetaIds(artist),
-  producer: getMetaIds(artist),
+  performer: getMetaIds(performer),
   recordingOf: getMetaId(composition)
 });
 
 const album = setMetaId({
   '@context': AlbumContext,
   '@type': 'Album',
-  artist: getMetaIds(artist),
+  artist: getMetaIds(performer),
   releaseType: 'SingleRelease',
+  title: 'album-title',
   track: getMetaIds(recording)
 });
 
 const createComposition = setClaimsId(
   timestamp({
-    iss: getMetaId(artist),
+    iss: getMetaId(composer),
     sub: getMetaId(composition),
     typ: 'Create'
   })
@@ -76,7 +87,7 @@ const createComposition = setClaimsId(
 
 const createRecording = setClaimsId(
   timestamp({
-    iss: getMetaId(artist),
+    iss: getMetaId(performer),
     sub: getMetaId(recording),
     typ: 'Create'
   })
@@ -84,7 +95,7 @@ const createRecording = setClaimsId(
 
 const createAlbum = setClaimsId(
   timestamp({
-    iss: getMetaId(artist),
+    iss: getMetaId(performer),
     sub: getMetaId(album),
     typ: 'Create'
   })
@@ -94,7 +105,7 @@ const licenseComposition = setClaimsId(
   timestamp({
     aud: getMetaIds(curator),
     exp: now() + 1000,
-    iss: getMetaId(artist),
+    iss: getMetaId(composer),
     sub: getMetaId(composition),
     typ: 'License'
   })
@@ -104,7 +115,7 @@ const licenseRecording = setClaimsId(
   timestamp({
     aud: getMetaIds(curator),
     exp: now() + 2000,
-    iss: getMetaId(artist),
+    iss: getMetaId(performer),
     sub: getMetaId(recording),
     typ: 'License'
   })
@@ -114,54 +125,64 @@ const licenseAlbum = setClaimsId(
   timestamp({
     aud: getMetaIds(curator),
     exp: now() + 3000,
-    iss: getMetaId(artist),
+    iss: getMetaId(performer),
     sub: getMetaId(album),
     typ: 'License'
   })
 );
 
-const createCompositionSig = signClaims(createComposition, artistKeypair.secretKey);
-const createRecordingSig = signClaims(createRecording, artistKeypair.secretKey);
-const createAlbumSig = signClaims(createAlbum, artistKeypair.secretKey);
+const ed25519Header = {
+  alg: 'EdDsa',
+  typ: 'JWT'
+}
 
-const licenseCompositionSig = signClaims(licenseComposition, artistKeypair.secretKey);
-const licenseRecordingSig = signClaims(licenseRecording, artistKeypair.secretKey);
-const licenseAlbumSig = signClaims(licenseAlbum, artistKeypair.secretKey);
+const secp256k1Header = {
+  alg: 'ES256',
+  typ: 'JWT'
+}
+
+const createCompositionSig = signClaims(createComposition, ed25519Header, composerKeypair.secretKey);
+const createRecordingSig = signClaims(createRecording, secp256k1Header, performerKeypair.privateKey);
+const createAlbumSig = signClaims(createAlbum, secp256k1Header, performerKeypair.privateKey);
+
+const licenseCompositionSig = signClaims(licenseComposition, ed25519Header, composerKeypair.secretKey);
+const licenseRecordingSig = signClaims(licenseRecording, secp256k1Header, performerKeypair.privateKey);
+const licenseAlbumSig = signClaims(licenseAlbum, secp256k1Header, performerKeypair.privateKey);
 
 describe('JWT', () => {
   it('verify create composition claims', () => {
     assert.isOk(
-      verifyClaims(createComposition, composition, Create, Composition, createCompositionSig),
+      verifyClaims(createComposition, ed25519Header, composition, Create, Composition, createCompositionSig),
       'should verify create composition claims'
     );
   });
   it('verify create recording claims', () => {
     assert.isOk(
-      verifyClaims(createRecording, recording, Create, Recording, createRecordingSig),
+      verifyClaims(createRecording, secp256k1Header, recording, Create, Recording, createRecordingSig),
       'should verify create recording claims'
     );
   });
   it('verify create album claims', () => {
     assert.isOk(
-      verifyClaims(createAlbum, album, Create, Album, createAlbumSig),
+      verifyClaims(createAlbum, secp256k1Header, album, Create, Album, createAlbumSig),
       'should verify create album claims'
     );
   });
   it('verify license composition claims', () => {
     assert.isOk(
-      verifyClaims(licenseComposition, composition, License, Composition, licenseCompositionSig),
+      verifyClaims(licenseComposition, ed25519Header, composition, License, Composition, licenseCompositionSig),
       'should verify license composition claims'
     );
   });
   it('verify license recording claims', () => {
     assert.isOk(
-      verifyClaims(licenseRecording, recording, License, Recording, licenseRecordingSig),
+      verifyClaims(licenseRecording, secp256k1Header, recording, License, Recording, licenseRecordingSig),
       'should verify license recording claims'
     );
   });
   it('verify license album claims', () => {
     assert.isOk(
-      verifyClaims(licenseAlbum, album, License, Album, licenseAlbumSig),
+      verifyClaims(licenseAlbum, secp256k1Header, album, License, Album, licenseAlbumSig),
       'should verify license album claims'
     );
   });
