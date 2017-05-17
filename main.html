@@ -3,6 +3,10 @@
     <title>constellate</title>
   </head>
   <body>
+    <input type='file' id='audio-file' accept='audio/*' />
+    <button id='read-tags-btn'>read tags</button>
+    <button id='write-tags-btn'>write tags</button><br>
+    <hr>
     <select>
       <option selected disabled>type</option>
       <optgroup label='meta'>
@@ -14,9 +18,8 @@
         <option value='recording'>recording</option>
       </optgroup>
       <optgroup label='claims'>
-        <option value='compose'>compose</option>
+        <option value='compose'>create</option>
         <option value='license'>license</option>
-        <option value='record'>record</option>
       </optgroup>
     </select><br>
     <button id='new-keypair-btn' hidden>new keypair</button>

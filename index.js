@@ -1,12 +1,13 @@
 const { encodeKeypair } = require('./lib/crypto.js');
 const ed25519 = require('./lib/ed25519.js');
+const FileSaver = require('file-saver');
 const { generateForm, parseForm } = require('./lib/form.js');
+const { generateFrames, readTags, writeTags } = require('./lib/id3.js');
 const { encodeBase64, decodeBase64 } = require('./lib/util.js');
 
 const {
-  Compose,
+  Create,
   License,
-  Record,
   setClaimsId,
   signClaims,
   timestamp,
@@ -26,18 +27,38 @@ const {
 } = require('./lib/meta.js');
 
 const claims = document.getElementById('claims');
+const audioFile = document.getElementById('audio-file');
 const form = document.querySelector('form');
 const meta = document.getElementById('meta');
 const newKeypairBtn = document.getElementById('new-keypair-btn');
 const ols = document.getElementsByTagName('ol');
+const readTagsBtn = document.getElementById('read-tags-btn');
 const select = document.querySelector('select');
 const sig = document.getElementById('sig');
 const signClaimsBtn = document.getElementById('sign-claims-btn');
 const submit = document.createElement('input');
 submit.type = 'submit';
+const writeTagsBtn = document.getElementById('write-tags-btn');
 const verifySigBtn = document.getElementById('verify-sig-btn');
 
 let claimsObj, metaObj, mode, publicKey, schemaClaims, schemaMeta;
+
+readTagsBtn.addEventListener('click', () => {
+  readTags(audioFile, (tags) => {
+    console.log(tags);
+  });
+}, false);
+
+writeTagsBtn.addEventListener('click', () => {
+  if (metaObj) {
+    const frames = generateFrames(metaObj);
+    // console.log(frames);
+    writeTags(audioFile, frames, (writer) => {
+      console.log(writer.getBlob());
+      FileSaver.saveAs(writer.getBlob(), 'test.mp3');
+    });
+  }
+}, false);
 
 newKeypairBtn.addEventListener('click', () => {
   if (mode === 'meta') {
@@ -127,15 +148,13 @@ select.addEventListener('change', () => {
       schemaMeta = Recording;
       break;
     //------------------------------
-    case 'compose':
-      schemaClaims = Compose;
+    case 'create':
+      schemaClaims = Create;
       break;
     case 'license':
       schemaClaims = License;
       break;
-    case 'record':
-      schemaClaims = Record;
-      break;
+      //..
     default:
       console.error('unexpected type: ' + select.value);
       return;

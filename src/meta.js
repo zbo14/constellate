@@ -5,6 +5,7 @@ const util = require('../lib/util.js');
 const {
   calcId,
   digestSHA256,
+  draft,
   encodeBase64,
   getId, getIds,
   hasKeys,
@@ -18,8 +19,6 @@ const {
 /**
 * @module constellate/src/meta
 */
-
-const draft = 'http://json-schema.org/draft-06/schema#';
 
 const schema = {
   type: 'string',
@@ -392,6 +391,7 @@ const albumContext =  {
     productionType: schemaPrefix('albumProductionType'),
     recordLabel: schemaIRI('recordLabel'),
     releaseType: schemaPrefix('albumReleaseType'),
+    title: schemaPrefix('name'),
     track: schemaIRI('track')
   },
   readonly: true,
@@ -449,6 +449,9 @@ const album = {
         'EPRelease',
         'SingleRelease'
       ]
+    },
+    title: {
+      type: 'string'
     },
     track: {
       type: 'array',

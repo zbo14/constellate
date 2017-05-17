@@ -5,6 +5,7 @@ const { calcMetaId, getMetaId, metaId, validateMeta } = require('../lib/meta.js'
 const {
   calcId,
   decodeBase64,
+  draft,
   encodeBase64,
   getId, getIds,
   now,
@@ -16,10 +17,6 @@ const {
 /**
 * @module constellate/src/jwt
 */
-
-const ajv = new Ajv();
-
-const draft = 'http://json-schema.org/draft-06/schema#';
 
 function calcClaimsId(claims: Object): string {
   return calcId('jti', claims);
@@ -35,6 +32,10 @@ function getClaimsIds(...claims: Object[]): string[] {
 
 function setClaimsId(claims: Object): Object {
   return Object.assign({}, claims, { 'jti': calcClaimsId(claims) });
+}
+
+function timestamp(claims: Object): Object {
+  return Object.assign({}, claims, { iat: now() });
 }
 
 const publicKey = {
@@ -77,6 +78,10 @@ const header =  {
     'typ'
   ]
 }
+
+const encodedHeader = encodeBase64({
+  alg: 'EdDsa', typ: 'JWT'
+});
 
 const intDate = {
   type: 'integer'
@@ -174,13 +179,7 @@ const Transfer = {
 }
 */
 
-function timestamp(claims: Object): Object {
-  return Object.assign({}, claims, { iat: now() });
-}
-
-const encodedHeader = encodeBase64({
-  alg: 'EdDsa', typ: 'JWT'
-});
+const typs = ['Create', 'License'];
 
 function signClaims(claims: Object, secretKey: Buffer): Buffer {
   const encodedPayload = encodeBase64(claims);
@@ -194,11 +193,14 @@ function validateClaims(claims: Object, meta: Object, schemaClaims: Object, sche
       if (!validateSchema(claims, schemaClaims)) {
         throw new Error('claims has invalid schema: ' + JSON.stringify(claims, null, 2));
       }
+      if (!typs.includes(claims.typ)) {
+        throw new Error('unexpected typ: ' + claims.typ);
+      }
       if (claims.iat > now()) {
         throw new Error('iat cannot be later than now');
       }
       if (claims.aud && claims.aud.some((aud) => aud === claims.iss)) {
-        throw new Error('audience cannot contain issuer');
+        throw new Error('aud cannot contain iss');
       }
       const rightNow = now();
       if (claims.exp) {

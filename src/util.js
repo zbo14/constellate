@@ -14,6 +14,8 @@ const urlsafeBase64  = require('urlsafe-base64');
 
 const ajv = new Ajv();
 
+const draft = 'http://json-schema.org/draft-06/schema#';
+
 function arrayFromObject(obj: Object): any[][] {
   return Object.keys(obj).map((key) => [key, obj[key]]);
 }
@@ -160,6 +162,7 @@ exports.decodeBase58 = decodeBase58;
 exports.decodeBase64 = decodeBase64;
 exports.digestSHA256 = digestSHA256;
 exports.digestSHA3 = digestSHA3;
+exports.draft = draft;
 exports.encodeBase58 = encodeBase58;
 exports.encodeBase64 = encodeBase64;
 exports.getId = getId;
