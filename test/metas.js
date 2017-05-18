@@ -1,4 +1,4 @@
-import { getPartyId } from '../lib/party.js';
+import { getAddr } from '../lib/party.js';
 
 import {
   Album, AlbumContext,
@@ -17,21 +17,13 @@ import {
   recordLabel
 } from './parties.js';
 
-function getMetaIds(...metas) {
-  return metas.map(getMetaId);
-}
-
-function getPartyIds(...parties) {
-  return parties.map(getPartyId);
-}
-
 const composition = setMetaId({
   '@context': CompositionContext,
   '@type': 'Composition',
-  composer: getPartyIds(composer),
+  composer: [getMetaId(composer)],
   iswcCode: 'T-034.524.680-1',
-  lyricist: getPartyIds(lyricist),
-  publisher: getPartyIds(publisher),
+  lyricist: [getMetaId(lyricist)],
+  publisher: [getMetaId(publisher)],
   title: 'fire-song'
 });
 
@@ -45,22 +37,22 @@ const audio = setMetaId({
 const recording = setMetaId({
   '@context': RecordingContext,
   '@type': 'Recording',
-  audio: getMetaIds(audio),
-  performer: getPartyIds(performer),
-  producer: getPartyIds(producer),
+  audio: [getMetaId(audio)],
+  performer: [getMetaId(performer)],
+  producer: [getMetaId(producer)],
   recordingOf: getMetaId(composition),
-  recordLabel: getPartyIds(recordLabel)
+  recordLabel: [getMetaId(recordLabel)]
 });
 
 const album = setMetaId({
   '@context': AlbumContext,
   '@type': 'Album',
-  artist: getPartyIds(performer, producer),
+  artist: [performer, producer].map(getAddr),
   productionType: 'DemoAlbum',
-  recordLabel: getPartyIds(recordLabel),
+  recordLabel: [getAddr(recordLabel)],
   releaseType: 'SingleRelease',
   title: 'ding-ding-dooby-doo',
-  track: getMetaIds(recording)
+  track: [getMetaId(recording)]
 });
 
 export {

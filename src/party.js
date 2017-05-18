@@ -11,7 +11,7 @@ const{
 const {
   digestRIPEMD160,
   digestSHA256,
-  encodeBase64,
+  encodeBase58,
   getId
 } = require('../lib/util.js');
 
@@ -21,31 +21,32 @@ const {
 * @module constellate/src/party
 */
 
-function calcPartyId(party: Object, publicKey: Buffer): string {
-  let partyId = '';
+function publicKey2Addr(publicKey: Buffer): string {
+  return '0x' + digestRIPEMD160(digestSHA256(encodeBase58(publicKey)).toString('hex')).toString('hex');
+}
+
+function calcAddr(party: Object, publicKey: Buffer): string {
+  let addr = '';
   try {
     if (party['@type'] !== 'Artist' && party['@type'] !== 'Organization') {
       throw new Error('unexpected @type: ' + party['@type']);
     }
-    if (!publicKey) {
-      throw new Error('no public key');
-    }
     if (publicKey.length !== 32 && publicKey.length !== 33) {
       throw new Error('invalid public key length: ' + publicKey.length);
     }
-    partyId = encodeBase64(digestRIPEMD160(encodeBase64(digestSHA256(encodeBase64(publicKey)))));
+    addr = publicKey2Addr(publicKey);
   } catch(err) {
     console.error(err);
   }
-  return partyId;
+  return addr;
 }
 
-function getPartyId(party: Object): string {
+function getAddr(party: Object): string {
   return getId('@id', party);
 }
 
-function setPartyId(party: Object, publicKey: Buffer): Object {
-  const id = calcPartyId(party, publicKey);
+function setAddr(party: Object, publicKey: Buffer): Object {
+  const id = calcAddr(party, publicKey);
   if (!id) return party;
   return Object.assign({}, party, { '@id': id });
 }
@@ -56,9 +57,9 @@ function validateParty(party: Object, publicKey: Buffer, schema: Object): boolea
     if (!validateSchema(party, schema)) {
       throw new Error('party has invalid schema: ' + JSON.stringify(party, null, 2));
     }
-    const partyId = calcPartyId(party, publicKey);
-    if (party['@id'] !== partyId) {
-      throw new Error(`expected partyId=${party['@id']}; got ` + partyId);
+    const addr = calcAddr(party, publicKey);
+    if (party['@id'] !== addr) {
+      throw new Error(`expected addr=${party['@id']}; got ` + addr);
     }
     valid = true;
   } catch(err) {
@@ -67,9 +68,9 @@ function validateParty(party: Object, publicKey: Buffer, schema: Object): boolea
   return valid;
 }
 
-const PartyId = {
+const Addr = {
   type: 'string',
-  pattern: '^[A-Za-z0-9-_]{27}$'
+  pattern: '^0x[a-fA-F0-9]{40}$'
 }
 
 const Artist = {
@@ -104,7 +105,7 @@ const Artist = {
       enum: ['Artist'],
       readonly: true
     },
-    '@id': Object.assign({}, PartyId, { readonly: true }),
+    '@id': Object.assign({}, Addr, { readonly: true }),
     email: Email,
     homepage: Url,
     name: {
@@ -161,7 +162,7 @@ const Organization = {
       enum: ['Organization'],
       readonly: true
     },
-    '@id': PartyId,
+    '@id': Addr,
     email: Email,
     homepage: Url,
     name: {
@@ -186,13 +187,14 @@ const OrganizationContext = {
   profile: 'schema:sameAs'
 }
 
-exports.PartyId = PartyId;
+exports.Addr = Addr;
 exports.Artist = Artist;
 exports.ArtistContext = ArtistContext;
 exports.Organization = Organization;
 exports.OrganizationContext = OrganizationContext;
 
-exports.calcPartyId = calcPartyId;
-exports.getPartyId = getPartyId;
-exports.setPartyId = setPartyId;
+exports.calcAddr = calcAddr;
+exports.getAddr = getAddr;
+exports.publicKey2Addr = publicKey2Addr;
+exports.setAddr = setAddr;
 exports.validateParty = validateParty;

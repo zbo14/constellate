@@ -1,7 +1,7 @@
 const Ajv = require('ajv');
 const ed25519 = require('../lib/ed25519.js');
 const secp256k1 = require('../lib/secp256k1.js');
-const { Addr } = require('../lib/party.js');
+const { Addr, publicKey2Addr } = require('../lib/party.js');
 
 const {
   MetaId,
@@ -61,14 +61,22 @@ const PublicKey = {
       oneOf: [
         {
           properties: {
-            crv: { enum: ['Ed25519'] },
-            kty: { enum: ['OKP'] }
+            crv: {
+              enum: ['Ed25519']
+            },
+            kty: {
+              enum: ['OKP']
+            }
           }
         },
         {
           properties: {
-            crv: { enum: ['P-256'] },
-            kty: { enum: ['EC'] },
+            crv: {
+              enum: ['P-256']
+            },
+            kty: {
+              enum: ['EC']
+            },
             y: {
               type: 'string',
               pattern: '^[A-Za-z0-9-_]{43}$'
@@ -89,17 +97,49 @@ const PublicKey = {
 const Header =  {
   $schema: Draft,
   type: 'object',
-  title: 'JWTHeader',
+  title: 'Header',
   properties: {
     alg: {
       enum: ['EdDsa', 'ES256']
     },
+    jwk: PublicKey,
     typ: {
       enum: ['JWT']
     }
   },
+  oneOf: [
+    {
+      properties: {
+        alg: {
+          enum: ['EdDsa']
+        },
+        jwk: {
+          properties: {
+            crv: {
+              enum: ['Ed25519']
+            }
+          }
+        }
+      }
+    },
+    {
+      properties: {
+        alg: {
+          enum: ['ES256']
+        },
+        jwk: {
+          properties: {
+            crv: {
+              enum: ['P-256']
+            }
+          }
+        }
+      }
+    }
+  ],
   required: [
     'alg',
+    'jwk',
     'typ'
   ]
 }
@@ -168,6 +208,51 @@ const License = {
   ]
 }
 
+function ed25519Header(publicKey: Buffer): Object {
+  let header = {};
+  try {
+    if (publicKey.length !== 32) {
+      throw new Error('expected public key length=32; got ' + publicKey.length);
+    }
+    header = {
+      alg: 'EdDsa',
+      jwk: {
+        x: encodeBase64(publicKey),
+        crv: 'Ed25519',
+        kty: 'OKP'
+      },
+      typ: 'JWT'
+    }
+  } catch(err) {
+    console.error(err);
+  }
+  return header;
+}
+
+function secp256k1Header(publicKey: Buffer) {
+  let header = {};
+  try {
+    if (publicKey.length !== 33) {
+      throw new Error('expected public key length=33; got ' + publicKey.length);
+    }
+    const coords = secp256k1.uncompress(publicKey);
+    header = {
+      alg: 'ES256',
+      jwk: {
+        x: encodeBase64(coords.x),
+        y: encodeBase64(coords.y),
+        crv: 'P-256',
+        kty: 'EC'
+      },
+      typ: 'JWT'
+    }
+  } catch(err) {
+    console.error(err);
+  }
+  return header;
+}
+
+
 function signClaims(claims: Object, header: Object, secretKey: Buffer): Buffer {
   let sig = new Buffer([]);
   const encodedHeader = encodeBase64(header);
@@ -181,7 +266,7 @@ function signClaims(claims: Object, header: Object, secretKey: Buffer): Buffer {
   return sig;
 }
 
-function validateClaims(claims: Object, meta: Object, schemaClaims: Object, schemaMeta: Object): boolean {
+function validateClaims(claims: Object, meta: Object, schemaClaims: Object, schemaMeta: Object): string {
   let valid = false;
   try {
     if (validateMeta(meta, schemaMeta)) {
@@ -229,17 +314,17 @@ function validateClaims(claims: Object, meta: Object, schemaClaims: Object, sche
         case 'Album':
           if (!meta.artist.some((id) => {
             return claims.iss === id;
-          })) throw new Error('iss should be artist on album');
+          })) throw new Error('iss should be album artist addr');
           break;
         case 'Composition':
           if (!meta.composer.concat(meta.lyricist).some((id) => {
             return claims.iss === id;
-          })) throw new Error('iss should be composer or lyricist of composition');
+          })) throw new Error('iss should be composer or lyricist addr');
           break;
         case 'Recording':
           if (!meta.performer.concat(meta.producer).some((id) => {
             return claims.iss === id;
-          })) throw new Error('iss should be performer or producer on recording');
+          })) throw new Error('iss should be performer or producer addr');
           break;
         default:
           throw new Error('unexpected @type: ' + meta['@type']);
@@ -262,13 +347,23 @@ function verifyClaims(claims: Object, header: Object, meta: Object, schemaClaims
     if (validateClaims(claims, meta, schemaClaims, schemaMeta)) {
       const encodedHeader = encodeBase64(header);
       const encodedPayload = encodeBase64(claims);
-      const publicKey = decodeBase64(claims.iss);
       if (header.alg === 'EdDsa') {
+        const publicKey = decodeBase64(header.jwk.x);
+        if (claims.iss !== publicKey2Addr(publicKey)) {
+          throw new Error('publicKey does not match addr');
+        }
         if (!ed25519.verify(encodedHeader + '.' + encodedPayload, publicKey, signature)) {
           throw new Error('invalid ed25519 signature: ' + encodeBase64(signature));
         }
       }
       if (header.alg === 'ES256') {
+        const publicKey = secp256k1.compress(
+          decodeBase64(header.jwk.x),
+          decodeBase64(header.jwk.y)
+        )
+        if (claims.iss !== publicKey2Addr(publicKey)) {
+          throw new Error('publicKey does not match addr');
+        }
         if (!secp256k1.verify(encodedHeader + '.' + encodedPayload, publicKey, signature)) {
           throw new Error('invalid secp256k1 signature: ' + encodeBase64(signature));
         }
@@ -285,7 +380,9 @@ exports.Create = Create;
 exports.License = License;
 
 exports.calcClaimsId = calcClaimsId;
+exports.ed25519Header = ed25519Header;
 exports.getClaimsId = getClaimsId;
+exports.secp256k1Header = secp256k1Header;
 exports.setClaimsId = setClaimsId;
 exports.signClaims = signClaims;
 exports.timestamp = timestamp;

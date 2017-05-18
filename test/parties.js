@@ -3,7 +3,7 @@ import {
   ArtistContext,
   Organization,
   OrganizationContext,
-  setPartyId
+  setAddr
 } from '../lib/party.js';
 
 const ed25519 = require('../lib/ed25519.js');
@@ -16,7 +16,7 @@ const producerKeypair = ed25519.randomKeypair();
 const publisherKeypair = ed25519.randomKeypair();
 const recordLabelKeypair = secp256k1.randomKeypair();
 
-const composer = setPartyId({
+const composer = setAddr({
   '@context': ArtistContext,
   '@type': 'Artist',
   email: 'composer@example.com',
@@ -25,7 +25,7 @@ const composer = setPartyId({
   profile: ['http://facebook-profile.com'],
 }, composerKeypair.publicKey);
 
-const lyricist = setPartyId({
+const lyricist = setAddr({
   '@context': ArtistContext,
   '@type': 'Artist',
   email: 'lyricist@example.com',
@@ -33,7 +33,7 @@ const lyricist = setPartyId({
   name: 'lyricist'
 }, lyricistKeypair.publicKey);
 
-const performer = setPartyId({
+const performer = setAddr({
   '@context': ArtistContext,
   '@type': 'Artist',
   email: 'performer@example.com',
@@ -42,7 +42,7 @@ const performer = setPartyId({
   profile: ['http://bandcamp-page.com']
 }, performerKeypair.publicKey);
 
-const producer = setPartyId({
+const producer = setAddr({
   '@context': ArtistContext,
   '@type': 'Artist',
   homepage: 'http://producer.com',
@@ -50,7 +50,7 @@ const producer = setPartyId({
   profile: ['http://soundcloud-page.com']
 }, producerKeypair.publicKey);
 
-const publisher = setPartyId({
+const publisher = setAddr({
   '@context': OrganizationContext,
   '@type': 'Organization',
   email: 'publisher@example.com',
@@ -58,7 +58,7 @@ const publisher = setPartyId({
   name: 'publisher'
 }, publisherKeypair.publicKey);
 
-const recordLabel = setPartyId({
+const recordLabel = setAddr({
   '@context': OrganizationContext,
   '@type': 'Organization',
   email: 'recordLabel@example.com',
