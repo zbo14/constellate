@@ -109,6 +109,7 @@ function orderStringify(obj: Object, space?: number) {
   const keys = [];
   JSON.stringify(obj, (k, v) => {
     keys.push(k);
+    if (isArray(v)) v.sort();
     return v;
   });
   return JSON.stringify(obj, keys.sort(), space);

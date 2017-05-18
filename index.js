@@ -62,7 +62,7 @@ readTagsBtn.addEventListener('click', () => {
 writeTagsBtn.addEventListener('click', () => {
   if (metaObj) {
     const frames = generateFrames(metaObj);
-    // console.log(frames);
+    console.log(frames);
     writeTags(audioFile, frames, (writer) => {
       console.log(writer.getBlob());
       FileSaver.saveAs(writer.getBlob(), 'test.mp3');
