@@ -9,16 +9,18 @@
     <hr>
     <select>
       <option selected disabled>type</option>
+      <optgroup label='party'>
+        <option value='artist'>artist</option>
+        <option value='organization'>organization</option>
+      </optgroup>
       <optgroup label='meta'>
         <option value='album'>album</option>
-        <option value='artist'>artist</option>
         <option value='audio'>audio</option>
         <option value='composition'>composition</option>
-        <option value='organization'>organization</option>
         <option value='recording'>recording</option>
       </optgroup>
       <optgroup label='claims'>
-        <option value='compose'>create</option>
+        <option value='create'>create</option>
         <option value='license'>license</option>
       </optgroup>
     </select><br>
@@ -27,6 +29,7 @@
     <button id='verify-sig-btn' hidden>verify signature</button>
     <hr>
     <form></form>
+    <pre id='party'></pre>
     <pre id='meta'></pre>
     <pre id='claims'></pre>
     <p id='sig'></p>

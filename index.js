@@ -3,11 +3,13 @@ const ed25519 = require('./lib/ed25519.js');
 const FileSaver = require('file-saver');
 const { generateForm, parseForm } = require('./lib/form.js');
 const { generateFrames, readTags, writeTags } = require('./lib/id3.js');
-const { encodeBase64, decodeBase64 } = require('./lib/util.js');
+const { encodeBase58, decodeBase58 } = require('./lib/util.js');
 
 const {
   Create,
   License,
+  ed25519Header,
+  secp256k1Header,
   setClaimsId,
   signClaims,
   timestamp,
@@ -17,14 +19,19 @@ const {
 
 const {
   Album,
-  Artist,
   Audio,
   Composition,
-  Organization,
   Recording,
   setMetaId,
   validateMeta
 } = require('./lib/meta.js');
+
+const {
+  Artist,
+  Organization,
+  setAddr,
+  validateParty
+} = require('./lib/party.js');
 
 const claims = document.getElementById('claims');
 const audioFile = document.getElementById('audio-file');
@@ -32,6 +39,7 @@ const form = document.querySelector('form');
 const meta = document.getElementById('meta');
 const newKeypairBtn = document.getElementById('new-keypair-btn');
 const ols = document.getElementsByTagName('ol');
+const party = document.getElementById('party');
 const readTagsBtn = document.getElementById('read-tags-btn');
 const select = document.querySelector('select');
 const sig = document.getElementById('sig');
@@ -41,7 +49,9 @@ submit.type = 'submit';
 const writeTagsBtn = document.getElementById('write-tags-btn');
 const verifySigBtn = document.getElementById('verify-sig-btn');
 
-let claimsObj, metaObj, mode, publicKey, schemaClaims, schemaMeta;
+let claimsObj, metaObj, partyObj,
+    schemaClaims, schemaMeta, schemaParty,
+    mode, publicKey;
 
 readTagsBtn.addEventListener('click', () => {
   readTags(audioFile, (tags) => {
@@ -61,29 +71,29 @@ writeTagsBtn.addEventListener('click', () => {
 }, false);
 
 newKeypairBtn.addEventListener('click', () => {
-  if (mode === 'meta') {
+  if (mode === 'party') {
     const password = prompt('Please enter a password to generate keypair', 'passwerd');
     if (!password) return;
     const keypair = ed25519.keypairFromPassword(password);
     publicKey = keypair.publicKey;
-    meta.textContent = JSON.stringify(encodeKeypair(keypair), null, 2);
+    party.textContent = JSON.stringify(encodeKeypair(keypair), null, 2);
   }
 }, false);
 
 signClaimsBtn.addEventListener('click', () => {
-  if (mode === 'claims' && claimsObj) {
+  if (mode === 'claims' && claimsObj && publicKey) {
     const secretKey = prompt('Please enter your secret key to sign claims', '');
     if (!secretKey) return;
-    sig.innerHTML = encodeBase64(signClaims(claimsObj, decodeBase64(secretKey)));
+    sig.innerHTML = encodeBase58(signClaims(claimsObj, ed25519Header(publicKey), decodeBase58(secretKey)));
   }
 }, false);
 
 verifySigBtn.addEventListener('click', () => {
   if (mode === 'claims'
-      && claimsObj && metaObj
+      && claimsObj && metaObj && publicKey
       && schemaClaims && schemaMeta) {
-    const signature = decodeBase64(sig.innerHTML);
-    console.log(verifyClaims(claimsObj, metaObj, schemaClaims, schemaMeta, signature));
+    const signature = decodeBase58(sig.innerHTML);
+    console.log(verifyClaims(claimsObj, ed25519Header(publicKey), metaObj, schemaClaims, schemaMeta, signature));
   }
 }, false);
 
@@ -128,22 +138,21 @@ select.addEventListener('change', () => {
   signClaimsBtn.hidden = true;
   verifySigBtn.hidden = true;
   switch(select.value) {
+    case 'artist':
+      schemaParty = Artist;
+      break;
+    case 'organization':
+      schemaParty = Organization;
+      break;
+    //------------------------------
     case 'album':
       schemaMeta = Album;
-      break;
-    case 'artist':
-      schemaMeta = Artist;
-      newKeypairBtn.hidden = false;
       break;
     case 'audio':
       schemaMeta = Audio;
       break;
     case 'composition':
       schemaMeta = Composition;
-      break;
-    case 'organization':
-      schemaMeta = Organization;
-      newKeypairBtn.hidden = false;
       break;
     case 'recording':
       schemaMeta = Recording;
@@ -160,13 +169,17 @@ select.addEventListener('change', () => {
       console.error('unexpected type: ' + select.value);
       return;
   }
+  if (mode === 'party') {
+    generateForm(schemaParty).forEach((div) => form.appendChild(div));
+    newKeypairBtn.hidden = false;
+  }
   if (mode === 'meta') {
     generateForm(schemaMeta).forEach((div) => form.appendChild(div));
   }
   if (mode === 'claims') {
+    generateForm(schemaClaims).forEach((div) => form.appendChild(div));
     signClaimsBtn.hidden = false;
     verifySigBtn.hidden = false;
-    generateForm(schemaClaims).forEach((div) => form.appendChild(div));
   }
   form.appendChild(submit);
   listModifiers();
@@ -210,16 +223,20 @@ form.addEventListener('submit', (event) => {
              && div.children.length === 2
              && includeElement(div.lastChild, div.firstChild);
     });
-    if (mode === 'meta') {
+    if (mode === 'party') {
+      partyObj = parseForm(divs);
+      if (partyObj) {
+        partyObj = setAddr(partyObj, publicKey);
+        if (partyObj && validateParty(partyObj, publicKey, schemaParty)) {
+          party.textContent = JSON.stringify(partyObj, null, 2);
+          return;
+        }
+      }
+    } else if (mode === 'meta') {
       metaObj = parseForm(divs);
       if (metaObj) {
-        if (select.value !== 'artist' && select.value !== 'organization') {
-          publicKey = null;
-        } else if (!publicKey || publicKey.length !== 32) {
-          throw new Error(`invalid public key: ${publicKey}`);
-        }
-        metaObj = setMetaId(metaObj, publicKey)
-        if (validateMeta(metaObj, schemaMeta, publicKey)) {
+        metaObj = setMetaId(metaObj);
+        if (metaObj && validateMeta(metaObj, schemaMeta)) {
           meta.textContent = JSON.stringify(metaObj, null, 2);
           return;
         }
@@ -228,7 +245,7 @@ form.addEventListener('submit', (event) => {
       claimsObj = parseForm(divs);
       if (claimsObj) {
         claimsObj = setClaimsId(timestamp(claimsObj));
-        if (validateClaims(claimsObj, metaObj, schemaClaims, schemaMeta)) {
+        if (claimsObj && validateClaims(claimsObj, metaObj, schemaClaims, schemaMeta)) {
           claims.textContent = JSON.stringify(claimsObj, null, 2);
           return;
         }
@@ -239,6 +256,7 @@ form.addEventListener('submit', (event) => {
   } catch(err) {
     console.error(err);
   }
+  // party.textContent = null;
   // meta.textContent = null;
   // claims.textContent = null;
 }, false);

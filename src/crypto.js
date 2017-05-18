@@ -3,7 +3,7 @@
 const atob = require('atob');
 const bcryptjs = require('bcryptjs');
 const crypto = require('crypto');
-const { decodeBase64, encodeBase64 } = require('../lib/util.js');
+const { decodeBase58, encodeBase58 } = require('../lib/util.js');
 
 // @flow
 
@@ -15,15 +15,15 @@ const saltRounds = 10;
 
 function decodeKeypair(keypair: Object): Object {
   return {
-    publicKey: decodeBase64(keypair.publicKey),
-    secretKey: decodeBase64(keypair.secretKey)
+    publicKey: decodeBase58(keypair.publicKey),
+    secretKey: decodeBase58(keypair.secretKey)
   }
 }
 
 function encodeKeypair(keypair: Object): Object {
   return {
-    publicKey: encodeBase64(keypair.publicKey),
-    secretKey: encodeBase64(keypair.secretKey)
+    publicKey: encodeBase58(keypair.publicKey),
+    secretKey: encodeBase58(keypair.secretKey)
   }
 }
 
