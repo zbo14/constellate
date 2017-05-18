@@ -3,12 +3,14 @@
     <title>constellate</title>
   </head>
   <body>
+    <button id='start-node-btn'>start node</button>
+    <hr>
     <input type='file' id='audio-file' accept='audio/*' />
     <button id='read-tags-btn'>read tags</button>
     <button id='write-tags-btn'>write tags</button><br>
     <hr>
     <select>
-      <option selected disabled>type</option>
+      <option selected disabled>--</option>
       <optgroup label='party'>
         <option value='artist'>artist</option>
         <option value='organization'>organization</option>
@@ -29,9 +31,13 @@
     <button id='verify-sig-btn' hidden>verify signature</button>
     <hr>
     <form></form>
+    <h3>Party</h3>
     <pre id='party'></pre>
+    <h3>Meta</h3>
     <pre id='meta'></pre>
+    <h3>Claims</h3>
     <pre id='claims'></pre>
+    <h3>Signature</h3>
     <p id='sig'></p>
   </body>
   <script src='./bundle.js'></script>

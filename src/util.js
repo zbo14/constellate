@@ -105,7 +105,7 @@ function objectFromArray(arr: any[][]): Object {
 
 // from http://stackoverflow.com/questions/16167581/sort-object-properties-and-json-stringify#comment73545624_40646557
 
-function orderStringify(obj: Object, space?: number) {
+function orderStringify(obj: Object, space?: number): Object {
   const keys = [];
   JSON.stringify(obj, (k, v) => {
     keys.push(k);
@@ -113,6 +113,13 @@ function orderStringify(obj: Object, space?: number) {
     return v;
   });
   return JSON.stringify(obj, keys.sort(), space);
+}
+
+function readFile(input: HTMLInputElement, callback: Function): boolean {
+  const reader = new FileReader();
+  reader.onload = () => callback(reader);
+  reader.readAsArrayBuffer(input.files[0]);
+  return true;
 }
 
 function recurse(x: any, fn: Function): any {
@@ -152,5 +159,6 @@ exports.isString = isString;
 exports.now = now;
 exports.objectFromArray = objectFromArray;
 exports.orderStringify = orderStringify;
+exports.readFileInput = readFileInput;
 exports.recurse = recurse;
 exports.withoutKeys = withoutKeys;

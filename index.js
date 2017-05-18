@@ -1,9 +1,11 @@
 const { encodeKeypair } = require('./lib/crypto.js');
 const ed25519 = require('./lib/ed25519.js');
+const ipfsNode = require('./lib/ipfs-node');
 const FileSaver = require('file-saver');
 const { generateForm, parseForm } = require('./lib/form.js');
 const { generateFrames, readTags, writeTags } = require('./lib/id3.js');
 const { encodeBase58, decodeBase58 } = require('./lib/util.js');
+require('setimmediate');
 
 const {
   Create,
@@ -44,6 +46,7 @@ const readTagsBtn = document.getElementById('read-tags-btn');
 const select = document.querySelector('select');
 const sig = document.getElementById('sig');
 const signClaimsBtn = document.getElementById('sign-claims-btn');
+const startNodeBtn = document.getElementById('start-node-btn');
 const submit = document.createElement('input');
 submit.type = 'submit';
 const writeTagsBtn = document.getElementById('write-tags-btn');
@@ -57,6 +60,10 @@ readTagsBtn.addEventListener('click', () => {
   readTags(audioFile, (tags) => {
     console.log(tags);
   });
+}, false);
+
+startNodeBtn.addEventListener('click', () => {
+  ipfsNode.start(audioFile);
 }, false);
 
 writeTagsBtn.addEventListener('click', () => {
