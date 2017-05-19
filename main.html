@@ -7,8 +7,8 @@
     <button id='read-tags-btn'>read tags</button>
     <button id='write-tags-btn'>write tags</button><br>
     <hr>
-    <select>
-      <option selected disabled>type</option>
+    <select id='schema-select'>
+      <option selected disabled>--</option>
       <optgroup label='party'>
         <option value='Artist'>artist</option>
         <option value='Organization'>organization</option>
@@ -26,11 +26,15 @@
     </select><br>
     <button id='new-keypair-btn' hidden>new keypair</button>
     <button id='sign-claims-btn' hidden>sign claims</button>
-    <button id='verify-sig-btn' hidden>verify signature</button>
-    <hr>
+    <button id='verify-sig-btn' hidden>verify signature</button><br><br>
     <form></form>
+    <hr>
     <input type='text' id='mode' hidden /><br>
     <label>public-key</label>
+    <select id='key-select'>
+      <option value='ed25519'>ed25519</option>
+      <option value='secp256k1'>secp256k1</option>
+    </select>
     <input type='text' id='pub' /><br>
     <label>signature</label>
     <input type='text' id='sig' /><br>

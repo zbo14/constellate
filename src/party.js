@@ -115,7 +115,7 @@ const Organization = {
       enum: ['Organization'],
       readonly: true
     },
-    '@id': Addr,
+    '@id': Object.assign({}, Addr, { readonly: true }),
     email: Email,
     homepage: Url,
     name: {

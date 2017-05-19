@@ -1,5 +1,6 @@
 const { encodeKeypair } = require('./lib/crypto.js');
 const ed25519 = require('./lib/ed25519.js');
+const secp256k1 = require('./lib/secp256k1.js');
 const FileSaver = require('file-saver');
 const { generateForm, parseForm } = require('./lib/form.js');
 const { generateFrames, readTags, writeTags } = require('./lib/id3.js');
@@ -36,10 +37,12 @@ const mode = document.getElementById('mode');
 const ols = document.getElementsByTagName('ol');
 const party = document.getElementById('party');
 const pub = document.getElementById('pub');
-const select = document.querySelector('select');
 const sig = document.getElementById('sig');
 const submit = document.createElement('input');
 submit.type = 'submit';
+
+const keySelect = document.getElementById('key-select');
+const schemaSelect = document.getElementById('schema-select');
 
 const newKeypairBtn = document.getElementById('new-keypair-btn');
 const readTagsBtn = document.getElementById('read-tags-btn');
@@ -63,31 +66,56 @@ writeTagsBtn.addEventListener('click', () => {
 }, false);
 
 newKeypairBtn.addEventListener('click', () => {
-  const password = prompt('Please enter a password to generate keypair', 'passwerd');
-  if (password) {
-    const keypair = ed25519.keypairFromPassword(password);
-    pub.setAttribute('value', encodeBase58(keypair.publicKey));
-    console.log(encodeBase58(keypair.secretKey));
+  let keypair;
+  if (keySelect.value === 'ed25519') {
+    const password = prompt('Please enter a password to generate ed25519 keypair', 'passwerd');
+    if (!password) return;
+    keypair = ed25519.keypairFromPassword(password);
   }
+  if (keySelect.value === 'secp256k1') {
+    keypair = secp256k1.randomKeypair();
+  }
+  pub.setAttribute('value', encodeBase58(keypair.publicKey));
+  console.log(encodeBase58(keypair.secretKey));
 }, false);
 
 signClaimsBtn.addEventListener('click', () => {
   const encodedSecretKey = prompt('Please enter your secret key to sign claims', '');
-  if (encodedSecretKey) {
+  if (!encodedSecretKey) return;
+  try {
     const claimsObj = JSON.parse(claims.textContent);
-    const header = ed25519Header(decodeBase58(pub.value));
+    const publicKey = decodeBase58(pub.value);
+    let header;
+    if (keySelect.value === 'ed25519') {
+      header = ed25519Header(publicKey);
+    }
+    if (keySelect.value === 'secp256k1') {
+      header = secp256k1Header(publicKey);
+    }
     const secretKey = decodeBase58(encodedSecretKey);
     sig.setAttribute('value', encodeBase58(signClaims(claimsObj, header, secretKey)));
+  } catch(err) {
+    console.error(err);
   }
 }, false);
 
-
 verifySigBtn.addEventListener('click', () => {
-  const claimsObj = JSON.parse(claims.textContent);
-  const header = ed25519Header(decodeBase58(pub.value));
-  const metaObj = JSON.parse(meta.textContent);
-  const signature = decodeBase58(sig.value);
-  console.log(verifyClaims(claimsObj, header, metaObj, signature));
+  try {
+    const claimsObj = JSON.parse(claims.textContent);
+    const publicKey = decodeBase58(pub.value);
+    let header;
+    if (keySelect.value === 'ed25519') {
+      header = ed25519Header(publicKey);
+    }
+    if (keySelect.value === 'secp256k1') {
+      header = secp256k1Header(publicKey);
+    }
+    const metaObj = JSON.parse(meta.textContent);
+    const signature = decodeBase58(sig.value);
+    console.log(verifyClaims(claimsObj, header, metaObj, signature));
+  } catch(err) {
+    console.error(err);
+  }
 }, false);
 
 function listModifiers() {
@@ -124,24 +152,26 @@ function listModifiers() {
   });
 }
 
-select.addEventListener('change', () => {
+schemaSelect.addEventListener('change', () => {
   form.innerHTML = null;
-  mode.setAttribute('value', select.selectedOptions[0].parentNode.label);
+  mode.setAttribute('value', schemaSelect.selectedOptions[0].parentNode.label);
+  keySelect.hidden = true;
   newKeypairBtn.hidden = true;
   signClaimsBtn.hidden = true;
   verifySigBtn.hidden = true;
+  let schema;
   try {
-    let schema;
     switch(mode.value) {
       case 'party':
-        schema = getPartySchema(select.value);
+        schema = getPartySchema(schemaSelect.value);
+        keySelect.hidden = false;
         newKeypairBtn.hidden = false;
         break;
       case 'meta':
-        schema = getMetaSchema(select.value);
+        schema = getMetaSchema(schemaSelect.value);
         break;
       case 'claims':
-        schema = getClaimsSchema(select.value);
+        schema = getClaimsSchema(schemaSelect.value);
         signClaimsBtn.hidden = false;
         verifySigBtn.hidden = false;
         break;
