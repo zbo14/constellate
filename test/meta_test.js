@@ -6,6 +6,7 @@ import {
   album,
   audio,
   composition,
+  image,
   recording
 } from './metas.js'
 
@@ -20,6 +21,12 @@ describe('Meta', () => {
       assert.isOk(
         validateMeta(audio),
         'should validate audio metadata'
+      );
+    });
+    it('validates image metadata', () => {
+      assert.isOk(
+        validateMeta(image),
+        'should validate image metadata'
       );
     });
     it('validates recording metadata', () => {

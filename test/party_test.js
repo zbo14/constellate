@@ -12,7 +12,7 @@ import {
 } from './parties.js';
 
 describe('Party', () => {
-  it('validates artist', () => {
+  it('validates artists', () => {
     assert.isOk(
       validateParty(composer, composerKeypair.publicKey),
       'should validate artist'

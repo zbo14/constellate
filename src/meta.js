@@ -41,6 +41,7 @@ const Album = {
           default: 'http://schema.org/'
         },
         Album: contextPrefix('schema', 'MusicAlbum'),
+        art: contextIRI('schema', 'image'),
         artist: contextIRI('schema', 'byArtist'),
         productionType: contextPrefix('schema', 'albumProductionType'),
         recordLabel: contextIRI('schema', 'recordLabel'),
@@ -52,6 +53,7 @@ const Album = {
       required: [
         'schema',
         'Album',
+        'art',
         'artist',
         'productionType',
         'recordLabel',
@@ -65,6 +67,7 @@ const Album = {
       readonly: true
     },
     '@id': Object.assign({}, MetaId, { readonly: true }),
+    art: MetaId,
     artist: {
       type: 'array',
       items: Addr,
@@ -114,6 +117,10 @@ const Album = {
 const AlbumContext = {
   schema: 'http://schema.org/',
   Album: 'schema:MusicAlbum',
+  art: {
+    '@id': 'schema:image',
+    '@type': '@id'
+  },
   artist: {
     '@id': 'schema:byArtist',
     '@type': '@id'
@@ -259,6 +266,51 @@ const CompositionContext = {
   title: 'schema:name'
 }
 
+const Image = {
+  $schema: Draft,
+  title: 'Image',
+  type: 'object',
+  properties: {
+    '@context': {
+      type: 'object',
+      properties: {
+        schema: {
+          type: 'string',
+          default: 'http://schema.org/'
+        },
+        contentUrl: contextPrefix('schema', 'contentUrl'),
+        Image: contextPrefix('schema', 'ImageObject'),
+        encodingFormat: contextPrefix('schema', 'encodingFormat')
+        //..
+      },
+      readonly: true,
+      required: [
+        'contentUrl',
+        'Image',
+        'encodingFormat'
+      ]
+    },
+    '@type': {
+      enum: ['Image'],
+      readonly: true
+    },
+    '@id': Object.assign({}, MetaId, { readonly: true }),
+    contentUrl: Url,
+    encodingFormat: {
+      enum: ['jpeg', 'png']
+    }
+    //..
+  },
+  require: ['@context', '@id', '@type', 'contentUrl']
+}
+
+const ImageContext = {
+  schema: 'http://schema.org/',
+  contentUrl: 'schema:contentUrl',
+  Image: 'schema:ImageObject',
+  encodingFormat: 'schema:encodingFormat'
+}
+
 const Recording = {
   $schema: Draft,
   title: 'Recording',
@@ -377,6 +429,8 @@ function getMetaSchema(type: string): Object {
       return Audio;
     case 'Composition':
       return Composition;
+    case 'Image':
+      return Image;
     case 'Recording':
       return Recording;
     default:
@@ -409,6 +463,7 @@ function validateMeta(meta: Object): boolean {
 exports.AlbumContext = AlbumContext;
 exports.AudioContext = AudioContext;
 exports.CompositionContext = CompositionContext;
+exports.ImageContext = ImageContext;
 exports.MetaId = MetaId;
 exports.RecordingContext = RecordingContext;
 
