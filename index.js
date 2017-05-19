@@ -35,14 +35,17 @@ const {
   validateParty
 } = require('./lib/party.js');
 
+const audio = document.getElementById('audio');
 const claims = document.getElementById('claims');
-const audioFile = document.getElementById('audio-file');
 const form = document.querySelector('form');
+const links = document.getElementById('links');
 const meta = document.getElementById('meta');
+const multihash = document.getElementById('multihash');
 const newKeypairBtn = document.getElementById('new-keypair-btn');
 const ols = document.getElementsByTagName('ol');
 const party = document.getElementById('party');
 const readTagsBtn = document.getElementById('read-tags-btn');
+const getFileBtn = document.getElementById('get-file-btn');
 const select = document.querySelector('select');
 const sig = document.getElementById('sig');
 const signClaimsBtn = document.getElementById('sign-claims-btn');
@@ -56,21 +59,37 @@ let claimsObj, metaObj, partyObj,
     schemaClaims, schemaMeta, schemaParty,
     mode, publicKey;
 
+getFileBtn.addEventListener('click', () => {
+  if (multihash.value) {
+    // ipfsNode.catFile(multihash.value);
+    ipfsNode.getFile(multihash.value, (link) => {
+      links.appendChild(link);
+    });
+  }
+}, false);
+
 readTagsBtn.addEventListener('click', () => {
-  readTags(audioFile, (tags) => {
+  readTags(audio, (tags) => {
     console.log(tags);
   });
 }, false);
 
 startNodeBtn.addEventListener('click', () => {
-  ipfsNode.start(audioFile);
+  ipfsNode.start(() => {
+    audio.addEventListener('change', () => {
+      ipfsNode.addFile(audio, (result) => {
+        console.log('Added file:', result);
+        multihash.value = result.hash;
+      });
+    }, false);
+  });
 }, false);
 
 writeTagsBtn.addEventListener('click', () => {
   if (metaObj) {
     const frames = generateFrames(metaObj);
     console.log(frames);
-    writeTags(audioFile, frames, (writer) => {
+    writeTags(audio, frames, (writer) => {
       console.log(writer.getBlob());
       FileSaver.saveAs(writer.getBlob(), 'test.mp3');
     });

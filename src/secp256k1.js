@@ -1,3 +1,5 @@
+'use strict';
+
 const crypto = require('../lib/crypto.js');
 const secp256k1 = require('secp256k1/js');
 const { digestSHA256 } = require('../lib/util.js');

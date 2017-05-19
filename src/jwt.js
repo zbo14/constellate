@@ -1,3 +1,5 @@
+'use strict';
+
 const Ajv = require('ajv');
 const ed25519 = require('../lib/ed25519.js');
 const secp256k1 = require('../lib/secp256k1.js');
