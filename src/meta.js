@@ -23,35 +23,6 @@ const {
 * @module constellate/src/meta
 */
 
-function calcMetaId(meta: Object): string {
-  return calcId('@id', meta);
-}
-
-function getMetaId(meta: Object): string {
-  return getId('@id', meta);
-}
-
-function setMetaId(meta: Object): Object {
-  return Object.assign({}, meta, { '@id': calcMetaId(meta) });
-}
-
-function validateMeta(meta: Object, schema: Object): boolean {
-  let valid = false;
-  try {
-    if (!validateSchema(meta, schema)) {
-      throw new Error('meta has invalid schema: ' + JSON.stringify(meta, null, 2));
-    }
-    const metaId = calcMetaId(meta);
-    if (meta['@id'] !== metaId) {
-      throw new Error(`expected metaId=${meta['@id']}; got ` + metaId);
-    }
-    valid = true;
-  } catch(err) {
-    console.error(err);
-  }
-  return valid;
-}
-
 const MetaId = {
   type: 'string',
   pattern: '^[A-Za-z0-9-_]{43,44}$'
@@ -390,17 +361,59 @@ const RecordingContext = {
   title: 'schema:name'
 }
 
-exports.Album = Album;
+function calcMetaId(meta: Object): string {
+  return calcId('@id', meta);
+}
+
+function getMetaId(meta: Object): string {
+  return getId('@id', meta);
+}
+
+function getMetaSchema(type: string): Object {
+  switch(type) {
+    case 'Album':
+      return Album;
+    case 'Audio':
+      return Audio;
+    case 'Composition':
+      return Composition;
+    case 'Recording':
+      return Recording;
+    default:
+      throw new Error('unexpected meta @type: ' + type);
+  }
+}
+
+function setMetaId(meta: Object): Object {
+  return Object.assign({}, meta, { '@id': calcMetaId(meta) });
+}
+
+function validateMeta(meta: Object): boolean {
+  let valid = false;
+  try {
+    const schema = getMetaSchema(meta['@type']);
+    if (!validateSchema(meta, schema)) {
+      throw new Error('meta has invalid schema: ' + JSON.stringify(meta, null, 2));
+    }
+    const metaId = calcMetaId(meta);
+    if (meta['@id'] !== metaId) {
+      throw new Error(`expected metaId=${meta['@id']}; got ` + metaId);
+    }
+    valid = true;
+  } catch(err) {
+    console.error(err);
+  }
+  return valid;
+}
+
 exports.AlbumContext = AlbumContext;
-exports.Audio = Audio;
 exports.AudioContext = AudioContext;
-exports.Composition = Composition;
 exports.CompositionContext = CompositionContext;
 exports.MetaId = MetaId;
-exports.Recording = Recording;
 exports.RecordingContext = RecordingContext;
 
 exports.calcMetaId = calcMetaId;
 exports.getMetaId = getMetaId;
+exports.getMetaSchema = getMetaSchema;
 exports.setMetaId = setMetaId;
 exports.validateMeta = validateMeta;

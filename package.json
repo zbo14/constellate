@@ -7,12 +7,10 @@
   "license": "MIT",
   "scripts": {
     "build": "babel src/ -d lib/",
-    "bundle": "read -p 'Enter name of module: ' module && export MODULE=$module && browserify -t unflowify browser/${MODULE}.js --debug | exorcist bundle/${MODULE}.map.js -o bundle/${MODULE}.js",
     "flow": "flow",
     "flow:file": "read -p 'Enter path to file: ' path_to_file && export PATH_TO_FILE=$path_to_file && flow check-contents < ${PATH_TO_FILE}",
     "gulp": "gulp",
-    "prepublish": "npm run build",
-    "remove-types:file": "read -p 'Enter filename: ' filename && export FILENAME=$filename && flow-remove-types src/${FILENAME} > lib/${FILENAME}",
+    "remove-types:file": "read -p 'Enter filename: ' filename && export FILENAME=$filename && flow-remove-types src/${FILENAME} | js-beautify -o lib/${FILENAME}",
     "test": "mocha --compilers js:babel-core/register --require babel-polyfill --recursive './test/*_test.js'",
     "_comment": "test command from https://github.com/Envoke-org/envokeJS/blob/master/package.json"
   },

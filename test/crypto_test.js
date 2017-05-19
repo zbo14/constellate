@@ -10,7 +10,7 @@ const bob = secp256k1.randomKeypair();
 const message = 'dreeming of elliptic curvez';
 
 const aliceSignature = ed25519.sign(message, alice.secretKey);
-const bobSignature = secp256k1.sign(message, bob.privateKey);
+const bobSignature = secp256k1.sign(message, bob.secretKey);
 
 describe('Crypto', () => {
   it('verifies ed25519 signature', () => {

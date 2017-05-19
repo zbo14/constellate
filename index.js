@@ -6,9 +6,8 @@ const { generateFrames, readTags, writeTags } = require('./lib/id3.js');
 const { encodeBase58, decodeBase58 } = require('./lib/util.js');
 
 const {
-  Create,
-  License,
   ed25519Header,
+  getClaimsSchema,
   secp256k1Header,
   setClaimsId,
   signClaims,
@@ -18,83 +17,77 @@ const {
 } = require('./lib/jwt.js');
 
 const {
-  Album,
-  Audio,
-  Composition,
-  Recording,
+  getMetaSchema,
   setMetaId,
   validateMeta
 } = require('./lib/meta.js');
 
 const {
-  Artist,
-  Organization,
+  getPartySchema,
   setAddr,
   validateParty
 } = require('./lib/party.js');
 
+const audio = document.getElementById('audio');
 const claims = document.getElementById('claims');
-const audioFile = document.getElementById('audio-file');
 const form = document.querySelector('form');
 const meta = document.getElementById('meta');
-const newKeypairBtn = document.getElementById('new-keypair-btn');
+const mode = document.getElementById('mode');
 const ols = document.getElementsByTagName('ol');
 const party = document.getElementById('party');
-const readTagsBtn = document.getElementById('read-tags-btn');
+const pub = document.getElementById('pub');
 const select = document.querySelector('select');
 const sig = document.getElementById('sig');
-const signClaimsBtn = document.getElementById('sign-claims-btn');
 const submit = document.createElement('input');
 submit.type = 'submit';
+
+const newKeypairBtn = document.getElementById('new-keypair-btn');
+const readTagsBtn = document.getElementById('read-tags-btn');
+const signClaimsBtn = document.getElementById('sign-claims-btn');
 const writeTagsBtn = document.getElementById('write-tags-btn');
 const verifySigBtn = document.getElementById('verify-sig-btn');
 
-let claimsObj, metaObj, partyObj,
-    schemaClaims, schemaMeta, schemaParty,
-    mode, publicKey;
-
 readTagsBtn.addEventListener('click', () => {
-  readTags(audioFile, (tags) => {
+  readTags(audio, (tags) => {
     console.log(tags);
   });
 }, false);
 
 writeTagsBtn.addEventListener('click', () => {
-  if (metaObj) {
-    const frames = generateFrames(metaObj);
-    console.log(frames);
-    writeTags(audioFile, frames, (writer) => {
-      console.log(writer.getBlob());
-      FileSaver.saveAs(writer.getBlob(), 'test.mp3');
-    });
-  }
+  const frames = generateFrames(JSON.parse(meta.textContent));
+  console.log(frames);
+  writeTags(audio, frames, (writer) => {
+    console.log(writer.getBlob());
+    FileSaver.saveAs(writer.getBlob(), 'test.mp3');
+  });
 }, false);
 
 newKeypairBtn.addEventListener('click', () => {
-  if (mode === 'party') {
-    const password = prompt('Please enter a password to generate keypair', 'passwerd');
-    if (!password) return;
+  const password = prompt('Please enter a password to generate keypair', 'passwerd');
+  if (password) {
     const keypair = ed25519.keypairFromPassword(password);
-    publicKey = keypair.publicKey;
-    party.textContent = JSON.stringify(encodeKeypair(keypair), null, 2);
+    pub.setAttribute('value', encodeBase58(keypair.publicKey));
+    console.log(encodeBase58(keypair.secretKey));
   }
 }, false);
 
 signClaimsBtn.addEventListener('click', () => {
-  if (mode === 'claims' && claimsObj && publicKey) {
-    const secretKey = prompt('Please enter your secret key to sign claims', '');
-    if (!secretKey) return;
-    sig.innerHTML = encodeBase58(signClaims(claimsObj, ed25519Header(publicKey), decodeBase58(secretKey)));
+  const encodedSecretKey = prompt('Please enter your secret key to sign claims', '');
+  if (encodedSecretKey) {
+    const claimsObj = JSON.parse(claims.textContent);
+    const header = ed25519Header(decodeBase58(pub.value));
+    const secretKey = decodeBase58(encodedSecretKey);
+    sig.setAttribute('value', encodeBase58(signClaims(claimsObj, header, secretKey)));
   }
 }, false);
 
+
 verifySigBtn.addEventListener('click', () => {
-  if (mode === 'claims'
-      && claimsObj && metaObj && publicKey
-      && schemaClaims && schemaMeta) {
-    const signature = decodeBase58(sig.innerHTML);
-    console.log(verifyClaims(claimsObj, ed25519Header(publicKey), metaObj, schemaClaims, schemaMeta, signature));
-  }
+  const claimsObj = JSON.parse(claims.textContent);
+  const header = ed25519Header(decodeBase58(pub.value));
+  const metaObj = JSON.parse(meta.textContent);
+  const signature = decodeBase58(sig.value);
+  console.log(verifyClaims(claimsObj, header, metaObj, signature));
 }, false);
 
 function listModifiers() {
@@ -133,56 +126,34 @@ function listModifiers() {
 
 select.addEventListener('change', () => {
   form.innerHTML = null;
-  mode = select.selectedOptions[0].parentNode.label;
+  mode.setAttribute('value', select.selectedOptions[0].parentNode.label);
   newKeypairBtn.hidden = true;
   signClaimsBtn.hidden = true;
   verifySigBtn.hidden = true;
-  switch(select.value) {
-    case 'artist':
-      schemaParty = Artist;
-      break;
-    case 'organization':
-      schemaParty = Organization;
-      break;
-    //------------------------------
-    case 'album':
-      schemaMeta = Album;
-      break;
-    case 'audio':
-      schemaMeta = Audio;
-      break;
-    case 'composition':
-      schemaMeta = Composition;
-      break;
-    case 'recording':
-      schemaMeta = Recording;
-      break;
-    //------------------------------
-    case 'create':
-      schemaClaims = Create;
-      break;
-    case 'license':
-      schemaClaims = License;
-      break;
-      //..
-    default:
-      console.error('unexpected type: ' + select.value);
-      return;
+  try {
+    let schema;
+    switch(mode.value) {
+      case 'party':
+        schema = getPartySchema(select.value);
+        newKeypairBtn.hidden = false;
+        break;
+      case 'meta':
+        schema = getMetaSchema(select.value);
+        break;
+      case 'claims':
+        schema = getClaimsSchema(select.value);
+        signClaimsBtn.hidden = false;
+        verifySigBtn.hidden = false;
+        break;
+      default:
+        throw new Error('unexpected mode: ' + mode.value);
+    }
+    generateForm(schema).forEach((div) => form.appendChild(div));
+    form.appendChild(submit);
+    listModifiers();
+  } catch(err) {
+    console.error(err);
   }
-  if (mode === 'party') {
-    generateForm(schemaParty).forEach((div) => form.appendChild(div));
-    newKeypairBtn.hidden = false;
-  }
-  if (mode === 'meta') {
-    generateForm(schemaMeta).forEach((div) => form.appendChild(div));
-  }
-  if (mode === 'claims') {
-    generateForm(schemaClaims).forEach((div) => form.appendChild(div));
-    signClaimsBtn.hidden = false;
-    verifySigBtn.hidden = false;
-  }
-  form.appendChild(submit);
-  listModifiers();
 }, false);
 
 function includeElement(elem, label) {
@@ -223,40 +194,32 @@ form.addEventListener('submit', (event) => {
              && div.children.length === 2
              && includeElement(div.lastChild, div.firstChild);
     });
-    if (mode === 'party') {
-      partyObj = parseForm(divs);
-      if (partyObj) {
-        partyObj = setAddr(partyObj, publicKey);
-        if (partyObj && validateParty(partyObj, publicKey, schemaParty)) {
+    const obj = parseForm(divs);
+    if (!obj) return;
+    switch(mode.value) {
+      case 'party':
+        const publicKey = decodeBase58(pub.value);
+        const partyObj = setAddr(obj, publicKey);
+        if (validateParty(partyObj, publicKey)) {
           party.textContent = JSON.stringify(partyObj, null, 2);
-          return;
         }
-      }
-    } else if (mode === 'meta') {
-      metaObj = parseForm(divs);
-      if (metaObj) {
-        metaObj = setMetaId(metaObj);
-        if (metaObj && validateMeta(metaObj, schemaMeta)) {
+        return;
+      case 'meta':
+        const metaObj = setMetaId(obj);
+        if (validateMeta(metaObj)) {
           meta.textContent = JSON.stringify(metaObj, null, 2);
-          return;
         }
-      }
-    } else if (mode === 'claims') {
-      claimsObj = parseForm(divs);
-      if (claimsObj) {
-        claimsObj = setClaimsId(timestamp(claimsObj));
-        if (claimsObj && validateClaims(claimsObj, metaObj, schemaClaims, schemaMeta)) {
+        return;
+      case 'claims':
+        const claimsObj = setClaimsId(timestamp(obj));
+        if (validateClaims(claimsObj, JSON.parse(meta.textContent))) {
           claims.textContent = JSON.stringify(claimsObj, null, 2);
-          return;
         }
+        return;
+      default:
+        throw new Error('unexpected mode: ' + mode.value);
       }
-    } else {
-      throw new Error('unexpected mode: ' + mode);
-    }
   } catch(err) {
     console.error(err);
   }
-  // party.textContent = null;
-  // meta.textContent = null;
-  // claims.textContent = null;
 }, false);

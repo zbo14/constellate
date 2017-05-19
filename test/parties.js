@@ -1,10 +1,4 @@
-import {
-  Artist,
-  ArtistContext,
-  Organization,
-  OrganizationContext,
-  setAddr
-} from '../lib/party.js';
+import { ArtistContext, OrganizationContext, setAddr } from '../lib/party.js';
 
 const ed25519 = require('../lib/ed25519.js');
 const secp256k1 = require('../lib/secp256k1.js');

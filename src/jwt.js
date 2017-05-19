@@ -1,3 +1,5 @@
+'use strict';
+
 const Ajv = require('ajv');
 const ed25519 = require('../lib/ed25519.js');
 const secp256k1 = require('../lib/secp256k1.js');
@@ -27,22 +29,6 @@ const {
 /**
 * @module constellate/src/jwt
 */
-
-function calcClaimsId(claims: Object): string {
-  return calcId('jti', claims);
-}
-
-function getClaimsId(claims: Object): string {
-  return getId('jti', claims);
-}
-
-function setClaimsId(claims: Object): Object {
-  return Object.assign({}, claims, { 'jti': calcClaimsId(claims) });
-}
-
-function timestamp(claims: Object): Object {
-  return Object.assign({}, claims, { iat: now() });
-}
 
 const PublicKey = {
   $schema: Draft,
@@ -208,6 +194,10 @@ const License = {
   ]
 }
 
+function calcClaimsId(claims: Object): string {
+  return calcId('jti', claims);
+}
+
 function ed25519Header(publicKey: Buffer): Object {
   let header = {};
   try {
@@ -227,6 +217,20 @@ function ed25519Header(publicKey: Buffer): Object {
     console.error(err);
   }
   return header;
+}
+
+function getClaimsId(claims: Object): string {
+  return getId('jti', claims);
+}
+
+function getClaimsSchema(typ: string): Object {
+    if (typ === 'Create') {
+      return Create;
+    }
+    if (typ === 'License') {
+      return License;
+    }
+    throw new Error('unexpected claims typ: ' + typ);
 }
 
 function secp256k1Header(publicKey: Buffer) {
@@ -252,6 +256,9 @@ function secp256k1Header(publicKey: Buffer) {
   return header;
 }
 
+function setClaimsId(claims: Object): Object {
+  return Object.assign({}, claims, { 'jti': calcClaimsId(claims) });
+}
 
 function signClaims(claims: Object, header: Object, secretKey: Buffer): Buffer {
   let sig = new Buffer([]);
@@ -266,29 +273,31 @@ function signClaims(claims: Object, header: Object, secretKey: Buffer): Buffer {
   return sig;
 }
 
-function validateClaims(claims: Object, meta: Object, schemaClaims: Object, schemaMeta: Object): string {
+function timestamp(claims: Object): Object {
+  return Object.assign({}, claims, { iat: now() });
+}
+
+function validateClaims(claims: Object, meta: Object): string {
   let valid = false;
   try {
-    if (validateMeta(meta, schemaMeta)) {
-      if (!validateSchema(claims, schemaClaims)) {
+    if (validateMeta(meta)) {
+      const schema = getClaimsSchema(claims.typ);
+      if (!validateSchema(claims, schema)) {
         throw new Error('claims has invalid schema: ' + JSON.stringify(claims, null, 2));
       }
-      if (!['Create', 'License'].includes(claims.typ)) {
-        throw new Error('unexpected typ: ' + claims.typ);
-      }
-      if (claims.iat > now()) {
+      const rightNow = now();
+      if (claims.iat > rightNow) {
         throw new Error('iat cannot be later than now');
       }
       if (claims.aud && claims.aud.some((aud) => aud === claims.iss)) {
         throw new Error('aud cannot contain iss');
       }
-      const rightNow = now();
       if (claims.exp) {
         if (claims.exp <= claims.iat) {
-          throw new Error('exp cannot be earlier than/same as iat');
+          throw new Error('exp should be later than iat');
         }
         if (claims.nbf && claims.exp <= claims.nbf) {
-          throw new Error('exp cannot be earlier than/same as nbf');
+          throw new Error('exp should be later than nbf');
         }
         if (claims.exp < rightNow) {
           throw new Error('claims expired');
@@ -296,7 +305,7 @@ function validateClaims(claims: Object, meta: Object, schemaClaims: Object, sche
       }
       if (claims.nbf) {
         if (claims.nbf <= claims.iat) {
-          throw new Error('nbf cannot be earlier than/same as iat');
+          throw new Error('nbf should be later than iat');
         }
         if (claims.nbf > rightNow) {
           throw new Error('claims not yet valid');
@@ -326,29 +335,28 @@ function validateClaims(claims: Object, meta: Object, schemaClaims: Object, sche
             return claims.iss === id;
           })) throw new Error('iss should be performer or producer addr');
           break;
-        default:
-          throw new Error('unexpected @type: ' + meta['@type']);
+        //..
       }
-      //..
       valid = true;
     }
   } catch(err) {
-    console.error(err.message);
+    console.error(err);
   }
   return valid;
 }
 
-function verifyClaims(claims: Object, header: Object, meta: Object, schemaClaims: Object, schemaMeta: Object, signature: Buffer): boolean {
+function verifyClaims(claims: Object, header: Object, meta: Object, signature: Buffer): boolean {
   let verified = false;
   try {
     if (!validateSchema(header, Header)) {
       throw new Error('header has invalid schema: ' + JSON.stringify(header, null, 2));
     }
-    if (validateClaims(claims, meta, schemaClaims, schemaMeta)) {
+    if (validateClaims(claims, meta)) {
       const encodedHeader = encodeBase64(header);
       const encodedPayload = encodeBase64(claims);
+      let publicKey;
       if (header.alg === 'EdDsa') {
-        const publicKey = decodeBase64(header.jwk.x);
+        publicKey = decodeBase64(header.jwk.x);
         if (claims.iss !== publicKey2Addr(publicKey)) {
           throw new Error('publicKey does not match addr');
         }
@@ -357,12 +365,12 @@ function verifyClaims(claims: Object, header: Object, meta: Object, schemaClaims
         }
       }
       if (header.alg === 'ES256') {
-        const publicKey = secp256k1.compress(
+        publicKey = secp256k1.compress(
           decodeBase64(header.jwk.x),
           decodeBase64(header.jwk.y)
         )
         if (claims.iss !== publicKey2Addr(publicKey)) {
-          throw new Error('publicKey does not match addr');
+          throw new Error('public-key does not match addr');
         }
         if (!secp256k1.verify(encodedHeader + '.' + encodedPayload, publicKey, signature)) {
           throw new Error('invalid secp256k1 signature: ' + encodeBase64(signature));
@@ -376,12 +384,10 @@ function verifyClaims(claims: Object, header: Object, meta: Object, schemaClaims
   return verified;
 }
 
-exports.Create = Create;
-exports.License = License;
-
 exports.calcClaimsId = calcClaimsId;
 exports.ed25519Header = ed25519Header;
 exports.getClaimsId = getClaimsId;
+exports.getClaimsSchema = getClaimsSchema;
 exports.secp256k1Header = secp256k1Header;
 exports.setClaimsId = setClaimsId;
 exports.signClaims = signClaims;

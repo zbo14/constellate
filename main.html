@@ -3,25 +3,25 @@
     <title>constellate</title>
   </head>
   <body>
-    <input type='file' id='audio-file' accept='audio/*' />
+    <input type='file' id='audio' accept='audio/*' />
     <button id='read-tags-btn'>read tags</button>
     <button id='write-tags-btn'>write tags</button><br>
     <hr>
     <select>
       <option selected disabled>type</option>
       <optgroup label='party'>
-        <option value='artist'>artist</option>
-        <option value='organization'>organization</option>
+        <option value='Artist'>artist</option>
+        <option value='Organization'>organization</option>
       </optgroup>
       <optgroup label='meta'>
-        <option value='album'>album</option>
-        <option value='audio'>audio</option>
-        <option value='composition'>composition</option>
-        <option value='recording'>recording</option>
+        <option value='Album'>album</option>
+        <option value='Audio'>audio</option>
+        <option value='Composition'>composition</option>
+        <option value='Recording'>recording</option>
       </optgroup>
       <optgroup label='claims'>
-        <option value='create'>create</option>
-        <option value='license'>license</option>
+        <option value='Create'>create</option>
+        <option value='License'>license</option>
       </optgroup>
     </select><br>
     <button id='new-keypair-btn' hidden>new keypair</button>
@@ -29,10 +29,17 @@
     <button id='verify-sig-btn' hidden>verify signature</button>
     <hr>
     <form></form>
-    <pre id='party'></pre>
-    <pre id='meta'></pre>
-    <pre id='claims'></pre>
-    <p id='sig'></p>
+    <input type='text' id='mode' hidden /><br>
+    <label>public-key</label>
+    <input type='text' id='pub' /><br>
+    <label>signature</label>
+    <input type='text' id='sig' /><br>
+    <h4>party</h4>
+    <textarea id='party'></textarea>
+    <h4>meta</h4>
+    <textarea id='meta'></textarea>
+    <h4>claims</h4>
+    <textarea id='claims'></textarea>
   </body>
   <script src='./bundle.js'></script>
 </html>

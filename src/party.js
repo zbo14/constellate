@@ -21,53 +21,6 @@ const {
 * @module constellate/src/party
 */
 
-function publicKey2Addr(publicKey: Buffer): string {
-  return '0x' + digestRIPEMD160(digestSHA256(encodeBase58(publicKey)).toString('hex')).toString('hex');
-}
-
-function calcAddr(party: Object, publicKey: Buffer): string {
-  let addr = '';
-  try {
-    if (party['@type'] !== 'Artist' && party['@type'] !== 'Organization') {
-      throw new Error('unexpected @type: ' + party['@type']);
-    }
-    if (publicKey.length !== 32 && publicKey.length !== 33) {
-      throw new Error('invalid public key length: ' + publicKey.length);
-    }
-    addr = publicKey2Addr(publicKey);
-  } catch(err) {
-    console.error(err);
-  }
-  return addr;
-}
-
-function getAddr(party: Object): string {
-  return getId('@id', party);
-}
-
-function setAddr(party: Object, publicKey: Buffer): Object {
-  const id = calcAddr(party, publicKey);
-  if (!id) return party;
-  return Object.assign({}, party, { '@id': id });
-}
-
-function validateParty(party: Object, publicKey: Buffer, schema: Object): boolean {
-  let valid = false;
-  try {
-    if (!validateSchema(party, schema)) {
-      throw new Error('party has invalid schema: ' + JSON.stringify(party, null, 2));
-    }
-    const addr = calcAddr(party, publicKey);
-    if (party['@id'] !== addr) {
-      throw new Error(`expected addr=${party['@id']}; got ` + addr);
-    }
-    valid = true;
-  } catch(err) {
-    console.error(err);
-  }
-  return valid;
-}
-
 const Addr = {
   type: 'string',
   pattern: '^0x[a-fA-F0-9]{40}$'
@@ -187,14 +140,71 @@ const OrganizationContext = {
   profile: 'schema:sameAs'
 }
 
+function calcAddr(party: Object, publicKey: Buffer): string {
+  let addr = '';
+  try {
+    if (party['@type'] !== 'Artist' && party['@type'] !== 'Organization') {
+      throw new Error('unexpected @type: ' + party['@type']);
+    }
+    if (publicKey.length !== 32 && publicKey.length !== 33) {
+      throw new Error('invalid public key length: ' + publicKey.length);
+    }
+    addr = publicKey2Addr(publicKey);
+  } catch(err) {
+    console.error(err);
+  }
+  return addr;
+}
+
+function getAddr(party: Object): string {
+  return getId('@id', party);
+}
+
+function getPartySchema(type: string): Object {
+  if (type === 'Artist') {
+    return Artist;
+  }
+  if (type === 'Organization') {
+    return Organization;
+  }
+  throw new Error('unexpected party @type: ' + type);
+}
+
+function publicKey2Addr(publicKey: Buffer): string {
+  return '0x' + digestRIPEMD160(digestSHA256(encodeBase58(publicKey)).toString('hex')).toString('hex');
+}
+
+function setAddr(party: Object, publicKey: Buffer): Object {
+  const id = calcAddr(party, publicKey);
+  if (!id) return party;
+  return Object.assign({}, party, { '@id': id });
+}
+
+function validateParty(party: Object, publicKey: Buffer): boolean {
+  let valid = false;
+  try {
+    const schema = getPartySchema(party['@type']);
+    if (!validateSchema(party, schema)) {
+      throw new Error('party has invalid schema: ' + JSON.stringify(party, null, 2));
+    }
+    const addr = calcAddr(party, publicKey);
+    if (party['@id'] !== addr) {
+      throw new Error(`expected addr=${party['@id']}; got ` + addr);
+    }
+    valid = true;
+  } catch(err) {
+    console.error(err);
+  }
+  return valid;
+}
+
 exports.Addr = Addr;
-exports.Artist = Artist;
 exports.ArtistContext = ArtistContext;
-exports.Organization = Organization;
 exports.OrganizationContext = OrganizationContext;
 
 exports.calcAddr = calcAddr;
 exports.getAddr = getAddr;
+exports.getPartySchema = getPartySchema;
 exports.publicKey2Addr = publicKey2Addr;
 exports.setAddr = setAddr;
 exports.validateParty = validateParty;

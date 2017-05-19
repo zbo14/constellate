@@ -1,10 +1,10 @@
 import { getAddr } from '../lib/party.js';
 
 import {
-  Album, AlbumContext,
-  Audio, AudioContext,
-  Composition, CompositionContext,
-  Recording, RecordingContext,
+  AlbumContext,
+  AudioContext,
+  CompositionContext,
+  RecordingContext,
   getMetaId, setMetaId
 } from '../lib/meta.js';
 

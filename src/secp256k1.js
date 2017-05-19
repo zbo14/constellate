@@ -1,3 +1,5 @@
+'use strict';
+
 const crypto = require('../lib/crypto.js');
 const secp256k1 = require('secp256k1/js');
 const { digestSHA256 } = require('../lib/util.js');
@@ -7,6 +9,22 @@ const { digestSHA256 } = require('../lib/util.js');
 /**
 * @module constellate/src/secp256k1
 */
+
+function compress(x: Buffer, y: Buffer): Buffer {
+  let publicKey = new Buffer([]);
+  try {
+    if (x.length !== 32) {
+      throw new Error('expected x coord length=32; got ' + x.length);
+    }
+    if (y.length !== 32) {
+      throw new Error('expected y coord length=32; got ' + y.length);
+    }
+    publicKey = secp256k1.publicKeyConvert(new Buffer([4, ...x, ...y]), true);
+  } catch(err) {
+    console.error(err);
+  }
+  return publicKey;
+}
 
 // https://www.npmjs.com/package/secp256k1
 
@@ -27,24 +45,8 @@ function sign(message: string, secretKey: Buffer): Buffer {
   return secp256k1.sign(hash, secretKey).signature;
 }
 
-function compress(x: Buffer, y: Buffer): Buffer {
-  let publicKey = new Buffer([]);
-  try {
-    if (x.length !== 32) {
-      throw new Error('expected x coord length=32; got ' + x.length);
-    }
-    if (y.length !== 32) {
-      throw new Error('expected y coord length=32; got ' + y.length);
-    }
-    publicKey = secp256k1.publicKeyConvert(new Buffer([4, ...x, ...y]));
-  } catch(err) {
-    console.error(err);
-  }
-  return publicKey;
-}
-
 function uncompress(publicKey: Buffer): Object {
-  const buf = secp256k1.publicKeyConvert(publicKey, true);
+  const buf = secp256k1.publicKeyConvert(publicKey, false);
   return {
     x: buf.slice(1, 33),
     y: buf.slice(33)

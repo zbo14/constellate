@@ -92,46 +92,46 @@ const composerHeader = ed25519Header(composerKeypair.publicKey);
 const performerHeader = secp256k1Header(performerKeypair.publicKey);
 
 const createCompositionSig = signClaims(createComposition, composerHeader, composerKeypair.secretKey);
-const createRecordingSig = signClaims(createRecording, performerHeader, performerKeypair.privateKey);
-const createAlbumSig = signClaims(createAlbum, performerHeader, performerKeypair.privateKey);
+const createRecordingSig = signClaims(createRecording, performerHeader, performerKeypair.secretKey);
+const createAlbumSig = signClaims(createAlbum, performerHeader, performerKeypair.secretKey);
 const licenseCompositionSig = signClaims(licenseComposition, composerHeader, composerKeypair.secretKey);
-const licenseRecordingSig = signClaims(licenseRecording, performerHeader, performerKeypair.privateKey);
-const licenseAlbumSig = signClaims(licenseAlbum, performerHeader, performerKeypair.privateKey);
+const licenseRecordingSig = signClaims(licenseRecording, performerHeader, performerKeypair.secretKey);
+const licenseAlbumSig = signClaims(licenseAlbum, performerHeader, performerKeypair.secretKey);
 
 describe('JWT', () => {
   it('verifies create composition claims', () => {
     assert.isOk(
-      verifyClaims(createComposition, composerHeader, composition, Create, Composition, createCompositionSig),
+      verifyClaims(createComposition, composerHeader, composition, createCompositionSig),
       'should verify create composition claims'
     );
   });
   it('verifies create recording claims', () => {
     assert.isOk(
-      verifyClaims(createRecording, performerHeader, recording, Create, Recording, createRecordingSig),
+      verifyClaims(createRecording, performerHeader, recording, createRecordingSig),
       'should verify create recording claims'
     );
   });
   it('verifies create album claims', () => {
     assert.isOk(
-      verifyClaims(createAlbum, performerHeader, album, Create, Album, createAlbumSig),
+      verifyClaims(createAlbum, performerHeader, album, createAlbumSig),
       'should verify create album claims'
     );
   });
   it('verifies license composition claims', () => {
     assert.isOk(
-      verifyClaims(licenseComposition, composerHeader, composition, License, Composition, licenseCompositionSig),
+      verifyClaims(licenseComposition, composerHeader, composition, licenseCompositionSig),
       'should verify license composition claims'
     );
   });
   it('verifies license recording claims', () => {
     assert.isOk(
-      verifyClaims(licenseRecording, performerHeader, recording, License, Recording, licenseRecordingSig),
+      verifyClaims(licenseRecording, performerHeader, recording, licenseRecordingSig),
       'should verify license recording claims'
     );
   });
   it('verifies license album claims', () => {
     assert.isOk(
-      verifyClaims(licenseAlbum, performerHeader, album, License, Album, licenseAlbumSig),
+      verifyClaims(licenseAlbum, performerHeader, album, licenseAlbumSig),
       'should verify license album claims'
     );
   });
