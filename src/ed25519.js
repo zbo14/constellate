@@ -10,6 +10,10 @@ const { digestSHA256 } = require('../lib/util.js');
 * @module constellate/src/ed25519
 */
 
+function generateKeypair(): Object {
+  return keypairBuffers(nacl.sign.keyPair());
+}
+
 function keypairFromPassword(password: string): Object {
   const secret = crypto.generateSecret(password);
   return keypairFromSeed(secret);
@@ -22,22 +26,18 @@ function keypairFromSeed(seed: ?Buffer): Object {
   return keypairBuffers(nacl.sign.keyPair.fromSeed(seed));
 }
 
-function randomKeypair(): Object {
-  return keypairBuffers(nacl.sign.keyPair());
-}
-
 function keypairBuffers(keypair: Object): Object {
   return {
-    publicKey: Buffer.from(keypair.publicKey),
-    secretKey: Buffer.from(keypair.secretKey)
+    privateKey: Buffer.from(keypair.secretKey),
+    publicKey: Buffer.from(keypair.publicKey)
   }
 }
 
-function sign(message: string, secretKey: Buffer): Buffer {
+function sign(message: string, privateKey: Buffer): Buffer {
   const hash = digestSHA256(message);
   return Buffer.from(nacl.sign.detached(
     new Uint8Array(hash),
-    new Uint8Array(secretKey))
+    new Uint8Array(privateKey))
   );
 }
 
@@ -50,8 +50,8 @@ function verify(message: string, publicKey: Buffer, signature: Buffer): boolean 
    );
 }
 
+exports.generateKeypair = generateKeypair;
 exports.keypairFromPassword = keypairFromPassword;
 exports.keypairFromSeed = keypairFromSeed;
-exports.randomKeypair = randomKeypair;
 exports.sign = sign;
 exports.verify = verify;

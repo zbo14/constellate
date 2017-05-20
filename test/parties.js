@@ -4,11 +4,11 @@ const ed25519 = require('../lib/ed25519.js');
 const secp256k1 = require('../lib/secp256k1.js');
 
 const composerKeypair = ed25519.keypairFromPassword('muzaq');
-const lyricistKeypair = ed25519.randomKeypair();
-const performerKeypair = secp256k1.randomKeypair();
-const producerKeypair = ed25519.randomKeypair();
-const publisherKeypair = ed25519.randomKeypair();
-const recordLabelKeypair = secp256k1.randomKeypair();
+const lyricistKeypair = ed25519.generateKeypair();
+const performerKeypair = secp256k1.generateKeypair();
+const producerKeypair = ed25519.generateKeypair();
+const publisherKeypair = ed25519.generateKeypair();
+const recordLabelKeypair = secp256k1.generateKeypair();
 
 const composer = setAddr({
   '@context': ArtistContext,

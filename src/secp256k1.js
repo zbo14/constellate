@@ -28,21 +28,21 @@ function compress(x: Buffer, y: Buffer): Buffer {
 
 // https://www.npmjs.com/package/secp256k1
 
-function randomKeypair(): Object {
-  let secretKey;
+function generateKeypair(): Object {
+  let privateKey;
   do {
-    secretKey = crypto.generateSeed();
-  } while (!secp256k1.privateKeyVerify(secretKey));
-  const publicKey = secp256k1.publicKeyCreate(secretKey);
+    privateKey = crypto.generateSeed();
+  } while (!secp256k1.privateKeyVerify(privateKey));
+  const publicKey = secp256k1.publicKeyCreate(privateKey);
   return {
-    publicKey: publicKey,
-    secretKey: secretKey
+    privateKey: privateKey,
+    publicKey: publicKey
   }
 }
 
-function sign(message: string, secretKey: Buffer): Buffer {
+function sign(message: string, privateKey: Buffer): Buffer {
   const hash = digestSHA256(message);
-  return secp256k1.sign(hash, secretKey).signature;
+  return secp256k1.sign(hash, privateKey).signature;
 }
 
 function uncompress(publicKey: Buffer): Object {
@@ -59,7 +59,7 @@ function verify(message: string, publicKey: Buffer, signature: Buffer): boolean 
 }
 
 exports.compress = compress;
-exports.randomKeypair = randomKeypair;
+exports.generateKeypair = generateKeypair;
 exports.sign = sign;
 exports.uncompress = uncompress;
 exports.verify = verify;

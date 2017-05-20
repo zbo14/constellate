@@ -91,12 +91,12 @@ const licenseAlbum = setClaimsId(
 const composerHeader = ed25519Header(composerKeypair.publicKey);
 const performerHeader = secp256k1Header(performerKeypair.publicKey);
 
-const createCompositionSig = signClaims(createComposition, composerHeader, composerKeypair.secretKey);
-const createRecordingSig = signClaims(createRecording, performerHeader, performerKeypair.secretKey);
-const createAlbumSig = signClaims(createAlbum, performerHeader, performerKeypair.secretKey);
-const licenseCompositionSig = signClaims(licenseComposition, composerHeader, composerKeypair.secretKey);
-const licenseRecordingSig = signClaims(licenseRecording, performerHeader, performerKeypair.secretKey);
-const licenseAlbumSig = signClaims(licenseAlbum, performerHeader, performerKeypair.secretKey);
+const createCompositionSig = signClaims(createComposition, composerHeader, composerKeypair.privateKey);
+const createRecordingSig = signClaims(createRecording, performerHeader, performerKeypair.privateKey);
+const createAlbumSig = signClaims(createAlbum, performerHeader, performerKeypair.privateKey);
+const licenseCompositionSig = signClaims(licenseComposition, composerHeader, composerKeypair.privateKey);
+const licenseRecordingSig = signClaims(licenseRecording, performerHeader, performerKeypair.privateKey);
+const licenseAlbumSig = signClaims(licenseAlbum, performerHeader, performerKeypair.privateKey);
 
 describe('JWT', () => {
   it('verifies create composition claims', () => {
