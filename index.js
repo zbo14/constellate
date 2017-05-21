@@ -1,5 +1,6 @@
 const { encodeKeypair } = require('./lib/crypto.js');
 const ed25519 = require('./lib/ed25519.js');
+const rsa = require('./lib/rsa.js');
 const secp256k1 = require('./lib/secp256k1.js');
 const FileSaver = require('file-saver');
 const { generateForm, parseForm } = require('./lib/form.js');
@@ -7,9 +8,10 @@ const { generateFrames, readTags, writeTags } = require('./lib/id3.js');
 const { encodeBase58, decodeBase58 } = require('./lib/util.js');
 
 const {
-  ed25519Header,
   getClaimsSchema,
-  secp256k1Header,
+  newEd25519Header,
+  newRsaHeader,
+  newSecp256k1Header,
   setClaimsId,
   signClaims,
   timestamp,
@@ -66,34 +68,49 @@ writeTagsBtn.addEventListener('click', () => {
 }, false);
 
 newKeypairBtn.addEventListener('click', () => {
-  let keypair;
+  let keypair, publicKey;
   if (keySelect.value === 'ed25519') {
     const password = prompt('Please enter a password to generate ed25519 keypair', 'passwerd');
     if (!password) return;
     keypair = ed25519.keypairFromPassword(password);
+    publicKey = encodeBase58(keypair.publicKey);
+    console.log(encodeBase58(keypair.privateKey));
+  }
+  if (keySelect.value === 'rsa') {
+    keypair = rsa.generateKeypair();
+    publicKey = keypair.publicKey.toString();
+    console.log(keypair.privateKey.toString());
   }
   if (keySelect.value === 'secp256k1') {
-    keypair = secp256k1.randomKeypair();
+    keypair = secp256k1.generateKeypair();
+    publicKey = encodeBase58(keypair.publicKey);
+    console.log(encodeBase58(keypair.privateKey));
   }
-  pub.setAttribute('value', encodeBase58(keypair.publicKey));
-  console.log(encodeBase58(keypair.secretKey));
+  pub.textContent = publicKey;
 }, false);
 
 signClaimsBtn.addEventListener('click', () => {
-  const encodedSecretKey = prompt('Please enter your secret key to sign claims', '');
-  if (!encodedSecretKey) return;
+  const encodedKey = prompt('Please enter your secret key to sign claims', '');
+  if (!encodedKey) return;
   try {
     const claimsObj = JSON.parse(claims.textContent);
-    const publicKey = decodeBase58(pub.value);
-    let header;
+    let header, privateKey, publicKey;
     if (keySelect.value === 'ed25519') {
-      header = ed25519Header(publicKey);
+      privateKey = decodeBase58(encodedKey);
+      publicKey = decodeBase58(pub.textContent);
+      header = newEd25519Header(publicKey);
+    }
+    if (keySelect.value === 'rsa') {
+      privateKey = rsa.importPrivateKey(encodedKey);
+      publicKey = rsa.importPublicKey(pub.textContent);
+      header = newRsaHeader(publicKey);
     }
     if (keySelect.value === 'secp256k1') {
-      header = secp256k1Header(publicKey);
+      privateKey = decodeBase58(encodedKey);
+      publicKey = decodeBase58(pub.textContent);
+      header = newSecp256k1Header(publicKey);
     }
-    const secretKey = decodeBase58(encodedSecretKey);
-    sig.setAttribute('value', encodeBase58(signClaims(claimsObj, header, secretKey)));
+    sig.setAttribute('value', encodeBase58(signClaims(claimsObj, header, privateKey)));
   } catch(err) {
     console.error(err);
   }
@@ -102,13 +119,18 @@ signClaimsBtn.addEventListener('click', () => {
 verifySigBtn.addEventListener('click', () => {
   try {
     const claimsObj = JSON.parse(claims.textContent);
-    const publicKey = decodeBase58(pub.value);
-    let header;
+    let header, publicKey;
     if (keySelect.value === 'ed25519') {
-      header = ed25519Header(publicKey);
+      publicKey = decodeBase58(pub.textContent);
+      header = newEd25519Header(publicKey);
+    }
+    if (keySelect.value === 'rsa') {
+      publicKey = rsa.importPublicKey(pub.textContent);
+      header = newRsaHeader(publicKey);
     }
     if (keySelect.value === 'secp256k1') {
-      header = secp256k1Header(publicKey);
+      publicKey = decodeBase58(pub.textContent);
+      header = newSecp256k1Header(publicKey);
     }
     const metaObj = JSON.parse(meta.textContent);
     const signature = decodeBase58(sig.value);
@@ -228,7 +250,13 @@ form.addEventListener('submit', (event) => {
     if (!obj) return;
     switch(mode.value) {
       case 'party':
-        const publicKey = decodeBase58(pub.value);
+        let publicKey;
+        if (keySelect.value === 'ed25519' || keySelect.value === 'secp256k1') {
+          publicKey = decodeBase58(pub.textContent);
+        }
+        if (keySelect.value === 'rsa') {
+          publicKey = rsa.importPublicKey(pub.textContent);
+        }
         const partyObj = setAddr(obj, publicKey);
         if (validateParty(partyObj, publicKey)) {
           party.textContent = JSON.stringify(partyObj, null, 2);

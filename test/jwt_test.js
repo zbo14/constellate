@@ -6,8 +6,9 @@ import { now } from '../lib/util.js';
 import {
   Create,
   License,
-  ed25519Header,
-  secp256k1Header,
+  newEd25519Header,
+  newRsaHeader,
+  newSecp256k1Header,
   setClaimsId,
   signClaims,
   timestamp,
@@ -29,7 +30,9 @@ import {
 
 import {
   composer, composerKeypair,
+  lyricist, lyricistKeypair,
   performer, performerKeypair,
+  producer, producerKeypair,
   publisher,
   recordLabel
 } from './parties.js';
@@ -62,7 +65,7 @@ const licenseComposition = setClaimsId(
   timestamp({
     aud: [getAddr(publisher)],
     exp: now() + 1000,
-    iss: getAddr(composer),
+    iss: getAddr(lyricist),
     sub: getMetaId(composition),
     typ: 'License'
   })
@@ -72,7 +75,7 @@ const licenseRecording = setClaimsId(
   timestamp({
     aud: [getAddr(recordLabel)],
     exp: now() + 2000,
-    iss: getAddr(performer),
+    iss: getAddr(producer),
     sub: getMetaId(recording),
     typ: 'License'
   })
@@ -82,21 +85,23 @@ const licenseAlbum = setClaimsId(
   timestamp({
     aud: [getAddr(recordLabel)],
     exp: now() + 3000,
-    iss: getAddr(performer),
+    iss: getAddr(producer),
     sub: getMetaId(album),
     typ: 'License'
   })
 );
 
-const composerHeader = ed25519Header(composerKeypair.publicKey);
-const performerHeader = secp256k1Header(performerKeypair.publicKey);
+const composerHeader = newEd25519Header(composerKeypair.publicKey);
+const lyricistHeader = newRsaHeader(lyricistKeypair.publicKey);
+const performerHeader = newSecp256k1Header(performerKeypair.publicKey);
+const producerHeader = newEd25519Header(producerKeypair.publicKey);
 
 const createCompositionSig = signClaims(createComposition, composerHeader, composerKeypair.privateKey);
 const createRecordingSig = signClaims(createRecording, performerHeader, performerKeypair.privateKey);
 const createAlbumSig = signClaims(createAlbum, performerHeader, performerKeypair.privateKey);
-const licenseCompositionSig = signClaims(licenseComposition, composerHeader, composerKeypair.privateKey);
-const licenseRecordingSig = signClaims(licenseRecording, performerHeader, performerKeypair.privateKey);
-const licenseAlbumSig = signClaims(licenseAlbum, performerHeader, performerKeypair.privateKey);
+const licenseCompositionSig = signClaims(licenseComposition, lyricistHeader, lyricistKeypair.privateKey);
+const licenseRecordingSig = signClaims(licenseRecording, producerHeader, producerKeypair.privateKey);
+const licenseAlbumSig = signClaims(licenseAlbum, producerHeader, producerKeypair.privateKey);
 
 describe('JWT', () => {
   it('verifies create composition claims', () => {
@@ -119,19 +124,19 @@ describe('JWT', () => {
   });
   it('verifies license composition claims', () => {
     assert.isOk(
-      verifyClaims(licenseComposition, composerHeader, composition, licenseCompositionSig),
+      verifyClaims(licenseComposition, lyricistHeader, composition, licenseCompositionSig),
       'should verify license composition claims'
     );
   });
   it('verifies license recording claims', () => {
     assert.isOk(
-      verifyClaims(licenseRecording, performerHeader, recording, licenseRecordingSig),
+      verifyClaims(licenseRecording, producerHeader, recording, licenseRecordingSig),
       'should verify license recording claims'
     );
   });
   it('verifies license album claims', () => {
     assert.isOk(
-      verifyClaims(licenseAlbum, performerHeader, album, licenseAlbumSig),
+      verifyClaims(licenseAlbum, producerHeader, album, licenseAlbumSig),
       'should verify license album claims'
     );
   });

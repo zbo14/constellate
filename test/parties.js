@@ -1,13 +1,14 @@
 import { ArtistContext, OrganizationContext, setAddr } from '../lib/party.js';
 
 const ed25519 = require('../lib/ed25519.js');
+const rsa = require('../lib/rsa.js');
 const secp256k1 = require('../lib/secp256k1.js');
 
 const composerKeypair = ed25519.keypairFromPassword('muzaq');
-const lyricistKeypair = ed25519.generateKeypair();
-const performerKeypair = secp256k1.generateKeypair();
+const lyricistKeypair = rsa.generateKeypair();
+const performerKeypair =  secp256k1.generateKeypair();
 const producerKeypair = ed25519.generateKeypair();
-const publisherKeypair = ed25519.generateKeypair();
+const publisherKeypair = rsa.generateKeypair();
 const recordLabelKeypair = secp256k1.generateKeypair();
 
 const composer = setAddr({

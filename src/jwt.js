@@ -1,9 +1,11 @@
 'use strict';
 
 const Ajv = require('ajv');
+const { jwk2pem, pem2jwk } = require('pem-jwk');
 const ed25519 = require('../lib/ed25519.js');
+const rsa = require('../lib/rsa.js');
 const secp256k1 = require('../lib/secp256k1.js');
-const { Addr, publicKey2Addr } = require('../lib/party.js');
+const { Addr, calcAddr } = require('../lib/party.js');
 
 const {
   MetaId,
@@ -34,50 +36,58 @@ const PublicKey = {
   $schema: Draft,
   type: 'object',
   title: 'PublicKey',
-  allOf: [
+  oneOf: [
     {
       properties: {
+        crv: {
+          enum: ['Ed25519']
+        },
+        kty: {
+          enum: ['OKP']
+        },
         x: {
           type: 'string',
           pattern: '^[A-Za-z0-9-_]{43}$'
         }
-      }
+      },
+      required: ['crv', 'x']
     },
     {
-      oneOf: [
-        {
-          properties: {
-            crv: {
-              enum: ['Ed25519']
-            },
-            kty: {
-              enum: ['OKP']
-            }
-          }
+      properties: {
+        e: {
+          enum: ['AQAB']
         },
-        {
-          properties: {
-            crv: {
-              enum: ['P-256']
-            },
-            kty: {
-              enum: ['EC']
-            },
-            y: {
-              type: 'string',
-              pattern: '^[A-Za-z0-9-_]{43}$'
-            }
-          },
-          required: ['y']
+        kty: {
+          enum: ['RSA']
+        },
+        n: {
+          type: 'string',
+          pattern: '^[A-Za-z0-9-_]+$'
         }
-      ]
+      },
+      required: ['e', 'n']
+    },
+    {
+      properties: {
+        crv: {
+          enum: ['P-256']
+        },
+        kty: {
+          enum: ['EC']
+        },
+        x: {
+          type: 'string',
+          pattern: '^[A-Za-z0-9-_]{43}$'
+        },
+        y: {
+          type: 'string',
+          pattern: '^[A-Za-z0-9-_]{43}$'
+        }
+      },
+      required: ['crv', 'x', 'y']
     }
   ],
-  required: [
-    'crv',
-    'kty',
-    'x'
-  ]
+  required: ['kty']
 }
 
 const Header =  {
@@ -86,11 +96,14 @@ const Header =  {
   title: 'Header',
   properties: {
     alg: {
-      enum: ['EdDsa', 'ES256']
+      enum: ['EdDsa', 'ES256', 'RS256']
     },
     jwk: PublicKey,
     typ: {
       enum: ['JWT']
+    },
+    use: {
+      enum: ['sig']
     }
   },
   oneOf: [
@@ -103,6 +116,20 @@ const Header =  {
           properties: {
             crv: {
               enum: ['Ed25519']
+            }
+          }
+        }
+      }
+    },
+    {
+      properties: {
+        alg: {
+          enum: ['RS256']
+        },
+        jwk: {
+          properties: {
+            kty: {
+              enum: ['RSA']
             }
           }
         }
@@ -126,7 +153,8 @@ const Header =  {
   required: [
     'alg',
     'jwk',
-    'typ'
+    'typ',
+    'use'
   ]
 }
 
@@ -198,27 +226,6 @@ function calcClaimsId(claims: Object): string {
   return calcId('jti', claims);
 }
 
-function ed25519Header(publicKey: Buffer): Object {
-  let header = {};
-  try {
-    if (publicKey.length !== 32) {
-      throw new Error('expected public key length=32; got ' + publicKey.length);
-    }
-    header = {
-      alg: 'EdDsa',
-      jwk: {
-        x: encodeBase64(publicKey),
-        crv: 'Ed25519',
-        kty: 'OKP'
-      },
-      typ: 'JWT'
-    }
-  } catch(err) {
-    console.error(err);
-  }
-  return header;
-}
-
 function getClaimsId(claims: Object): string {
   return getId('jti', claims);
 }
@@ -233,7 +240,46 @@ function getClaimsSchema(typ: string): Object {
     throw new Error('unexpected claims typ: ' + typ);
 }
 
-function secp256k1Header(publicKey: Buffer) {
+
+function newEd25519Header(publicKey: Buffer): Object {
+  let header = {};
+  try {
+    if (publicKey.length !== 32) {
+      throw new Error('expected public key length=32; got ' + publicKey.length);
+    }
+    header = {
+      alg: 'EdDsa',
+      jwk: {
+        x: encodeBase64(publicKey),
+        crv: 'Ed25519',
+        kty: 'OKP'
+      },
+      typ: 'JWT',
+      use: 'sig'
+    }
+  } catch(err) {
+    console.error(err);
+  }
+  return header;
+}
+
+function newRsaHeader(publicKey: Object): Object {
+  let header = {};
+  try {
+    const jwk = pem2jwk(publicKey.toString());
+    header = {
+      alg: 'RS256',
+      jwk: jwk,
+      typ: 'JWT',
+      use: 'sig'
+    }
+  } catch(err) {
+    console.error(err);
+  }
+  return header;
+}
+
+function newSecp256k1Header(publicKey: Buffer): Object {
   let header = {};
   try {
     if (publicKey.length !== 33) {
@@ -248,7 +294,8 @@ function secp256k1Header(publicKey: Buffer) {
         crv: 'P-256',
         kty: 'EC'
       },
-      typ: 'JWT'
+      typ: 'JWT',
+      use: 'sig'
     }
   } catch(err) {
     console.error(err);
@@ -260,15 +307,19 @@ function setClaimsId(claims: Object): Object {
   return Object.assign({}, claims, { 'jti': calcClaimsId(claims) });
 }
 
-function signClaims(claims: Object, header: Object, secretKey: Buffer): Buffer {
+function signClaims(claims: Object, header: Object, privateKey: Buffer|Object): Buffer {
   let sig = new Buffer([]);
   const encodedHeader = encodeBase64(header);
   const encodedPayload = encodeBase64(claims);
+  const message = encodedHeader + '.' + encodedPayload;
   if (header.alg === 'EdDsa') {
-    sig = ed25519.sign(encodedHeader + '.' + encodedPayload, secretKey);
+    sig = ed25519.sign(message, privateKey);
   }
   if (header.alg === 'ES256') {
-    sig = secp256k1.sign(encodedHeader + '.' + encodedPayload, secretKey);
+    sig = secp256k1.sign(message, privateKey);
+  }
+  if (header.alg === 'RS256') {
+    sig = rsa.sign(message, privateKey)
   }
   return sig;
 }
@@ -354,13 +405,14 @@ function verifyClaims(claims: Object, header: Object, meta: Object, signature: B
     if (validateClaims(claims, meta)) {
       const encodedHeader = encodeBase64(header);
       const encodedPayload = encodeBase64(claims);
+      const message = encodedHeader + '.' + encodedPayload;
       let publicKey;
       if (header.alg === 'EdDsa') {
         publicKey = decodeBase64(header.jwk.x);
-        if (claims.iss !== publicKey2Addr(publicKey)) {
+        if (claims.iss !== calcAddr(publicKey)) {
           throw new Error('publicKey does not match addr');
         }
-        if (!ed25519.verify(encodedHeader + '.' + encodedPayload, publicKey, signature)) {
+        if (!ed25519.verify(message, publicKey, signature)) {
           throw new Error('invalid ed25519 signature: ' + encodeBase64(signature));
         }
       }
@@ -369,11 +421,21 @@ function verifyClaims(claims: Object, header: Object, meta: Object, signature: B
           decodeBase64(header.jwk.x),
           decodeBase64(header.jwk.y)
         )
-        if (claims.iss !== publicKey2Addr(publicKey)) {
+        if (claims.iss !== calcAddr(publicKey)) {
           throw new Error('public-key does not match addr');
         }
-        if (!secp256k1.verify(encodedHeader + '.' + encodedPayload, publicKey, signature)) {
+        if (!secp256k1.verify(message, publicKey, signature)) {
           throw new Error('invalid secp256k1 signature: ' + encodeBase64(signature));
+        }
+      }
+      if (header.alg === 'RS256') {
+        const pem = jwk2pem(header.jwk).slice(0, -1);
+        publicKey = rsa.importPublicKey(pem);
+        if (claims.iss !== calcAddr(publicKey)) {
+          throw new Error('public-key does not match addr');
+        }
+        if (!rsa.verify(message, publicKey, signature)) {
+          throw new Error('invalid rsa signature: ' + encodeBase64(signature));
         }
       }
       verified = true;
@@ -385,10 +447,11 @@ function verifyClaims(claims: Object, header: Object, meta: Object, signature: B
 }
 
 exports.calcClaimsId = calcClaimsId;
-exports.ed25519Header = ed25519Header;
 exports.getClaimsId = getClaimsId;
 exports.getClaimsSchema = getClaimsSchema;
-exports.secp256k1Header = secp256k1Header;
+exports.newEd25519Header = newEd25519Header;
+exports.newSecp256k1Header = newSecp256k1Header;
+exports.newRsaHeader = newRsaHeader;
 exports.setClaimsId = setClaimsId;
 exports.signClaims = signClaims;
 exports.timestamp = timestamp;
