@@ -2,6 +2,8 @@
 
 const Ajv = require('ajv');
 
+const { getId } = require('../lib/util.js');
+
 // @flow
 
 /**
@@ -28,7 +30,7 @@ function contextIRI(prefix: string, key: string): Object {
   return {
     type: 'object',
     properties: {
-      '@id': contextPrefix(key, prefix),
+      '@id': contextPrefix(prefix, key),
       '@type': {
         type: 'string',
         default: '@id'

@@ -4,46 +4,60 @@
   </head>
   <body>
     <button id='start-node-btn'>start node</button><br>
-    <label>file multihash</label>
+    <label>add file</label>
+    <input type='file' id='content' accept='audio/*,image/*' />
+    <button id='add-file-btn'>add</button><br>
+    <label>get file</label>
     <input type='text' id='multihash' \>
-    <button id='get-file-btn'>get file</button><br>
-    <label>file links</label><br>
+    <button id='get-file-btn'>get</button><br>
+    <label>links</label><br>
     <div id='links'></div>
+    <!--
     <hr>
-    <input type='file' id='audio' accept='audio/*' />
     <button id='read-tags-btn'>read tags</button>
     <button id='write-tags-btn'>write tags</button><br>
+    -->
     <hr>
-    <select>
+    <select id='schema-select'>
       <option selected disabled>--</option>
       <optgroup label='party'>
-        <option value='artist'>artist</option>
-        <option value='organization'>organization</option>
+        <option value='Artist'>artist</option>
+        <option value='Organization'>organization</option>
       </optgroup>
       <optgroup label='meta'>
-        <option value='album'>album</option>
-        <option value='audio'>audio</option>
-        <option value='composition'>composition</option>
-        <option value='recording'>recording</option>
+        <option value='Album'>album</option>
+        <option value='Audio'>audio</option>
+        <option value='Composition'>composition</option>
+        <option value='Image'>image</option>
+        <option value='Recording'>recording</option>
       </optgroup>
       <optgroup label='claims'>
-        <option value='create'>create</option>
-        <option value='license'>license</option>
+        <option value='Create'>create</option>
+        <option value='License'>license</option>
       </optgroup>
     </select><br>
     <button id='new-keypair-btn' hidden>new keypair</button>
+    <button id='add-meta-btn' hidden>add meta</button>
     <button id='sign-claims-btn' hidden>sign claims</button>
-    <button id='verify-sig-btn' hidden>verify signature</button>
-    <hr>
+    <button id='verify-sig-btn' hidden>verify signature</button><br><br>
     <form></form>
-    <h3>Party</h3>
-    <pre id='party'></pre>
-    <h3>Meta</h3>
-    <pre id='meta'></pre>
-    <h3>Claims</h3>
-    <pre id='claims'></pre>
-    <h3>Signature</h3>
-    <p id='sig'></p>
+    <hr>
+    <input type='text' id='mode' hidden /><br>
+    <label>public-key</label>
+    <select id='key-select'>
+      <option value='ed25519'>ed25519</option>
+      <option value='rsa'>rsa</option>
+      <option value='secp256k1'>secp256k1</option>
+    </select>
+    <textarea id='pub'></textarea><br>
+    <label>signature</label>
+    <input type='text' id='sig' /><br>
+    <h4>party</h4>
+    <textarea id='party'></textarea>
+    <h4>meta</h4>
+    <textarea id='meta'></textarea>
+    <h4>claims</h4>
+    <textarea id='claims'></textarea>
   </body>
   <script src='./bundle.js'></script>
 </html>

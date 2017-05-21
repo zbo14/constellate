@@ -1,9 +1,11 @@
 'use strict';
 
 const { Addr } = require('../lib/party.js');
+const { calcIPFSHash } = require('../lib/ipfs.js');
 
 const {
-  Draft, Url,
+  Draft,
+  // Url,
   contextIRI,
   contextPrefix,
   validateSchema
@@ -14,7 +16,9 @@ const {
   digestRIPEMD160,
   digestSHA256,
   encodeBase64,
-  getId
+  getId,
+  orderStringify,
+  withoutKeys
 } = require('../lib/util.js');
 
 // @flow
@@ -23,38 +27,9 @@ const {
 * @module constellate/src/meta
 */
 
-function calcMetaId(meta: Object): string {
-  return calcId('@id', meta);
-}
-
-function getMetaId(meta: Object): string {
-  return getId('@id', meta);
-}
-
-function setMetaId(meta: Object): Object {
-  return Object.assign({}, meta, { '@id': calcMetaId(meta) });
-}
-
-function validateMeta(meta: Object, schema: Object): boolean {
-  let valid = false;
-  try {
-    if (!validateSchema(meta, schema)) {
-      throw new Error('meta has invalid schema: ' + JSON.stringify(meta, null, 2));
-    }
-    const metaId = calcMetaId(meta);
-    if (meta['@id'] !== metaId) {
-      throw new Error(`expected metaId=${meta['@id']}; got ` + metaId);
-    }
-    valid = true;
-  } catch(err) {
-    console.error(err);
-  }
-  return valid;
-}
-
 const MetaId = {
   type: 'string',
-  pattern: '^[A-Za-z0-9-_]{43,44}$'
+  pattern: '^[1-9A-HJ-NP-Za-km-z]{46}$'
 }
 
 const Album = {
@@ -70,6 +45,7 @@ const Album = {
           default: 'http://schema.org/'
         },
         Album: contextPrefix('schema', 'MusicAlbum'),
+        art: contextIRI('schema', 'image'),
         artist: contextIRI('schema', 'byArtist'),
         productionType: contextPrefix('schema', 'albumProductionType'),
         recordLabel: contextIRI('schema', 'recordLabel'),
@@ -81,6 +57,7 @@ const Album = {
       required: [
         'schema',
         'Album',
+        'art',
         'artist',
         'productionType',
         'recordLabel',
@@ -94,6 +71,7 @@ const Album = {
       readonly: true
     },
     '@id': Object.assign({}, MetaId, { readonly: true }),
+    art: MetaId,
     artist: {
       type: 'array',
       items: Addr,
@@ -143,6 +121,10 @@ const Album = {
 const AlbumContext = {
   schema: 'http://schema.org/',
   Album: 'schema:MusicAlbum',
+  art: {
+    '@id': 'schema:image',
+    '@type': '@id'
+  },
   artist: {
     '@id': 'schema:byArtist',
     '@type': '@id'
@@ -189,7 +171,9 @@ const Audio = {
       readonly: true
     },
     '@id': Object.assign({}, MetaId, { readonly: true }),
-    contentUrl: Url,
+    contentUrl: {
+      type: 'string'
+    },
     encodingFormat: {
       enum: ['mp3', 'mpeg4']
     }
@@ -286,6 +270,53 @@ const CompositionContext = {
     '@type': '@id'
   },
   title: 'schema:name'
+}
+
+const Image = {
+  $schema: Draft,
+  title: 'Image',
+  type: 'object',
+  properties: {
+    '@context': {
+      type: 'object',
+      properties: {
+        schema: {
+          type: 'string',
+          default: 'http://schema.org/'
+        },
+        contentUrl: contextPrefix('schema', 'contentUrl'),
+        Image: contextPrefix('schema', 'ImageObject'),
+        encodingFormat: contextPrefix('schema', 'encodingFormat')
+        //..
+      },
+      readonly: true,
+      required: [
+        'contentUrl',
+        'Image',
+        'encodingFormat'
+      ]
+    },
+    '@type': {
+      enum: ['Image'],
+      readonly: true
+    },
+    '@id': Object.assign({}, MetaId, { readonly: true }),
+    contentUrl: {
+      type: 'string'
+    },
+    encodingFormat: {
+      enum: ['jpeg', 'png']
+    }
+    //..
+  },
+  require: ['@context', '@id', '@type', 'contentUrl']
+}
+
+const ImageContext = {
+  schema: 'http://schema.org/',
+  contentUrl: 'schema:contentUrl',
+  Image: 'schema:ImageObject',
+  encodingFormat: 'schema:encodingFormat'
 }
 
 const Recording = {
@@ -390,17 +421,66 @@ const RecordingContext = {
   title: 'schema:name'
 }
 
-exports.Album = Album;
+function calcMetaId(meta: Object, cb: Function) {
+  const buf = new Buffer.from(orderStringify(withoutKeys(meta, '@id')));
+  calcIPFSHash(buf, cb);
+}
+
+function getMetaId(meta: Object): string {
+  return getId('@id', meta);
+}
+
+function getMetaSchema(type: string): Object {
+  switch(type) {
+    case 'Album':
+      return Album;
+    case 'Audio':
+      return Audio;
+    case 'Composition':
+      return Composition;
+    case 'Image':
+      return Image;
+    case 'Recording':
+      return Recording;
+    default:
+      throw new Error('unexpected meta @type: ' + type);
+  }
+}
+
+function setMetaId(meta: Object, cb: Function) {
+  calcMetaId(meta, (id) => {
+    cb(Object.assign({}, meta, { '@id': id }));
+  });
+}
+
+function validateMeta(meta: Object, cb: Function) {
+  try {
+    const schema = getMetaSchema(meta['@type']);
+    if (!validateSchema(meta, schema)) {
+      throw new Error('meta has invalid schema: ' + JSON.stringify(meta, null, 2));
+    }
+    calcMetaId(meta, (id) => {
+      console.log(id, meta['@id']);
+      if (meta['@id'] !== id) {
+        console.error(`expected metaId=${meta['@id']}; got ` + id);
+        cb(false);
+      }
+      cb(true);
+    });
+  } catch(err) {
+    console.error(err);
+  }
+}
+
 exports.AlbumContext = AlbumContext;
-exports.Audio = Audio;
 exports.AudioContext = AudioContext;
-exports.Composition = Composition;
 exports.CompositionContext = CompositionContext;
+exports.ImageContext = ImageContext;
 exports.MetaId = MetaId;
-exports.Recording = Recording;
 exports.RecordingContext = RecordingContext;
 
 exports.calcMetaId = calcMetaId;
 exports.getMetaId = getMetaId;
+exports.getMetaSchema = getMetaSchema;
 exports.setMetaId = setMetaId;
 exports.validateMeta = validateMeta;

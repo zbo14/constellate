@@ -1,10 +1,11 @@
 import { getAddr } from '../lib/party.js';
 
 import {
-  Album, AlbumContext,
-  Audio, AudioContext,
-  Composition, CompositionContext,
-  Recording, RecordingContext,
+  AlbumContext,
+  AudioContext,
+  CompositionContext,
+  ImageContext,
+  RecordingContext,
   getMetaId, setMetaId
 } from '../lib/meta.js';
 
@@ -34,6 +35,13 @@ const audio = setMetaId({
   encodingFormat: 'mp3'
 });
 
+const image = setMetaId({
+  '@context': ImageContext,
+  '@type': 'Image',
+  contentUrl: 'http://image-file.com',
+  encodingFormat: 'png'
+})
+
 const recording = setMetaId({
   '@context': RecordingContext,
   '@type': 'Recording',
@@ -47,6 +55,7 @@ const recording = setMetaId({
 const album = setMetaId({
   '@context': AlbumContext,
   '@type': 'Album',
+  art: getMetaId(image),
   artist: [performer, producer].map(getAddr),
   productionType: 'DemoAlbum',
   recordLabel: [getAddr(recordLabel)],
@@ -59,5 +68,6 @@ export {
   audio,
   album,
   composition,
+  image,
   recording
 }

@@ -1,17 +1,26 @@
 const { encodeKeypair } = require('./lib/crypto.js');
 const ed25519 = require('./lib/ed25519.js');
-const ipfsNode = require('./lib/ipfs-node');
+const ipfs = require('./lib/ipfs.js');
+const rsa = require('./lib/rsa.js');
+const secp256k1 = require('./lib/secp256k1.js');
 const FileSaver = require('file-saver');
+const multihash = require('multihashes');
 const { generateForm, parseForm } = require('./lib/form.js');
 const { generateFrames, readTags, writeTags } = require('./lib/id3.js');
-const { encodeBase58, decodeBase58 } = require('./lib/util.js');
 require('setimmediate');
 
 const {
-  Create,
-  License,
-  ed25519Header,
-  secp256k1Header,
+  encodeBase58,
+  decodeBase58,
+  orderStringify,
+  withoutKeys
+} = require('./lib/util.js');
+
+const {
+  getClaimsSchema,
+  newEd25519Header,
+  newRsaHeader,
+  newSecp256k1Header,
   setClaimsId,
   signClaims,
   timestamp,
@@ -20,106 +29,166 @@ const {
 } = require('./lib/jwt.js');
 
 const {
-  Album,
-  Audio,
-  Composition,
-  Recording,
+  getMetaSchema,
   setMetaId,
   validateMeta
 } = require('./lib/meta.js');
 
 const {
-  Artist,
-  Organization,
+  getPartySchema,
   setAddr,
   validateParty
 } = require('./lib/party.js');
 
-const audio = document.getElementById('audio');
 const claims = document.getElementById('claims');
+const content = document.getElementById('content');
 const form = document.querySelector('form');
-const links = document.getElementById('links');
 const meta = document.getElementById('meta');
-const multihash = document.getElementById('multihash');
-const newKeypairBtn = document.getElementById('new-keypair-btn');
+const mode = document.getElementById('mode');
 const ols = document.getElementsByTagName('ol');
 const party = document.getElementById('party');
-const readTagsBtn = document.getElementById('read-tags-btn');
-const getFileBtn = document.getElementById('get-file-btn');
-const select = document.querySelector('select');
+const pub = document.getElementById('pub');
 const sig = document.getElementById('sig');
-const signClaimsBtn = document.getElementById('sign-claims-btn');
-const startNodeBtn = document.getElementById('start-node-btn');
 const submit = document.createElement('input');
 submit.type = 'submit';
-const writeTagsBtn = document.getElementById('write-tags-btn');
+
+const keySelect = document.getElementById('key-select');
+const schemaSelect = document.getElementById('schema-select');
+
+const addFileBtn = document.getElementById('add-file-btn');
+const addMetaBtn = document.getElementById('add-meta-btn');
+const getFileBtn = document.getElementById('get-file-btn');
+const newKeypairBtn = document.getElementById('new-keypair-btn');
+// const readTagsBtn = document.getElementById('read-tags-btn');
+const signClaimsBtn = document.getElementById('sign-claims-btn');
+const startNodeBtn = document.getElementById('start-node-btn');
+// const writeTagsBtn = document.getElementById('write-tags-btn');
 const verifySigBtn = document.getElementById('verify-sig-btn');
 
-let claimsObj, metaObj, partyObj,
-    schemaClaims, schemaMeta, schemaParty,
-    mode, publicKey;
-
-getFileBtn.addEventListener('click', () => {
-  if (multihash.value) {
-    // ipfsNode.catFile(multihash.value);
-    ipfsNode.getFile(multihash.value, (link) => {
-      links.appendChild(link);
-    });
-  }
-}, false);
-
-readTagsBtn.addEventListener('click', () => {
-  readTags(audio, (tags) => {
-    console.log(tags);
-  });
-}, false);
-
 startNodeBtn.addEventListener('click', () => {
-  ipfsNode.start(() => {
-    audio.addEventListener('change', () => {
-      ipfsNode.addFile(audio, (result) => {
-        console.log('Added file:', result);
-        multihash.value = result.hash;
-      });
+  ipfs.startNode(() => {
+    addFileBtn.addEventListener('click', () => {
+      if (content.files && schemaSelect.value) {
+        if (schemaSelect.value.toLowerCase() === content.files[0].type.split('/')[0]) {
+          ipfs.addFileInput(content, (result) => {
+            console.log('Added file:', result);
+            multihash.value = result.hash;
+            const label = Array.from(document.querySelectorAll('label')).find((label) => {
+              return label.textContent === 'contentUrl'
+                     && label.nextElementSibling.type === 'text'
+                     && !label.nextElementSibling.value
+            });
+            label.nextElementSibling.value = result.hash;
+          });
+        }
+      }
+    }, false);
+    getFileBtn.addEventListener('click', () => {
+      if (multihash.value) {
+        // ipfs.catFile(multihash.value);
+        ipfs.getFile(multihash.value, (link) => {
+          links.appendChild(link);
+        });
+      }
     }, false);
   });
 }, false);
 
-writeTagsBtn.addEventListener('click', () => {
-  if (metaObj) {
-    const frames = generateFrames(metaObj);
-    console.log(frames);
-    writeTags(audio, frames, (writer) => {
-      console.log(writer.getBlob());
-      FileSaver.saveAs(writer.getBlob(), 'test.mp3');
-    });
-  }
+addMetaBtn.addEventListener('click', () => {
+  const metaObj = withoutKeys(JSON.parse(meta.textContent), '@id');
+  const buf = new Buffer.from(orderStringify(metaObj));
+  ipfs.addFile(buf, '', (result) => {
+    console.log('Added meta:', result);
+  });
 }, false);
 
+/*
+readTagsBtn.addEventListener('click', () => {
+  readTags(content, (tags) => {
+    console.log(tags);
+  });
+}, false);
+
+writeTagsBtn.addEventListener('click', () => {
+  const frames = generateFrames(JSON.parse(meta.textContent));
+  console.log(frames);
+  writeTags(content, frames, (writer) => {
+    console.log(writer.getBlob());
+    FileSaver.saveAs(writer.getBlob(), 'test.mp3');
+  });
+}, false);
+*/
+
 newKeypairBtn.addEventListener('click', () => {
-  if (mode === 'party') {
-    const password = prompt('Please enter a password to generate keypair', 'passwerd');
+  let keypair, publicKey;
+  if (keySelect.value === 'ed25519') {
+    const password = prompt('Please enter a password to generate ed25519 keypair', 'passwerd');
     if (!password) return;
-    const keypair = ed25519.keypairFromPassword(password);
-    publicKey = keypair.publicKey;
-    party.textContent = JSON.stringify(encodeKeypair(keypair), null, 2);
+    keypair = ed25519.keypairFromPassword(password);
+    publicKey = encodeBase58(keypair.publicKey);
+    console.log(encodeBase58(keypair.privateKey));
   }
+  if (keySelect.value === 'rsa') {
+    keypair = rsa.generateKeypair();
+    publicKey = keypair.publicKey.toString();
+    console.log(keypair.privateKey.toString());
+  }
+  if (keySelect.value === 'secp256k1') {
+    keypair = secp256k1.generateKeypair();
+    publicKey = encodeBase58(keypair.publicKey);
+    console.log(encodeBase58(keypair.privateKey));
+  }
+  pub.textContent = publicKey;
 }, false);
 
 signClaimsBtn.addEventListener('click', () => {
-  if (mode === 'claims' && claimsObj && publicKey) {
-    const secretKey = prompt('Please enter your secret key to sign claims', '');
-    if (!secretKey) return;
-    sig.innerHTML = encodeBase58(signClaims(claimsObj, ed25519Header(publicKey), decodeBase58(secretKey)));
+  const encodedKey = prompt('Please enter your secret key to sign claims', '');
+  if (!encodedKey) return;
+  try {
+    const claimsObj = JSON.parse(claims.textContent);
+    let header, privateKey, publicKey;
+    if (keySelect.value === 'ed25519') {
+      privateKey = decodeBase58(encodedKey);
+      publicKey = decodeBase58(pub.textContent);
+      header = newEd25519Header(publicKey);
+    }
+    if (keySelect.value === 'rsa') {
+      privateKey = rsa.importPrivateKey(encodedKey);
+      publicKey = rsa.importPublicKey(pub.textContent);
+      header = newRsaHeader(publicKey);
+    }
+    if (keySelect.value === 'secp256k1') {
+      privateKey = decodeBase58(encodedKey);
+      publicKey = decodeBase58(pub.textContent);
+      header = newSecp256k1Header(publicKey);
+    }
+    sig.setAttribute('value', encodeBase58(signClaims(claimsObj, header, privateKey)));
+  } catch(err) {
+    console.error(err);
   }
 }, false);
 
 verifySigBtn.addEventListener('click', () => {
-  if (mode === 'claims'
-      && claimsObj && metaObj && publicKey
-      && schemaClaims && schemaMeta) {
-    const signature = decodeBase58(sig.innerHTML);
-    console.log(verifyClaims(claimsObj, ed25519Header(publicKey), metaObj, schemaClaims, schemaMeta, signature));
+  try {
+    const claimsObj = JSON.parse(claims.textContent);
+    let header, publicKey;
+    if (keySelect.value === 'ed25519') {
+      publicKey = decodeBase58(pub.textContent);
+      header = newEd25519Header(publicKey);
+    }
+    if (keySelect.value === 'rsa') {
+      publicKey = rsa.importPublicKey(pub.textContent);
+      header = newRsaHeader(publicKey);
+    }
+    if (keySelect.value === 'secp256k1') {
+      publicKey = decodeBase58(pub.textContent);
+      header = newSecp256k1Header(publicKey);
+    }
+    const metaObj = JSON.parse(meta.textContent);
+    const signature = decodeBase58(sig.value);
+    console.log(verifyClaims(claimsObj, header, metaObj, signature));
+  } catch(err) {
+    console.error(err);
   }
 }, false);
 
@@ -157,58 +226,40 @@ function listModifiers() {
   });
 }
 
-select.addEventListener('change', () => {
+schemaSelect.addEventListener('change', () => {
   form.innerHTML = null;
-  mode = select.selectedOptions[0].parentNode.label;
+  mode.setAttribute('value', schemaSelect.selectedOptions[0].parentNode.label);
+  addMetaBtn.hidden = true;
+  keySelect.hidden = true;
   newKeypairBtn.hidden = true;
   signClaimsBtn.hidden = true;
   verifySigBtn.hidden = true;
-  switch(select.value) {
-    case 'artist':
-      schemaParty = Artist;
-      break;
-    case 'organization':
-      schemaParty = Organization;
-      break;
-    //------------------------------
-    case 'album':
-      schemaMeta = Album;
-      break;
-    case 'audio':
-      schemaMeta = Audio;
-      break;
-    case 'composition':
-      schemaMeta = Composition;
-      break;
-    case 'recording':
-      schemaMeta = Recording;
-      break;
-    //------------------------------
-    case 'create':
-      schemaClaims = Create;
-      break;
-    case 'license':
-      schemaClaims = License;
-      break;
-      //..
-    default:
-      console.error('unexpected type: ' + select.value);
-      return;
+  let schema;
+  try {
+    switch(mode.value) {
+      case 'party':
+        schema = getPartySchema(schemaSelect.value);
+        keySelect.hidden = false;
+        newKeypairBtn.hidden = false;
+        break;
+      case 'meta':
+        schema = getMetaSchema(schemaSelect.value);
+        addMetaBtn.hidden = false;
+        break;
+      case 'claims':
+        schema = getClaimsSchema(schemaSelect.value);
+        signClaimsBtn.hidden = false;
+        verifySigBtn.hidden = false;
+        break;
+      default:
+        throw new Error('unexpected mode: ' + mode.value);
+    }
+    generateForm(schema).forEach((div) => form.appendChild(div));
+    form.appendChild(submit);
+    listModifiers();
+  } catch(err) {
+    console.error(err);
   }
-  if (mode === 'party') {
-    generateForm(schemaParty).forEach((div) => form.appendChild(div));
-    newKeypairBtn.hidden = false;
-  }
-  if (mode === 'meta') {
-    generateForm(schemaMeta).forEach((div) => form.appendChild(div));
-  }
-  if (mode === 'claims') {
-    generateForm(schemaClaims).forEach((div) => form.appendChild(div));
-    signClaimsBtn.hidden = false;
-    verifySigBtn.hidden = false;
-  }
-  form.appendChild(submit);
-  listModifiers();
 }, false);
 
 function includeElement(elem, label) {
@@ -249,40 +300,41 @@ form.addEventListener('submit', (event) => {
              && div.children.length === 2
              && includeElement(div.lastChild, div.firstChild);
     });
-    if (mode === 'party') {
-      partyObj = parseForm(divs);
-      if (partyObj) {
-        partyObj = setAddr(partyObj, publicKey);
-        if (partyObj && validateParty(partyObj, publicKey, schemaParty)) {
+    const obj = parseForm(divs);
+    if (!obj) return;
+    switch(mode.value) {
+      case 'party':
+        let publicKey;
+        if (keySelect.value === 'ed25519' || keySelect.value === 'secp256k1') {
+          publicKey = decodeBase58(pub.textContent);
+        }
+        if (keySelect.value === 'rsa') {
+          publicKey = rsa.importPublicKey(pub.textContent);
+        }
+        const partyObj = setAddr(obj, publicKey);
+        if (validateParty(partyObj, publicKey)) {
           party.textContent = JSON.stringify(partyObj, null, 2);
-          return;
         }
-      }
-    } else if (mode === 'meta') {
-      metaObj = parseForm(divs);
-      if (metaObj) {
-        metaObj = setMetaId(metaObj);
-        if (metaObj && validateMeta(metaObj, schemaMeta)) {
-          meta.textContent = JSON.stringify(metaObj, null, 2);
-          return;
-        }
-      }
-    } else if (mode === 'claims') {
-      claimsObj = parseForm(divs);
-      if (claimsObj) {
-        claimsObj = setClaimsId(timestamp(claimsObj));
-        if (claimsObj && validateClaims(claimsObj, metaObj, schemaClaims, schemaMeta)) {
+        return;
+      case 'meta':
+        setMetaId(obj, (metaObj) => {
+          console.log(metaObj);
+          validateMeta(metaObj, (valid) => {
+            if (valid) meta.textContent = JSON.stringify(metaObj, null, 2);
+          });
+        });
+        return;
+      case 'claims':
+        const claimsObj = setClaimsId(timestamp(obj));
+        const metaObj = JSON.parse(meta.textContent);
+        if (validateClaims(claimsObj, metaObj)) {
           claims.textContent = JSON.stringify(claimsObj, null, 2);
-          return;
         }
+        return;
+      default:
+        throw new Error('unexpected mode: ' + mode.value);
       }
-    } else {
-      throw new Error('unexpected mode: ' + mode);
-    }
   } catch(err) {
     console.error(err);
   }
-  // party.textContent = null;
-  // meta.textContent = null;
-  // claims.textContent = null;
 }, false);
