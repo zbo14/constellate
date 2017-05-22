@@ -10,8 +10,8 @@ const alice = ed25519.keypairFromPassword('passwerd');
 
 const bob = {};
 // .pem files from http://phpseclib.sourceforge.net/rsa/examples.html
-bob.privateKey = rsa.importPrivateKey(readFileSync(__dirname + '/private-pkcs1.pem'));
-bob.publicKey = rsa.importPublicKey(readFileSync(__dirname + '/public-pkcs1.pem'));
+bob.privateKey = rsa.importPrivateKey(readFileSync(__dirname + '/keys/private_pkcs1.pem'));
+bob.publicKey = rsa.importPublicKey(readFileSync(__dirname + '/keys/public_pkcs1.pem'));
 
 const charlie = secp256k1.generateKeypair();
 

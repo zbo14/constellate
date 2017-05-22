@@ -63,8 +63,10 @@ function generateElement(obj: Object, defs: Object): HTMLElement {
       case 'string':
         return newInput('text');
       default:
-        const def = definition(obj, defs);
-        if (isObject(def)) return generateElement(def, defs);
+        if (defs) {
+          const def = definition(obj, defs);
+          if (isObject(def)) return generateElement(def, defs);
+        }
     }
     throw new Error('unexpected type: ' + obj.type);
 }

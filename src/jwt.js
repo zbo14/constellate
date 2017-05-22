@@ -6,6 +6,7 @@ const ed25519 = require('../lib/ed25519.js');
 const rsa = require('../lib/rsa.js');
 const secp256k1 = require('../lib/secp256k1.js');
 const { Addr, calcAddr } = require('../lib/party.js');
+const { calcIPFSHash } = require('../lib/ipfs.js');
 
 const {
   MetaId,
@@ -23,7 +24,9 @@ const {
   decodeBase64,
   digestSHA256,
   encodeBase64,
-  getId, now
+  getId, now,
+  orderStringify,
+  withoutKeys
 } = require('../lib/util.js');
 
 // @flow
@@ -34,7 +37,7 @@ const {
 
 const ClaimsId = {
   type: 'string',
-  pattern: '^[A-Za-z0-9-_]{43,44}$'
+  pattern: '^[1-9A-HJ-NP-Za-km-z]{46}$'
 }
 
 const PublicKey = {
@@ -227,8 +230,9 @@ const License = {
   ]
 }
 
-function calcClaimsId(claims: Object): string {
-  return calcId('jti', claims);
+function calcClaimsId(claims: Object, cb: Function) {
+  const buf = new Buffer.from(orderStringify(withoutKeys(claims, 'jti')));
+  calcIPFSHash(buf, cb);
 }
 
 function getClaimsId(claims: Object): string {
@@ -308,8 +312,12 @@ function newSecp256k1Header(publicKey: Buffer): Object {
   return header;
 }
 
-function setClaimsId(claims: Object): Object {
-  return Object.assign({}, claims, { 'jti': calcClaimsId(claims) });
+
+function setClaimsId(claims: Object, cb: Function) {
+  calcClaimsId(claims, (err, id) => {
+    if (err) return cb(err, null);
+    cb(null, Object.assign({}, claims, { 'jti': id }));
+  });
 }
 
 function signClaims(claims: Object, header: Object, privateKey: Buffer|Object): Buffer {
@@ -324,7 +332,7 @@ function signClaims(claims: Object, header: Object, privateKey: Buffer|Object): 
     sig = secp256k1.sign(message, privateKey);
   }
   if (header.alg === 'RS256') {
-    sig = rsa.sign(message, privateKey)
+    sig = rsa.sign(message, privateKey);
   }
   return sig;
 }
@@ -335,8 +343,8 @@ function timestamp(claims: Object): Object {
 
 function validateClaims(claims: Object, meta: Object, cb: Function) {
   validateMeta(meta, (err) => {
-    if (err) throw err;
     try {
+      if (err) throw err;
       const schema = getClaimsSchema(claims.typ);
       if (!validateSchema(claims, schema)) {
         throw new Error('claims has invalid schema: ' + JSON.stringify(claims, null, 2));
@@ -367,33 +375,39 @@ function validateClaims(claims: Object, meta: Object, cb: Function) {
           throw new Error('claims not yet valid');
         }
       }
-      const claimsId = calcClaimsId(claims);
-      if (claims.jti !== claimsId) {
-        throw new Error(`expected jti=${claims.jti}; got ` + claimsId);
-      }
-      const metaId = getMetaId(meta);
-      if (claims.sub !== metaId) {
-        throw new Error(`expected sub=${claims.sub}; got ` + metaId);
-      }
-      switch(meta['@type']) {
-        case 'Album':
-          if (!meta.artist.some((id) => {
-            return claims.iss === id;
-          })) throw new Error('iss should be album artist addr');
-          break;
-        case 'Composition':
-          if (!meta.composer.concat(meta.lyricist).some((id) => {
-            return claims.iss === id;
-          })) throw new Error('iss should be composer or lyricist addr');
-          break;
-        case 'Recording':
-          if (!meta.performer.concat(meta.producer).some((id) => {
-            return claims.iss === id;
-          })) throw new Error('iss should be performer or producer addr');
-          break;
-        //..
-      }
-      cb(null);
+      calcClaimsId(claims, (err, id) => {
+        try {
+          if (err) throw err;
+          if (claims.jti !== id) {
+            throw new Error(`expected jti=${claims.jti}; got ` + id);
+          }
+          const metaId = getMetaId(meta);
+          if (claims.sub !== metaId) {
+            throw new Error(`expected sub=${claims.sub}; got ` + metaId);
+          }
+          switch(meta['@type']) {
+            case 'Album':
+              if (!meta.artist.some((id) => {
+                return claims.iss === id;
+              })) throw new Error('iss should be album artist addr');
+              break;
+            case 'Composition':
+              if (!meta.composer.concat(meta.lyricist).some((id) => {
+                return claims.iss === id;
+              })) throw new Error('iss should be composer or lyricist addr');
+              break;
+            case 'Recording':
+              if (!meta.performer.concat(meta.producer).some((id) => {
+                return claims.iss === id;
+              })) throw new Error('iss should be performer or producer addr');
+              break;
+            //..
+          }
+          cb(null);
+        } catch(err) {
+          cb(err);
+        }
+      });
     } catch(err) {
       cb(err);
     }
@@ -449,8 +463,8 @@ function verifyClaims(claims: Object, header: Object, meta: Object, signature: B
   });
 }
 
-exports.calcClaimsId = calcClaimsId;
 exports.ClaimsId = ClaimsId;
+exports.calcClaimsId = calcClaimsId;
 exports.getClaimsId = getClaimsId;
 exports.getClaimsSchema = getClaimsSchema;
 exports.newEd25519Header = newEd25519Header;

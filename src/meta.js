@@ -448,14 +448,16 @@ function getMetaSchema(type: string): Object {
 }
 
 function setMetaId(meta: Object, cb: Function) {
-  calcMetaId(meta, (id) => {
-    cb(Object.assign({}, meta, { '@id': id }));
+  calcMetaId(meta, (err, id) => {
+    if (err) return cb(err, null);
+    cb(null, Object.assign({}, meta, { '@id': id }));
   });
 }
 
 function validateMeta(meta: Object, cb: Function) {
-  calcMetaId(meta, (id) => {
+  calcMetaId(meta, (err, id) => {
     try {
+      if (err) throw err;
       const schema = getMetaSchema(meta['@type']);
       if (!validateSchema(meta, schema)) {
         throw new Error('meta has invalid schema: ' + JSON.stringify(meta, null, 2));

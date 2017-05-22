@@ -13,7 +13,8 @@
     "flow:file": "read -p 'Enter path to file: ' path_to_file && export PATH_TO_FILE=$path_to_file && flow check-contents < ${PATH_TO_FILE}",
     "gulp": "gulp",
     "remove-types:file": "read -p 'Enter filename: ' filename && export FILENAME=$filename && flow-remove-types src/${FILENAME} | js-beautify -o lib/${FILENAME}",
-    "test": "mocha --compilers js:babel-core/register --require babel-polyfill --recursive './test/*_test.js'"
+    "test": "mocha --compilers js:babel-core/register --require babel-polyfill --recursive './test/*_test.js'",
+    "_comment": "test command from https://github.com/Envoke-org/envokeJS/blob/master/package.json"
   },
   "babel": {
     "presets": [
