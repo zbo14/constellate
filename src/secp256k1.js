@@ -2,7 +2,7 @@
 
 const crypto = require('../lib/crypto.js');
 const secp256k1 = require('secp256k1/js');
-const { digestSHA256 } = require('../lib/util.js');
+const { decodeBase58, digestSHA256, encodeBase58 } = require('../lib/util.js');
 
 // @flow
 
@@ -24,6 +24,21 @@ function compress(x: Buffer, y: Buffer): Buffer {
     console.error(err);
   }
   return publicKey;
+}
+
+function decodeKeypair(encoded: string): Object {
+  const keypair = JSON.parse(encoded);
+  return {
+    privateKey: decodeBase58(keypair.privateKey),
+    publicKey: decodeBase58(keypair.publicKey)
+  }
+}
+
+function encodeKeypair(keypair: Object): string {
+  return JSON.stringify({
+    privateKey: encodeBase58(keypair.privateKey),
+    publicKey: encodeBase58(keypair.publicKey)
+  });
 }
 
 // https://www.npmjs.com/package/secp256k1
@@ -59,6 +74,8 @@ function verify(message: string, publicKey: Buffer, signature: Buffer): boolean 
 }
 
 exports.compress = compress;
+exports.decodeKeypair = decodeKeypair;
+exports.encodeKeypair = encodeKeypair;
 exports.generateKeypair = generateKeypair;
 exports.sign = sign;
 exports.uncompress = uncompress;

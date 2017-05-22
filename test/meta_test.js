@@ -1,44 +1,35 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
 import { validateMeta } from '../lib/meta.js';
+import { readFileSync } from 'fs';
 
-import {
-  album,
-  audio,
-  composition,
-  image,
-  recording
-} from './metas.js'
+const album = JSON.parse(readFileSync(__dirname + '/metas/album.json'));
+const audio = JSON.parse(readFileSync(__dirname + '/metas/audio.json'));
+const composition = JSON.parse(readFileSync(__dirname + '/metas/composition.json'));
+const image = JSON.parse(readFileSync(__dirname + '/metas/image.json'));
+const recording = JSON.parse(readFileSync(__dirname + '/metas/recording.json'));
+
+function callback(done) {
+  return (err) => {
+    assert.isNull(err);
+    done();
+  }
+}
 
 describe('Meta', () => {
-    it('validates composition metadata', () => {
-      assert.isOk(
-        validateMeta(composition),
-        'should validate composition metadata'
-      );
-    });
-    it('validates audio metadata', () => {
-      assert.isOk(
-        validateMeta(audio),
-        'should validate audio metadata'
-      );
-    });
-    it('validates image metadata', () => {
-      assert.isOk(
-        validateMeta(image),
-        'should validate image metadata'
-      );
-    });
-    it('validates recording metadata', () => {
-      assert.isOk(
-        validateMeta(recording),
-        'should validate recording metadata'
-      );
-    });
-    it('validates album metadata', () => {
-      assert.isOk(
-        validateMeta(album),
-        'should validate album metadata'
-      );
-    });
+  it('validates composition metadata', (done) => {
+    validateMeta(composition, callback(done));
+  });
+  it('validates audio metadata', (done) => {
+    validateMeta(audio, callback(done));
+  });
+  it('validates image metadata', (done) => {
+    validateMeta(image, callback(done));
+  });
+  it('validates recording metadata', (done) => {
+    validateMeta(recording, callback(done));
+  });
+  it ('validates album metadata', (done) => {
+    validateMeta(album, callback(done));
+  });
 });

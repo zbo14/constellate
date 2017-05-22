@@ -12,8 +12,23 @@ const { withoutKeys } = require('../lib/util.js');
 const privateKeyFormat = 'pkcs1-private-pem';
 const publicKeyFormat = 'pkcs1-public-pem';
 
+function decodeKeypair(encoded: string): Object {
+  const keypair = JSON.parse(encoded);
+  return {
+    privateKey: importPrivateKey(keypair.privateKey),
+    publicKey: importPublicKey(keypair.publicKey)
+  }
+}
+
 function decrypt(encrypted: Buffer, privateKey: Object): Buffer {
   return privateKey.decrypt(encrypted, 'buffer');
+}
+
+function encodeKeypair(keypair: Object): string {
+  return JSON.stringify({
+    privateKey: keypair.privateKey.toString(),
+    publicKey: keypair.publicKey.toString()
+  });
 }
 
 function encrypt(message: string, publicKey: Object): Buffer {
@@ -75,7 +90,9 @@ function verify(message: string, publicKey: Object, signature: Buffer): boolean 
   return publicKey.verify(message, signature, 'utf8', 'buffer');
 }
 
+exports.decodeKeypair = decodeKeypair;
 exports.decrypt = decrypt;
+exports.encodeKeypair = encodeKeypair;
 exports.encrypt = encrypt;
 exports.exportPrivateKey = exportPrivateKey;
 exports.exportPublicKey = exportPublicKey;

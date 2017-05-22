@@ -454,22 +454,20 @@ function setMetaId(meta: Object, cb: Function) {
 }
 
 function validateMeta(meta: Object, cb: Function) {
-  try {
-    const schema = getMetaSchema(meta['@type']);
-    if (!validateSchema(meta, schema)) {
-      throw new Error('meta has invalid schema: ' + JSON.stringify(meta, null, 2));
-    }
-    calcMetaId(meta, (id) => {
-      console.log(id, meta['@id']);
-      if (meta['@id'] !== id) {
-        console.error(`expected metaId=${meta['@id']}; got ` + id);
-        cb(false);
+  calcMetaId(meta, (id) => {
+    try {
+      const schema = getMetaSchema(meta['@type']);
+      if (!validateSchema(meta, schema)) {
+        throw new Error('meta has invalid schema: ' + JSON.stringify(meta, null, 2));
       }
-      cb(true);
-    });
-  } catch(err) {
-    console.error(err);
-  }
+      if (meta['@id'] !== id) {
+        throw new Error(`expected metaId=${meta['@id']}; got ` + id);
+      }
+      cb(null);
+    } catch(err) {
+      cb(err);
+    }
+  });
 }
 
 exports.AlbumContext = AlbumContext;

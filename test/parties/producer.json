@@ -1,0 +1,1 @@
+{"@context":{"schema":"http://schema.org/","Artist":"schema:MusicGroup","email":"schema:email","homepage":"schema:url","name":"schema:name","profile":"schema:sameAs"},"@type":"Artist","homepage":"http://producer.com","name":"producer","profile":["http://soundcloud-page.com"],"@id":"0x370dbcf9a113613c265f86e6b2c9217b08804795"}

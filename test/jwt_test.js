@@ -1,5 +1,6 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
+import { readFileSync } from 'fs';
 import { getAddr } from '../lib/party.js';
 import { now } from '../lib/util.js';
 
@@ -22,20 +23,26 @@ import {
   getMetaId
 } from '../lib/meta.js';
 
-import {
-  album,
-  composition,
-  recording
-} from './metas.js';
+const ed25519 = require('../lib/ed25519.js');
+const rsa = require('../lib/rsa.js');
+const secp256k1 = require('../lib/secp256k1.js');
 
-import {
-  composer, composerKeypair,
-  lyricist, lyricistKeypair,
-  performer, performerKeypair,
-  producer, producerKeypair,
-  publisher,
-  recordLabel
-} from './parties.js';
+const album = JSON.parse(readFileSync(__dirname +'/metas/album.json'));
+const composition = JSON.parse(readFileSync(__dirname +'/metas/composition.json'));
+const recording = JSON.parse(readFileSync(__dirname +'/metas/recording.json'));
+
+const composer = JSON.parse(readFileSync(__dirname +'/parties/composer.json'));
+const composerKeypair = ed25519.decodeKeypair(readFileSync(__dirname + '/parties/composerKeypair.json'));
+const lyricist = JSON.parse(readFileSync(__dirname +'/parties/lyricist.json'));
+const lyricistKeypair = rsa.decodeKeypair(readFileSync(__dirname + '/parties/lyricistKeypair.json'));
+const performer = JSON.parse(readFileSync(__dirname +'/parties/performer.json'));
+const performerKeypair = secp256k1.decodeKeypair(readFileSync(__dirname + '/parties/performerKeypair.json'));
+const producer = JSON.parse(readFileSync(__dirname +'/parties/producer.json'));
+const producerKeypair = ed25519.decodeKeypair(readFileSync(__dirname + '/parties/producerKeypair.json'));
+const publisher = JSON.parse(readFileSync(__dirname +'/parties/publisher.json'));
+const publisherKeypair = rsa.decodeKeypair(readFileSync(__dirname + '/parties/publisherKeypair.json'));
+const recordLabel = JSON.parse(readFileSync(__dirname +'/parties/recordLabel.json'));
+const recordLabelKeypair = secp256k1.decodeKeypair(readFileSync(__dirname + '/parties/recordLabelKeypair.json'));
 
 const createComposition = setClaimsId(
   timestamp({
@@ -103,41 +110,30 @@ const licenseCompositionSig = signClaims(licenseComposition, lyricistHeader, lyr
 const licenseRecordingSig = signClaims(licenseRecording, producerHeader, producerKeypair.privateKey);
 const licenseAlbumSig = signClaims(licenseAlbum, producerHeader, producerKeypair.privateKey);
 
+function callback(done) {
+  return (err) => {
+    assert.isNull(err);
+    done();
+  }
+}
+
 describe('JWT', () => {
-  it('verifies create composition claims', () => {
-    assert.isOk(
-      verifyClaims(createComposition, composerHeader, composition, createCompositionSig),
-      'should verify create composition claims'
-    );
+  it('verifies create composition claims', (done) => {
+    verifyClaims(createComposition, composerHeader, composition, createCompositionSig, callback(done));
   });
-  it('verifies create recording claims', () => {
-    assert.isOk(
-      verifyClaims(createRecording, performerHeader, recording, createRecordingSig),
-      'should verify create recording claims'
-    );
+  it('verifies create recording claims', (done) => {
+    verifyClaims(createRecording, performerHeader, recording, createRecordingSig, callback(done));
   });
-  it('verifies create album claims', () => {
-    assert.isOk(
-      verifyClaims(createAlbum, performerHeader, album, createAlbumSig),
-      'should verify create album claims'
-    );
+  it('verifies create album claims', (done) => {
+    verifyClaims(createAlbum, performerHeader, album, createAlbumSig, callback(done));
   });
-  it('verifies license composition claims', () => {
-    assert.isOk(
-      verifyClaims(licenseComposition, lyricistHeader, composition, licenseCompositionSig),
-      'should verify license composition claims'
-    );
+  it('verifies license composition claims', (done) => {
+    verifyClaims(licenseComposition, lyricistHeader, composition, licenseCompositionSig, callback(done));
   });
-  it('verifies license recording claims', () => {
-    assert.isOk(
-      verifyClaims(licenseRecording, producerHeader, recording, licenseRecordingSig),
-      'should verify license recording claims'
-    );
+  it('verifies license recording claims', (done) => {
+    verifyClaims(licenseRecording, producerHeader, recording, licenseRecordingSig, callback(done));
   });
-  it('verifies license album claims', () => {
-    assert.isOk(
-      verifyClaims(licenseAlbum, producerHeader, album, licenseAlbumSig),
-      'should verify license album claims'
-    );
+  it('verifies license album claims', (done) => {
+    verifyClaims(licenseAlbum, producerHeader, album, licenseAlbumSig, callback(done));
   });
 });

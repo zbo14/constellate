@@ -1,0 +1,1 @@
+{"@context":{"schema":"http://schema.org/","Artist":"schema:MusicGroup","email":"schema:email","homepage":"schema:url","name":"schema:name","profile":"schema:sameAs"},"@type":"Artist","email":"composer@example.com","homepage":"http://composer.com","name":"composer","profile":["http://facebook-profile.com"],"@id":"0x802b38a5452719d9d2d5a9115f31e3c3157850b9"}

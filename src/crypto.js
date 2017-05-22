@@ -3,7 +3,6 @@
 const atob = require('atob');
 const bcryptjs = require('bcryptjs');
 const crypto = require('crypto');
-const { decodeBase58, encodeBase58 } = require('../lib/util.js');
 
 // @flow
 
@@ -12,20 +11,6 @@ const { decodeBase58, encodeBase58 } = require('../lib/util.js');
 */
 
 const saltRounds = 10;
-
-function decodeKeypair(keypair: Object): Object {
-  return {
-    publicKey: decodeBase58(keypair.publicKey),
-    secretKey: decodeBase58(keypair.secretKey)
-  }
-}
-
-function encodeKeypair(keypair: Object): Object {
-  return {
-    publicKey: encodeBase58(keypair.publicKey),
-    secretKey: encodeBase58(keypair.secretKey)
-  }
-}
 
 function generateSecret(password: string): Buffer {
   let secret;
@@ -47,7 +32,5 @@ function generateSeed(): Buffer {
   return crypto.randomBytes(32);
 }
 
-exports.decodeKeypair = decodeKeypair;
-exports.encodeKeypair = encodeKeypair;
 exports.generateSecret = generateSecret;
 exports.generateSeed = generateSeed;

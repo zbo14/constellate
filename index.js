@@ -186,7 +186,10 @@ verifySigBtn.addEventListener('click', () => {
     }
     const metaObj = JSON.parse(meta.textContent);
     const signature = decodeBase58(sig.value);
-    console.log(verifyClaims(claimsObj, header, metaObj, signature));
+    verifyClaims(claimsObj, header, metaObj, signature, (err) => {
+      if (err) throw err;
+      console.log('Verified claims!');
+    });
   } catch(err) {
     console.error(err);
   }
@@ -318,18 +321,19 @@ form.addEventListener('submit', (event) => {
         return;
       case 'meta':
         setMetaId(obj, (metaObj) => {
-          console.log(metaObj);
-          validateMeta(metaObj, (valid) => {
-            if (valid) meta.textContent = JSON.stringify(metaObj, null, 2);
+          validateMeta(metaObj, (err) => {
+            if (err) throw err;
+            meta.textContent = JSON.stringify(metaObj, null, 2);
           });
         });
         return;
       case 'claims':
         const claimsObj = setClaimsId(timestamp(obj));
         const metaObj = JSON.parse(meta.textContent);
-        if (validateClaims(claimsObj, metaObj)) {
+        validateClaims(claimsObj, metaObj, (err) => {
+          if (err) throw err;
           claims.textContent = JSON.stringify(claimsObj, null, 2);
-        }
+        });
         return;
       default:
         throw new Error('unexpected mode: ' + mode.value);

@@ -1,0 +1,1 @@
+{"@context":{"schema":"http://schema.org/","email":"schema:email","homepage":"schema:url","name":"schema:name","Organization":"schema:Organization","profile":"schema:sameAs"},"@type":"Organization","email":"recordLabel@example.com","homepage":"http://recordLabel.com","name":"recordLabel","@id":"0xca167ceebe536d4c83ccfc68660edcf086a39cfa"}

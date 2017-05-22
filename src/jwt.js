@@ -9,7 +9,7 @@ const { Addr, calcAddr } = require('../lib/party.js');
 
 const {
   MetaId,
-  calcMetaId,
+  getMetaId,
   validateMeta
 } = require('../lib/meta.js');
 
@@ -333,10 +333,10 @@ function timestamp(claims: Object): Object {
   return Object.assign({}, claims, { iat: now() });
 }
 
-function validateClaims(claims: Object, meta: Object): string {
-  let valid = false;
-  try {
-    if (validateMeta(meta)) {
+function validateClaims(claims: Object, meta: Object, cb: Function) {
+  validateMeta(meta, (err) => {
+    if (err) throw err;
+    try {
       const schema = getClaimsSchema(claims.typ);
       if (!validateSchema(claims, schema)) {
         throw new Error('claims has invalid schema: ' + JSON.stringify(claims, null, 2));
@@ -371,7 +371,7 @@ function validateClaims(claims: Object, meta: Object): string {
       if (claims.jti !== claimsId) {
         throw new Error(`expected jti=${claims.jti}; got ` + claimsId);
       }
-      const metaId = calcMetaId(meta);
+      const metaId = getMetaId(meta);
       if (claims.sub !== metaId) {
         throw new Error(`expected sub=${claims.sub}; got ` + metaId);
       }
@@ -393,62 +393,60 @@ function validateClaims(claims: Object, meta: Object): string {
           break;
         //..
       }
-      valid = true;
+      cb(null);
+    } catch(err) {
+      cb(err);
     }
-  } catch(err) {
-    console.error(err);
-  }
-  return valid;
+  });
 }
 
-function verifyClaims(claims: Object, header: Object, meta: Object, signature: Buffer): boolean {
-  let verified = false;
-  try {
-    if (!validateSchema(header, Header)) {
-      throw new Error('header has invalid schema: ' + JSON.stringify(header, null, 2));
+function verifyClaims(claims: Object, header: Object, meta: Object, signature: Buffer, cb: Function): boolean {
+  validateClaims(claims, meta, (err) => {
+    try {
+        if (err) throw err;
+        if (!validateSchema(header, Header)) {
+            throw new Error('header has invalid schema: ' + JSON.stringify(header, null, 2));
+        }
+        const encodedHeader = encodeBase64(header);
+        const encodedPayload = encodeBase64(claims);
+        const message = encodedHeader + '.' + encodedPayload;
+        let publicKey;
+        if (header.alg === 'EdDsa') {
+            publicKey = decodeBase64(header.jwk.x);
+            if (claims.iss !== calcAddr(publicKey)) {
+                throw new Error('publicKey does not match addr');
+            }
+            if (!ed25519.verify(message, publicKey, signature)) {
+                throw new Error('invalid ed25519 signature: ' + encodeBase64(signature));
+            }
+        }
+        if (header.alg === 'ES256') {
+            publicKey = secp256k1.compress(
+                decodeBase64(header.jwk.x),
+                decodeBase64(header.jwk.y)
+            )
+            if (claims.iss !== calcAddr(publicKey)) {
+                throw new Error('public-key does not match addr');
+            }
+            if (!secp256k1.verify(message, publicKey, signature)) {
+                throw new Error('invalid secp256k1 signature: ' + encodeBase64(signature));
+            }
+        }
+        if (header.alg === 'RS256') {
+            const pem = jwk2pem(header.jwk).slice(0, -1);
+            publicKey = rsa.importPublicKey(pem);
+            if (claims.iss !== calcAddr(publicKey)) {
+                throw new Error('public-key does not match addr');
+            }
+            if (!rsa.verify(message, publicKey, signature)) {
+                throw new Error('invalid rsa signature: ' + encodeBase64(signature));
+            }
+        }
+        cb(null);
+    } catch (err) {
+        cb(err);
     }
-    if (validateClaims(claims, meta)) {
-      const encodedHeader = encodeBase64(header);
-      const encodedPayload = encodeBase64(claims);
-      const message = encodedHeader + '.' + encodedPayload;
-      let publicKey;
-      if (header.alg === 'EdDsa') {
-        publicKey = decodeBase64(header.jwk.x);
-        if (claims.iss !== calcAddr(publicKey)) {
-          throw new Error('publicKey does not match addr');
-        }
-        if (!ed25519.verify(message, publicKey, signature)) {
-          throw new Error('invalid ed25519 signature: ' + encodeBase64(signature));
-        }
-      }
-      if (header.alg === 'ES256') {
-        publicKey = secp256k1.compress(
-          decodeBase64(header.jwk.x),
-          decodeBase64(header.jwk.y)
-        )
-        if (claims.iss !== calcAddr(publicKey)) {
-          throw new Error('public-key does not match addr');
-        }
-        if (!secp256k1.verify(message, publicKey, signature)) {
-          throw new Error('invalid secp256k1 signature: ' + encodeBase64(signature));
-        }
-      }
-      if (header.alg === 'RS256') {
-        const pem = jwk2pem(header.jwk).slice(0, -1);
-        publicKey = rsa.importPublicKey(pem);
-        if (claims.iss !== calcAddr(publicKey)) {
-          throw new Error('public-key does not match addr');
-        }
-        if (!rsa.verify(message, publicKey, signature)) {
-          throw new Error('invalid rsa signature: ' + encodeBase64(signature));
-        }
-      }
-      verified = true;
-    }
-  } catch(err) {
-    console.error(err);
-  }
-  return verified;
+  });
 }
 
 exports.calcClaimsId = calcClaimsId;
