@@ -115,11 +115,12 @@ function orderStringify(obj: Object, space?: number): Object {
   return JSON.stringify(obj, keys.sort(), space);
 }
 
-function readFile(input: HTMLInputElement, callback: Function): boolean {
+function readFileInput(input: HTMLInputElement): Promise<ArrayBuffer> {
   const reader = new FileReader();
-  reader.onload = () => callback(reader);
-  reader.readAsArrayBuffer(input.files[0]);
-  return true;
+  return new Promise((resolve, reject) => {
+    reader.onload = () => resolve(reader.result);
+    reader.readAsArrayBuffer(input.files[0]);
+  });
 }
 
 function recurse(x: any, fn: Function): any {

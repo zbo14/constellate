@@ -66,12 +66,12 @@ const startNodeBtn = document.getElementById('start-node-btn');
 const verifySigBtn = document.getElementById('verify-sig-btn');
 
 startNodeBtn.addEventListener('click', () => {
-  ipfs.startNode(() => {
+  ipfs.startNode().then((info) => {
+    console.log('Peer info:', info);
     addFileBtn.addEventListener('click', () => {
       if (content.files && schemaSelect.value) {
         if (schemaSelect.value.toLowerCase() === content.files[0].type.split('/')[0]) {
-          ipfs.addFileInput(content, (err, result) => {
-            if (err) return console.error(err);
+          ipfs.addFileInput(content).then((result) => {
             console.log('Added file:', result);
             multihash.value = result.hash;
             const label = Array.from(document.querySelectorAll('label')).find((label) => {
@@ -80,46 +80,42 @@ startNodeBtn.addEventListener('click', () => {
                      && !label.nextElementSibling.value
             });
             label.nextElementSibling.value = result.hash;
-          });
+          }, (reason) => console.error(reason));
         }
       }
-    }, false);
+    });
     getFileBtn.addEventListener('click', () => {
       if (multihash.value) {
-        // ipfs.catFile(multihash.value);
-        ipfs.getFile(multihash.value, (err, link) => {
-          if (err) return console.error(err);
+        ipfs.getFile(multihash.value).then((link) => {
           links.appendChild(link);
-        });
+        }, (reason) => console.error(reason));
       }
-    }, false);
+    });
   });
-}, false);
+});
 
 addMetaBtn.addEventListener('click', () => {
   const metaObj = withoutKeys(JSON.parse(meta.textContent), '@id');
   const buf = new Buffer.from(orderStringify(metaObj));
-  ipfs.addFile(buf, '', (err, result) => {
-    if (err) return console.error(err);
+  ipfs.addFile(buf, '').then((result) => {
     console.log('Added meta:', result);
-  });
-}, false);
+  }, (reason) => console.error(reason));
+});
 
 /*
 readTagsBtn.addEventListener('click', () => {
-  readTags(content, (tags) => {
+  readTags(content).then((tags) => {
     console.log(tags);
-  });
-}, false);
+  }, (reason) => console.error(reason));
+});
 
 writeTagsBtn.addEventListener('click', () => {
   const frames = generateFrames(JSON.parse(meta.textContent));
   console.log(frames);
-  writeTags(content, frames, (writer) => {
-    console.log(writer.getBlob());
+  writeTags(content, frames).then((writer) => {
     FileSaver.saveAs(writer.getBlob(), 'test.mp3');
-  });
-}, false);
+  }, (reason) => console.error(reason));
+});
 */
 
 newKeypairBtn.addEventListener('click', () => {
@@ -142,7 +138,7 @@ newKeypairBtn.addEventListener('click', () => {
     console.log(encodeBase58(keypair.privateKey));
   }
   pub.textContent = publicKey;
-}, false);
+});
 
 signClaimsBtn.addEventListener('click', () => {
   const encodedKey = prompt('Please enter your secret key to sign claims', '');
@@ -165,7 +161,7 @@ signClaimsBtn.addEventListener('click', () => {
     header = newSecp256k1Header(publicKey);
   }
   sig.setAttribute('value', encodeBase58(signClaims(claimsObj, header, privateKey)));
-}, false);
+});
 
 verifySigBtn.addEventListener('click', () => {
   const claimsObj = JSON.parse(claims.textContent);
@@ -184,11 +180,10 @@ verifySigBtn.addEventListener('click', () => {
   }
   const metaObj = JSON.parse(meta.textContent);
   const signature = decodeBase58(sig.value);
-  verifyClaims(claimsObj, header, metaObj, signature, (err) => {
-    if (err) return console.error(err);
-    console.log('Verified claims!');
-    });
-}, false);
+  verifyClaims(claimsObj, header, metaObj, signature).then((claimsObj) => {
+    console.log('Verified claims:', JSON.stringify(claimsObj, null, 2));
+  }, (reason) => console.error(reason));
+});
 
 function listModifiers() {
   const lis = Array.from(document.getElementsByTagName('li')).map((li) => {
@@ -254,7 +249,7 @@ schemaSelect.addEventListener('change', () => {
   generateForm(schema).forEach((div) => form.appendChild(div));
   form.appendChild(submit);
   listModifiers();
-}, false);
+});
 
 function includeElement(elem, label) {
   switch (elem.nodeName) {
@@ -310,25 +305,21 @@ form.addEventListener('submit', (event) => {
       }
       return;
     case 'meta':
-      setMetaId(obj, (err, metaObj) => {
-        if (err) return console.error(err);
-        validateMeta(metaObj, (err) => {
-          if (err) return console.error(err);
-          meta.textContent = JSON.stringify(metaObj, null, 2);
-        });
-      });
+      setMetaId(obj).then((metaObj) => {
+        return validateMeta(metaObj);
+      }).then((metaObj) => {
+        meta.textContent = JSON.stringify(metaObj, null, 2);
+      }).catch((reason) => console.error(err));
       return;
     case 'claims':
-      setClaimsId(timestamp(obj), (err, claimsObj) => {
-        if (err) return console.error(err);
+      setClaimsId(timestamp(obj)).then((claimsObj) => {
         const metaObj = JSON.parse(meta.textContent);
-        validateClaims(claimsObj, metaObj, (err) => {
-          if (err) return console.error(err);
-          claims.textContent = JSON.stringify(claimsObj, null, 2);
-        });
-      });
+        return validateClaims(claimsObj, metaObj);
+      }).then((claimsObj) => {
+        claims.textContent = JSON.stringify(claimsObj, null, 2);
+      }).catch((reason) => console.error(err));
       return;
     default:
       console.error('unexpected mode: ' + mode.value);
   }
-}, false);
+});
