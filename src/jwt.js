@@ -23,6 +23,7 @@ const {
   calcId,
   decodeBase64,
   digestSHA256,
+  encodeBase58,
   encodeBase64,
   getId, now,
   orderStringify,
@@ -321,8 +322,8 @@ function setClaimsId(claims: Object): Promise<Object> {
 
 function signClaims(claims: Object, header: Object, privateKey: Buffer|Object): Buffer {
   let sig = new Buffer([]);
-  const encodedHeader = encodeBase64(header);
-  const encodedPayload = encodeBase64(claims);
+  const encodedHeader = encodeBase64(new Buffer(JSON.stringify(header)));
+  const encodedPayload = encodeBase64(new Buffer(JSON.stringify(claims)));
   const message = encodedHeader + '.' + encodedPayload;
   if (header.alg === 'EdDsa') {
     sig = ed25519.sign(message, privateKey);
@@ -340,10 +341,8 @@ function timestamp(claims: Object): Object {
   return Object.assign({}, claims, { iat: now() });
 }
 
-function validateClaims(claims: Object, meta: Object): Promise<Object> {
-  return validateMeta(meta).then(() => {
-    return calcClaimsId(claims);
-  }).then((id) => {
+function validateClaims(claims: Object, meta: Object, subject?: Object): Promise<Object> {
+  return calcClaimsId(claims).then((claimsId) => {
     const schema = getClaimsSchema(claims.typ);
     if (!validateSchema(claims, schema)) {
       throw new Error('claims has invalid schema: ' + JSON.stringify(claims, null, 2));
@@ -352,74 +351,93 @@ function validateClaims(claims: Object, meta: Object): Promise<Object> {
     if (claims.iat > rightNow) {
       throw new Error('iat cannot be later than now');
     }
-    if (claims.aud && claims.aud.some((aud) => aud === claims.iss)) {
-      throw new Error('aud cannot contain iss');
+    if (claims.jti !== claimsId) {
+      throw new Error(`expected jti=${claims.jti}; got ` + claimsId);
     }
-    if (claims.exp) {
+    let promise = Promise.resolve();
+    if (claims.typ === 'Create') {
+      promise = validateMeta(meta).then(() => {
+        const metaId = getMetaId(meta);
+        if (claims.sub !== metaId) {
+          throw new Error(`expected sub=${claims.sub}; got ` + metaId);
+        }
+        switch(meta['@type']) {
+          case 'Album':
+            if (!meta.artist.some((addr) => {
+              return claims.iss === addr;
+            })) throw new Error('iss should be album artist addr');
+            return claims;
+          case 'Composition':
+            if (!meta.composer.concat(meta.lyricist).some((addr) => {
+              return claims.iss === addr;
+            })) throw new Error('iss should be composer or lyricist addr');
+            return claims;
+          case 'Recording':
+            if (!meta.performer.concat(meta.producer).some((addr) => {
+              return claims.iss === addr;
+            })) throw new Error('iss should be performer or producer addr');
+            return claims;
+          //..
+        }
+      });
+    }
+    if (claims.typ === 'License') {
+      if (claims.aud.some((aud) => aud === claims.iss)) {
+        throw new Error('aud cannot contain iss');
+      }
       if (claims.exp <= claims.iat) {
         throw new Error('exp should be later than iat');
       }
-      if (claims.nbf && claims.exp <= claims.nbf) {
-        throw new Error('exp should be later than nbf');
-      }
       if (claims.exp < rightNow) {
-        throw new Error('claims expired');
+        throw new Error('license expired');
       }
-    }
-    if (claims.nbf) {
-      if (claims.nbf <= claims.iat) {
-        throw new Error('nbf should be later than iat');
+      if (claims.nbf) {
+        if (claims.nbf >= claims.exp) {
+          throw new Error('nbf should be before exp');
+        }
+        if (claims.nbf <= claims.iat) {
+          throw new Error('nbf should be later than iat');
+        }
+        if (claims.nbf > rightNow) {
+          throw new Error('license not yet valid');
+        }
       }
-      if (claims.nbf > rightNow) {
-        throw new Error('claims not yet valid');
+      if (!subject) {
+        throw new Error('no subject with license');
       }
-    }
-    if (claims.jti !== id) {
-      throw new Error(`expected jti=${claims.jti}; got ` + id);
-    }
-    const metaId = getMetaId(meta);
-    if (claims.sub !== metaId) {
-      throw new Error(`expected sub=${claims.sub}; got ` + metaId);
-    }
-    switch(meta['@type']) {
-      case 'Album':
-        if (!meta.artist.some((id) => {
-          return claims.iss === id;
-        })) throw new Error('iss should be album artist addr');
-        break;
-      case 'Composition':
-        if (!meta.composer.concat(meta.lyricist).some((id) => {
-          return claims.iss === id;
-        })) throw new Error('iss should be composer or lyricist addr');
-        break;
-      case 'Recording':
-        if (!meta.performer.concat(meta.producer).some((id) => {
-          return claims.iss === id;
-        })) throw new Error('iss should be performer or producer addr');
-        break;
+      if (claims.iat <= subject.iat) {
+        throw new Error('iat should be after subject iat');
+      }
+      if (claims.iss !== subject.iss) {
+        throw new Error('iss should equal subject iss');
+      }
+      if (claims.sub !== subject.jti) {
+        throw new Error('sub should equal subject jti');
+      }
       //..
+      promise = validateClaims(subject, meta).then(() => {
+        return claims;
+      });
     }
-    return claims;
+    return promise;
   });
 }
 
-function verifyClaims(claims: Object, header: Object, meta: Object, signature: Buffer): Promise<Object> {
-  return validateClaims(claims, meta).then(() => {
+function verifyClaims(claims: Object, header: Object, meta: Object, signature: Buffer, subject?: Object, subjectSignature?: Buffer): Promise<Object> {
+  return validateClaims(claims, meta, subject).then(() => {
     if (!validateSchema(header, Header)) {
         throw new Error('header has invalid schema: ' + JSON.stringify(header, null, 2));
     }
-    const encodedHeader = encodeBase64(header);
-    const encodedPayload = encodeBase64(claims);
-    const message = encodedHeader + '.' + encodedPayload;
-    let publicKey;
+    const encodedHeader = encodeBase64(new Buffer(JSON.stringify(header)));
+    let encodedPayload = encodeBase64(new Buffer(JSON.stringify(claims)));
+    let message = encodedHeader + '.' + encodedPayload;
+    let publicKey, verify = () => {};
     if (header.alg === 'EdDsa') {
         publicKey = decodeBase64(header.jwk.x);
         if (claims.iss !== calcAddr(publicKey)) {
             throw new Error('publicKey does not match addr');
         }
-        if (!ed25519.verify(message, publicKey, signature)) {
-            throw new Error('invalid ed25519 signature: ' + encodeBase64(signature));
-        }
+        verify = ed25519.verify;
     }
     if (header.alg === 'ES256') {
         publicKey = secp256k1.compress(
@@ -429,9 +447,7 @@ function verifyClaims(claims: Object, header: Object, meta: Object, signature: B
         if (claims.iss !== calcAddr(publicKey)) {
             throw new Error('public-key does not match addr');
         }
-        if (!secp256k1.verify(message, publicKey, signature)) {
-            throw new Error('invalid secp256k1 signature: ' + encodeBase64(signature));
-        }
+        verify = secp256k1.verify;
     }
     if (header.alg === 'RS256') {
         const pem = jwk2pem(header.jwk).slice(0, -1);
@@ -439,9 +455,17 @@ function verifyClaims(claims: Object, header: Object, meta: Object, signature: B
         if (claims.iss !== calcAddr(publicKey)) {
             throw new Error('public-key does not match addr');
         }
-        if (!rsa.verify(message, publicKey, signature)) {
-            throw new Error('invalid rsa signature: ' + encodeBase64(signature));
-        }
+        verify = rsa.verify;
+    }
+    if (!verify(message, publicKey, signature)) {
+      throw new Error(`invalid signature`);
+    }
+    if (subject) {
+      encodedPayload = encodeBase64(new Buffer(JSON.stringify(subject)));
+      message = encodedHeader + '.' + encodedPayload;
+      if (!verify(message, publicKey, subjectSignature)) {
+        throw new Error(`invalid subject signature`);
+      }
     }
     return claims;
   });

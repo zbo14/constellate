@@ -40,15 +40,18 @@ const {
   validateParty
 } = require('./lib/party.js');
 
-const claims = document.getElementById('claims');
+// const claims = document.getElementById('claims');
 const content = document.getElementById('content');
+const create = document.getElementById('create');
+const createSig = document.getElementById('create-sig');
 const form = document.querySelector('form');
+const license = document.getElementById('license');
+const licenseSig = document.getElementById('license-sig');
 const meta = document.getElementById('meta');
 const mode = document.getElementById('mode');
 const ols = document.getElementsByTagName('ol');
 const party = document.getElementById('party');
 const pub = document.getElementById('pub');
-const sig = document.getElementById('sig');
 const submit = document.createElement('input');
 submit.type = 'submit';
 
@@ -143,7 +146,6 @@ newKeypairBtn.addEventListener('click', () => {
 signClaimsBtn.addEventListener('click', () => {
   const encodedKey = prompt('Please enter your secret key to sign claims', '');
   if (!encodedKey) return;
-  const claimsObj = JSON.parse(claims.textContent);
   let header, privateKey, publicKey;
   if (keySelect.value === 'ed25519') {
     privateKey = decodeBase58(encodedKey);
@@ -160,11 +162,17 @@ signClaimsBtn.addEventListener('click', () => {
     publicKey = decodeBase58(pub.textContent);
     header = newSecp256k1Header(publicKey);
   }
-  sig.setAttribute('value', encodeBase58(signClaims(claimsObj, header, privateKey)));
+  if (schemaSelect.value === 'Create') {
+    const createObj = JSON.parse(create.textContent);
+    createSig.setAttribute('value', encodeBase58(signClaims(createObj, header, privateKey)));
+  }
+  if (schemaSelect.value === 'License') {
+    const licenseObj = JSON.parse(license.textContent);
+    licenseSig.setAttribute('value', encodeBase58(signClaims(licenseObj, header, privateKey)));
+  }
 });
 
 verifySigBtn.addEventListener('click', () => {
-  const claimsObj = JSON.parse(claims.textContent);
   let header, publicKey;
   if (keySelect.value === 'ed25519') {
     publicKey = decodeBase58(pub.textContent);
@@ -178,11 +186,21 @@ verifySigBtn.addEventListener('click', () => {
     publicKey = decodeBase58(pub.textContent);
     header = newSecp256k1Header(publicKey);
   }
+  const createObj = JSON.parse(create.textContent);
+  const createSignature = decodeBase58(createSig.value);
   const metaObj = JSON.parse(meta.textContent);
-  const signature = decodeBase58(sig.value);
-  verifyClaims(claimsObj, header, metaObj, signature).then((claimsObj) => {
-    console.log('Verified claims:', JSON.stringify(claimsObj, null, 2));
-  }, (reason) => console.error(reason));
+  if (schemaSelect.value === 'Create') {
+    verifyClaims(createObj, header, metaObj, createSignature).then(() => {
+      console.log('Verified create claims:', JSON.stringify(createObj, null, 2));
+    }, (reason) => console.error(reason));
+  }
+  if (schemaSelect.value === 'License') {
+    const licenseObj = JSON.parse(license.textContent);
+    const licenseSignature = decodeBase58(licenseSig.value);
+    verifyClaims(licenseObj, header, metaObj, licenseSignature, createObj, createSignature).then(() => {
+      console.log('Verified license claims:', JSON.stringify(licenseObj, null, 2));
+    }, (reason) => console.error(reason));
+  }
 });
 
 function listModifiers() {
@@ -309,15 +327,25 @@ form.addEventListener('submit', (event) => {
         return validateMeta(metaObj);
       }).then((metaObj) => {
         meta.textContent = JSON.stringify(metaObj, null, 2);
-      }).catch((reason) => console.error(err));
+      }).catch((reason) => console.error(reason));
       return;
     case 'claims':
-      setClaimsId(timestamp(obj)).then((claimsObj) => {
-        const metaObj = JSON.parse(meta.textContent);
-        return validateClaims(claimsObj, metaObj);
-      }).then((claimsObj) => {
-        claims.textContent = JSON.stringify(claimsObj, null, 2);
-      }).catch((reason) => console.error(err));
+      const metaObj = JSON.parse(meta.textContent)
+      if (schemaSelect.value === 'Create') {
+        setClaimsId(timestamp(obj)).then((createObj) => {
+          return validateClaims(createObj, metaObj);
+        }).then((createObj) => {
+          create.textContent = JSON.stringify(createObj, null, 2);
+        }).catch((reason) => console.error(reason));
+      }
+      if (schemaSelect.value === 'License') {
+        const createObj = JSON.parse(create.textContent);
+        setClaimsId(timestamp(obj)).then((licenseObj) => {
+          return validateClaims(licenseObj, metaObj, createObj);
+        }).then((licenseObj) => {
+          license.textContent = JSON.stringify(licenseObj, null, 2);
+        }).catch((reason) => console.error(reason));
+      }
       return;
     default:
       console.error('unexpected mode: ' + mode.value);
