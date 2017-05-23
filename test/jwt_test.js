@@ -46,30 +46,35 @@ const licenseCompositionSig = signClaims(licenseComposition, lyricistHeader, lyr
 const licenseRecordingSig = signClaims(licenseRecording, producerHeader, producerKeypair.privateKey);
 const licenseAlbumSig = signClaims(licenseAlbum, producerHeader, producerKeypair.privateKey);
 
-function callback(done) {
-  return (err) => {
-    assert.isNull(err);
-    done();
-  }
-}
-
 describe('JWT', () => {
   it('verifies create composition claims', (done) => {
-    verifyClaims(createComposition, composerHeader, composition, createCompositionSig, callback(done));
+    verifyClaims(createComposition, composerHeader, composition, createCompositionSig)
+      .then(() => done())
+      .catch((reason) => { throw reason });
   });
   it('verifies create recording claims', (done) => {
-    verifyClaims(createRecording, performerHeader, recording, createRecordingSig, callback(done));
+    verifyClaims(createRecording, performerHeader, recording, createRecordingSig)
+      .then(() => done())
+      .catch((reason) => { throw reason });
   });
   it('verifies create album claims', (done) => {
-    verifyClaims(createAlbum, performerHeader, album, createAlbumSig, callback(done));
+    verifyClaims(createAlbum, performerHeader, album, createAlbumSig)
+      .then(() => done())
+      .catch((reason) => { throw reason });
   });
   it('verifies license composition claims', (done) => {
-    verifyClaims(licenseComposition, lyricistHeader, composition, licenseCompositionSig, callback(done));
+    verifyClaims(licenseComposition, lyricistHeader, composition, licenseCompositionSig)
+      .then(() => done())
+      .catch((reason) => { throw reason });
   });
   it('verifies license recording claims', (done) => {
-    verifyClaims(licenseRecording, producerHeader, recording, licenseRecordingSig, callback(done));
+    verifyClaims(licenseRecording, producerHeader, recording, licenseRecordingSig)
+      .then(() => done())
+      .catch((reason) => { throw reason });
   });
   it('verifies license album claims', (done) => {
-    verifyClaims(licenseAlbum, producerHeader, album, licenseAlbumSig, callback(done));
+    verifyClaims(licenseAlbum, producerHeader, album, licenseAlbumSig)
+      .then(() => done())
+      .catch((reason) => { throw reason });
   });
 });

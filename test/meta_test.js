@@ -9,27 +9,31 @@ const composition = JSON.parse(readFileSync(__dirname + '/metas/composition.json
 const image = JSON.parse(readFileSync(__dirname + '/metas/image.json'));
 const recording = JSON.parse(readFileSync(__dirname + '/metas/recording.json'));
 
-function callback(done) {
-  return (err) => {
-    assert.isNull(err);
-    done();
-  }
-}
 
 describe('Meta', () => {
   it('validates composition metadata', (done) => {
-    validateMeta(composition, callback(done));
+    validateMeta(composition)
+      .then(() => done())
+      .catch((reason) => { throw reason });
   });
   it('validates audio metadata', (done) => {
-    validateMeta(audio, callback(done));
+    validateMeta(audio)
+      .then(() => done())
+      .catch((reason) => { throw reason });
   });
   it('validates image metadata', (done) => {
-    validateMeta(image, callback(done));
+    validateMeta(image)
+      .then(() => done())
+      .catch((reason) => { throw reason });
   });
   it('validates recording metadata', (done) => {
-    validateMeta(recording, callback(done));
+    validateMeta(recording)
+      .then(() => done())
+      .catch((reason) => { throw reason });
   });
   it ('validates album metadata', (done) => {
-    validateMeta(album, callback(done));
+    validateMeta(album)
+      .then(() => done())
+      .catch((reason) => { throw reason });
   });
 });

@@ -140,120 +140,156 @@ writeFile(
   JSON.stringify(recordLabel)
 );
 
-waterfall([
-  function(callback) {
-    setMetaId({
-      '@context': CompositionContext,
-      '@type': 'Composition',
-      composer: [getMetaId(composer)],
-      iswcCode: 'T-034.524.680-1',
-      lyricist: [getMetaId(lyricist)],
-      publisher: [getMetaId(publisher)],
-      title: 'fire-song'
-    }, callback);
-  },
-  function(composition, callback) {
+let album, audio, composition, image, recording;
+
+[ newComposition,
+  newAudio,
+  newImage,
+  newRecording,
+  newAlbum,
+  newCreateComposition,
+  newCreateRecording,
+  newCreateAlbum,
+  newLicenseComposition,
+  newLicenseRecording,
+  newLicenseAlbum
+].reduce((p, fn) => {
+  return p.then(fn);
+}, Promise.resolve()).catch(console.error);
+
+function newComposition() {
+  return setMetaId({
+    '@context': CompositionContext,
+    '@type': 'Composition',
+    composer: [getMetaId(composer)],
+    iswcCode: 'T-034.524.680-1',
+    lyricist: [getMetaId(lyricist)],
+    publisher: [getMetaId(publisher)],
+    title: 'fire-song'
+  }).then((obj) => {
+    composition = obj;
     writeFile(__dirname + '/metas/composition.json', JSON.stringify(composition));
-    setMetaId({
-      '@context': AudioContext,
-      '@type': 'Audio',
-      contentUrl: 'QmYKAhVW2d4e28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE',
-      encodingFormat: 'mp3'
-    }, (err, audio) => callback(err, audio, composition));
-  },
-  function(audio, composition, callback) {
+  });
+}
+
+function newAudio() {
+  return setMetaId({
+    '@context': AudioContext,
+    '@type': 'Audio',
+    contentUrl: 'QmYKAhVW2d4e28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE',
+    encodingFormat: 'mp3'
+  }).then((obj) => {
+    audio = obj;
     writeFile(__dirname + '/metas/audio.json', JSON.stringify(audio));
-    setMetaId({
-      '@context': ImageContext,
-      '@type': 'Image',
-      contentUrl: 'QmYKAhvW2d4f28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE',
-      encodingFormat: 'png'
-    }, (err, image) => callback(err, audio, composition, image));
-  },
-  function(audio, composition, image, callback) {
+  });
+}
+
+function newImage() {
+  return setMetaId({
+    '@context': ImageContext,
+    '@type': 'Image',
+    contentUrl: 'QmYKAhvW2d4f28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE',
+    encodingFormat: 'png'
+  }).then((obj) => {
+    image = obj;
     writeFile(__dirname + '/metas/image.json', JSON.stringify(image));
-    setMetaId({
-      '@context': RecordingContext,
-      '@type': 'Recording',
-      audio: [getMetaId(audio)],
-      performer: [getMetaId(performer)],
-      producer: [getMetaId(producer)],
-      recordingOf: getMetaId(composition),
-      recordLabel: [getMetaId(recordLabel)]
-    }, (err, recording) => callback(err, composition, image, recording));
-  },
-  function(composition, image, recording, callback) {
+  });
+}
+
+function newRecording() {
+  return setMetaId({
+    '@context': RecordingContext,
+    '@type': 'Recording',
+    audio: [getMetaId(audio)],
+    performer: [getMetaId(performer)],
+    producer: [getMetaId(producer)],
+    recordingOf: getMetaId(composition),
+    recordLabel: [getMetaId(recordLabel)]
+  }).then((obj) => {
+    recording = obj;
     writeFile(__dirname + '/metas/recording.json', JSON.stringify(recording));
-    setMetaId({
-      '@context': AlbumContext,
-      '@type': 'Album',
-      art: getMetaId(image),
-      artist: [performer, producer].map(getAddr),
-      productionType: 'DemoAlbum',
-      recordLabel: [getAddr(recordLabel)],
-      releaseType: 'SingleRelease',
-      title: 'ding-ding-dooby-doo',
-      track: [getMetaId(recording)]
-    }, (err, album) => callback(err, album, composition, recording));
-  },
-  function(album, composition, recording, callback) {
+  });
+}
+
+function newAlbum() {
+  return setMetaId({
+    '@context': AlbumContext,
+    '@type': 'Album',
+    art: getMetaId(image),
+    artist: [performer, producer].map(getAddr),
+    productionType: 'DemoAlbum',
+    recordLabel: [getAddr(recordLabel)],
+    releaseType: 'SingleRelease',
+    title: 'ding-ding-dooby-doo',
+    track: [getMetaId(recording)]
+  }).then((obj) => {
+    album = obj;
     writeFile(__dirname + '/metas/album.json', JSON.stringify(album));
-    setClaimsId(timestamp({
-      iss: getAddr(composer),
-      sub: getMetaId(composition),
-      typ: 'Create'
-    }), (err, createComposition) => callback(err, album, createComposition, composition, recording));
-  },
-  function(album, createComposition, composition, recording, callback) {
+  });
+}
+
+function newCreateComposition() {
+  return setClaimsId(timestamp({
+    iss: getAddr(composer),
+    sub: getMetaId(composition),
+    typ: 'Create'
+  })).then((createComposition) => {
     writeFile(__dirname + '/claims/createComposition.json', JSON.stringify(createComposition));
-    setClaimsId(timestamp({
-      iss: getAddr(performer),
-      sub: getMetaId(recording),
-      typ: 'Create'
-    }), (err, createRecording) => callback(err, album, createRecording, composition, recording));
-  },
-  function(album, createRecording, composition, recording, callback) {
+  });
+}
+
+function newCreateRecording() {
+  return setClaimsId(timestamp({
+    iss: getAddr(performer),
+    sub: getMetaId(recording),
+    typ: 'Create'
+  })).then((createRecording) => {
     writeFile(__dirname + '/claims/createRecording.json', JSON.stringify(createRecording));
-    setClaimsId(timestamp({
-      iss: getAddr(performer),
-      sub: getMetaId(album),
-      typ: 'Create'
-    }), (err, createAlbum) => callback(err, album, createAlbum, composition, recording));
-  },
-  function(album, createAlbum, composition, recording, callback) {
+  });
+}
+
+function newCreateAlbum() {
+  return setClaimsId(timestamp({
+    iss: getAddr(performer),
+    sub: getMetaId(album),
+    typ: 'Create'
+  })).then((createAlbum) => {
     writeFile(__dirname + '/claims/createAlbum.json', JSON.stringify(createAlbum));
-    setClaimsId(timestamp({
-      aud: [getAddr(publisher)],
-      exp: now() + 1000,
-      iss: getAddr(lyricist),
-      sub: getMetaId(composition),
-      typ: 'License'
-    }), (err, licenseComposition) => callback(err, album, licenseComposition, recording));
-  },
-  function(album, licenseComposition, recording, callback) {
+  });
+}
+
+function newLicenseComposition() {
+  return setClaimsId(timestamp({
+    aud: [getAddr(publisher)],
+    exp: now() + 1000,
+    iss: getAddr(lyricist),
+    sub: getMetaId(composition),
+    typ: 'License'
+  })).then((licenseComposition) => {
     writeFile(__dirname + '/claims/licenseComposition.json', JSON.stringify(licenseComposition));
-    setClaimsId(timestamp({
-      aud: [getAddr(recordLabel)],
-      exp: now() + 2000,
-      iss: getAddr(producer),
-      sub: getMetaId(recording),
-      typ: 'License'
-    }), (err, licenseRecording) => callback(err, album, licenseRecording));
-  },
-  function(album, licenseRecording, callback) {
+  });
+}
+
+function newLicenseRecording() {
+  return setClaimsId(timestamp({
+    aud: [getAddr(recordLabel)],
+    exp: now() + 2000,
+    iss: getAddr(producer),
+    sub: getMetaId(recording),
+    typ: 'License'
+  })).then((licenseRecording) => {
     writeFile(__dirname + '/claims/licenseRecording.json', JSON.stringify(licenseRecording));
-    setClaimsId(timestamp({
-      aud: [getAddr(recordLabel)],
-      exp: now() + 3000,
-      iss: getAddr(producer),
-      sub: getMetaId(album),
-      typ: 'License'
-    }), (err, licenseAlbum) => callback(err, licenseAlbum));
-  },
-  function(licenseAlbum, callback) {
+  });
+}
+
+function newLicenseAlbum() {
+  return setClaimsId(timestamp({
+    aud: [getAddr(recordLabel)],
+    exp: now() + 3000,
+    iss: getAddr(producer),
+    sub: getMetaId(album),
+    typ: 'License'
+  })).then((licenseAlbum) => {
     writeFile(__dirname + '/claims/licenseAlbum.json', JSON.stringify(licenseAlbum));
-    callback(null, 'done');
-  }
-], function(err, result) {
-  //..
-});
+  });
+}
