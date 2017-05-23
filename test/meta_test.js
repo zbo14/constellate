@@ -13,27 +13,22 @@ const recording = JSON.parse(readFileSync(__dirname + '/metas/recording.json'));
 describe('Meta', () => {
   it('validates composition metadata', (done) => {
     validateMeta(composition)
-      .then(() => done())
-      .catch((reason) => { throw reason });
+      .then(() => done(), done);
   });
   it('validates audio metadata', (done) => {
     validateMeta(audio)
-      .then(() => done())
-      .catch((reason) => { throw reason });
+      .then(() => done(), done);
   });
   it('validates image metadata', (done) => {
     validateMeta(image)
-      .then(() => done())
-      .catch((reason) => { throw reason });
+      .then(() => done(), done);
   });
   it('validates recording metadata', (done) => {
     validateMeta(recording)
-      .then(() => done())
-      .catch((reason) => { throw reason });
+      .then(() => done(), done);
   });
   it ('validates album metadata', (done) => {
     validateMeta(album)
-      .then(() => done())
-      .catch((reason) => { throw reason });
+      .then(() => done(), done);
   });
 });

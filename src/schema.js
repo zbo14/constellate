@@ -2,8 +2,6 @@
 
 const Ajv = require('ajv');
 
-const { getId } = require('../lib/util.js');
-
 // @flow
 
 /**
@@ -14,10 +12,20 @@ const ajv = new Ajv();
 
 const Draft = 'http://json-schema.org/draft-06/schema#';
 
+const Address = {
+  type: 'string',
+  pattern: '^0x[a-fA-F0-9]{40}$'
+}
+
 const Email = {
   type: 'string',
   format: 'email',
   pattern: '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'
+}
+
+const Id = {
+  type: 'string',
+  pattern: '^[1-9A-HJ-NP-Za-km-z]{46}$'
 }
 
 const Url = {
@@ -51,8 +59,10 @@ function validateSchema(obj: Object, schema: Object): boolean {
   return ajv.compile(schema)(obj);
 }
 
+exports.Address = Address;
 exports.Draft = Draft;
 exports.Email = Email;
+exports.Id = Id;
 exports.Url = Url;
 
 exports.contextIRI = contextIRI;

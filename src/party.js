@@ -1,32 +1,27 @@
 'use strict';
 
-const isBuffer = require('is-buffer');
+const secp256k1 = require('../lib/secp256k1.js');
+
+const {
+  calcId,
+  setId
+} = require('../lib/util.js');
 
 const{
+  Address,
   Draft,
   Email,
+  Id,
   Url,
   contextPrefix,
   validateSchema
 } = require('../lib/schema.js');
-
-const {
-  digestRIPEMD160,
-  digestSHA256,
-  encodeBase58,
-  getId, isObject
-} = require('../lib/util.js');
 
 // @flow
 
 /**
 * @module constellate/src/party
 */
-
-const Addr = {
-  type: 'string',
-  pattern: '^0x[a-fA-F0-9]{40}$'
-}
 
 const Artist = {
   $schema: Draft,
@@ -40,6 +35,7 @@ const Artist = {
           type: 'string',
           default: 'http://schema.org/'
         },
+        address: contextPrefix('schema', 'address'),
         Artist: contextPrefix('schema', 'MusicGroup'),
         email: contextPrefix('schema', 'email'),
         homepage: contextPrefix('schema', 'url'),
@@ -49,6 +45,7 @@ const Artist = {
       readonly: true,
       required: [
         'schema',
+        'address',
         'Artist',
         'email',
         'homepage',
@@ -60,7 +57,8 @@ const Artist = {
       enum: ['Artist'],
       readonly: true
     },
-    '@id': Object.assign({}, Addr, { readonly: true }),
+    '@id': Object.assign({}, Id, { readonly: true }),
+    address: Address,
     email: Email,
     homepage: Url,
     name: {
@@ -73,11 +71,12 @@ const Artist = {
       uniqueItems: true
     }
   },
-  required: ['@context', '@id', '@type']
+  required: ['@context', '@id', '@type', 'name']
 }
 
 const ArtistContext = {
   schema: 'http://schema.org/',
+  address: 'schema:address',
   Artist: 'schema:MusicGroup',
   email: 'schema:email',
   homepage: 'schema:url',
@@ -97,6 +96,7 @@ const Organization = {
           type: 'string',
           default: 'http://schema.org/'
         },
+        address: contextPrefix('schema', 'address'),
         email: contextPrefix('schema', 'email'),
         homepage: contextPrefix('schema', 'url'),
         name: contextPrefix('schema', 'name'),
@@ -117,7 +117,8 @@ const Organization = {
       enum: ['Organization'],
       readonly: true
     },
-    '@id': Object.assign({}, Addr, { readonly: true }),
+    '@id': Object.assign({}, Id, { readonly: true }),
+    address: Address,
     email: Email,
     homepage: Url,
     name: {
@@ -130,11 +131,12 @@ const Organization = {
       uniqueItems: true
     }
   },
-  required: ['@context', '@id', '@type']
+  required: ['@context', '@id', '@type', 'name']
 }
 
 const OrganizationContext = {
   schema: 'http://schema.org/',
+  address: 'schema:address',
   email: 'schema:email',
   homepage: 'schema:url',
   name: 'schema:name',
@@ -142,24 +144,18 @@ const OrganizationContext = {
   profile: 'schema:sameAs'
 }
 
-function calcAddr(publicKey: Buffer|Object): string {
-  let str;
-  if (isBuffer(publicKey)) {
-    if (publicKey.length !== 32 && publicKey.length !== 33) {
-      throw new Error('invalid public-key buffer length: ' + publicKey.length);
+function newParty(party: Object, publicKey?: Buffer): Promise<Object> {
+  return new Promise((resolve, reject) => {
+    if (publicKey) {
+      if (publicKey.length !== 33) {
+        return reject(`expected public-key length=33; got ` + publicKey.length);
+      }
+      party.address = secp256k1.publicKeyToAddress(publicKey);
     }
-    str = encodeBase58(publicKey);
-  } else if (typeof publicKey === 'object') {
-    str = publicKey.toString();
-    //..
-  } else {
-    throw new Error('unexpected public-key type: ' + typeof publicKey);
-  }
-  return'0x' + digestRIPEMD160(digestSHA256(str).toString('hex')).toString('hex');
-}
-
-function getAddr(party: Object): string {
-  return getId('@id', party);
+    setId('@id', party).then((party) => {
+      resolve(party);
+    });
+  });
 }
 
 function getPartySchema(type: string): Object {
@@ -172,46 +168,30 @@ function getPartySchema(type: string): Object {
   throw new Error('unexpected party @type: ' + type);
 }
 
-function setAddr(party: Object, publicKey: Buffer|Object): Object {
-  try {
-    if (party['@type'] !== 'Artist' && party['@type'] !== 'Organization') {
-      throw new Error('expected Artist or Organization; got' + party['@type']);
-    }
-    const addr = calcAddr(publicKey);
-    party = Object.assign({}, party, { '@id': addr });
-  } catch(err) {
-    console.error(err);
-  }
-  return party;
-}
-
-function validateParty(party: Object, publicKey: Buffer|Object): boolean {
-  let valid = false;
-  try {
+function validateParty(party: Object, publicKey?: Buffer): Promise<Object> {
+  return calcId('@id', party).then((id) => {
     const schema = getPartySchema(party['@type']);
     if (!validateSchema(party, schema)) {
       throw new Error('party has invalid schema: ' + JSON.stringify(party, null, 2));
     }
-    if (party['@type'] !== 'Artist' && party['@type'] !== 'Organization') {
-      throw new Error('expected Artist or Organization; got' + party['@type']);
+    if (party['@id'] !== id) {
+      throw new Error(`expected id=${party['@id']}; got ` + id);
     }
-    const addr = calcAddr(publicKey);
-    if (party['@id'] !== addr) {
-      throw new Error(`expected addr=${party['@id']}; got ` + addr);
+    if (publicKey) {
+      if (publicKey.length !== 33) {
+        throw new Error(`expected public-key length=33; got ` + publicKey.length);
+      }
+      const addr = secp256k1.publicKeyToAddress(publicKey);
+      if (party.address !== addr) {
+        throw new Error(`expected addr=${party['address']}; got ` + addr)
+      }
     }
-    valid = true;
-  } catch(err) {
-    console.error(err);
-  }
-  return valid;
+    return party;
+  });
 }
 
-exports.Addr = Addr;
 exports.ArtistContext = ArtistContext;
 exports.OrganizationContext = OrganizationContext;
-
-exports.calcAddr = calcAddr;
-exports.getAddr = getAddr;
 exports.getPartySchema = getPartySchema;
-exports.setAddr = setAddr;
+exports.newParty = newParty;
 exports.validateParty = validateParty;

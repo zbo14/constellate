@@ -1,7 +1,7 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
-import { validateParty } from '../lib/party.js';
 import { readFileSync } from 'fs';
+import { validateParty } from '../lib/party.js';
 
 const ed25519 = require('../lib/ed25519.js');
 const rsa = require('../lib/rsa.js');
@@ -14,40 +14,32 @@ const producer = JSON.parse(readFileSync(__dirname +'/parties/producer.json'));
 const publisher = JSON.parse(readFileSync(__dirname +'/parties/publisher.json'));
 const recordLabel = JSON.parse(readFileSync(__dirname +'/parties/recordLabel.json'));
 
-const composerKeypair = ed25519.decodeKeypair(readFileSync(__dirname + '/keys/composerKeypair.json'));
-const lyricistKeypair = rsa.decodeKeypair(readFileSync(__dirname + '/keys/lyricistKeypair.json'));
 const performerKeypair = secp256k1.decodeKeypair(readFileSync(__dirname + '/keys/performerKeypair.json'));
-const producerKeypair = ed25519.decodeKeypair(readFileSync(__dirname + '/keys/producerKeypair.json'));
-const publisherKeypair = rsa.decodeKeypair(readFileSync(__dirname + '/keys/publisherKeypair.json'));
 const recordLabelKeypair = secp256k1.decodeKeypair(readFileSync(__dirname + '/keys/recordLabelKeypair.json'));
 
 describe('Party', () => {
-  it('validates artists', () => {
-    assert.isOk(
-      validateParty(composer, composerKeypair.publicKey),
-      'should validate artist'
-    );
-    assert.isOk(
-      validateParty(lyricist, lyricistKeypair.publicKey),
-      'should validate artist'
-    );
-    assert.isOk(
-      validateParty(performer, performerKeypair.publicKey),
-      'should validate artist'
-    );
-    assert.isOk(
-      validateParty(producer, producerKeypair.publicKey),
-      'should validate artist'
-    );
+  it('validates composer', (done) => {
+    validateParty(composer)
+      .then(() => done(), done);
   });
-  it('validates organizations', () => {
-    assert.isOk(
-      validateParty(publisher, publisherKeypair.publicKey),
-      'should validate organization'
-    )
-    assert.isOk(
-      validateParty(recordLabel, recordLabelKeypair.publicKey),
-      'should validate organization'
-    );
+  it('validates lyricist', (done) => {
+    validateParty(lyricist)
+      .then(() => done(), done);
+  });
+  it('validates performer', (done) => {
+    validateParty(performer, performerKeypair.publicKey)
+      .then(() => done(), done);
+  });
+  it('validates producer', (done) => {
+    validateParty(producer).catch(done)
+      .then(() => done(), done);
+  });
+  it('validates publisher', (done) => {
+    validateParty(publisher).catch(done)
+      .then(() => done(), done);
+  });
+  it('validates recordLabel', (done) => {
+    validateParty(recordLabel, recordLabelKeypair.publicKey)
+      .then(() => done(), done);
   });
 });

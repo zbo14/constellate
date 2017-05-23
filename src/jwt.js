@@ -5,29 +5,21 @@ const { jwk2pem, pem2jwk } = require('pem-jwk');
 const ed25519 = require('../lib/ed25519.js');
 const rsa = require('../lib/rsa.js');
 const secp256k1 = require('../lib/secp256k1.js');
-const { Addr, calcAddr } = require('../lib/party.js');
-const { calcIPFSHash } = require('../lib/ipfs.js');
-
-const {
-  MetaId,
-  getMetaId,
-  validateMeta
-} = require('../lib/meta.js');
+const { validateMeta } = require('../lib/meta.js');
 
 const {
   Draft,
+  Id,
   validateSchema
 } = require('../lib/schema.js');
 
 const {
   calcId,
   decodeBase64,
-  digestSHA256,
-  encodeBase58,
   encodeBase64,
-  getId, now,
+  now,
   orderStringify,
-  withoutKeys
+  setId
 } = require('../lib/util.js');
 
 // @flow
@@ -35,11 +27,6 @@ const {
 /**
 * @module constellate/src/jwt
 */
-
-const ClaimsId = {
-  type: 'string',
-  pattern: '^[1-9A-HJ-NP-Za-km-z]{46}$'
-}
 
 const PublicKey = {
   $schema: Draft,
@@ -173,7 +160,7 @@ const intDate = {
 
 const iat = Object.assign({}, intDate, { readonly: true });
 
-const jti = Object.assign({}, ClaimsId, { readonly: true });
+const jti = Object.assign({}, Id, { readonly: true });
 
 const Create = {
   $schema: Draft,
@@ -181,9 +168,9 @@ const Create = {
   title: 'Create',
   properties: {
     iat: iat,
-    iss: Addr,
+    iss: Id,
     jti: jti,
-    sub: MetaId,
+    sub: Id,
     typ: {
       enum: ['Create'],
       readonly: true
@@ -205,16 +192,16 @@ const License = {
   properties: {
     aud: {
       type: 'array',
-      items: Addr,
+      items: Id,
       minItems: 1,
       uniqueItems: true
     },
     exp: intDate,
     iat: iat,
-    iss: Addr,
+    iss: Id,
     jti: jti,
     nbf: intDate,
-    sub: MetaId,
+    sub: Id,
     typ: {
       enum: ['License'],
       readonly: true
@@ -229,15 +216,6 @@ const License = {
     'sub',
     'typ'
   ]
-}
-
-function calcClaimsId(claims: Object): Promise<string> {
-  const buf = new Buffer.from(orderStringify(withoutKeys(claims, 'jti')));
-  return calcIPFSHash(buf);
-}
-
-function getClaimsId(claims: Object): string {
-  return getId('jti', claims);
 }
 
 function getClaimsSchema(typ: string): Object {
@@ -313,17 +291,14 @@ function newSecp256k1Header(publicKey: Buffer): Object {
   return header;
 }
 
-
-function setClaimsId(claims: Object): Promise<Object> {
-  return calcClaimsId(claims).then((id) => {
-    return Object.assign({}, claims, { 'jti': id });
-  });
+function newClaims(claims: Object): Promise<Object> {
+  return setId('jti', timestamp(claims));
 }
 
 function signClaims(claims: Object, header: Object, privateKey: Buffer|Object): Buffer {
-  let sig = new Buffer([]);
-  const encodedHeader = encodeBase64(new Buffer(JSON.stringify(header)));
-  const encodedPayload = encodeBase64(new Buffer(JSON.stringify(claims)));
+  let sig = Buffer.from([]);
+  const encodedHeader = encodeBase64(Buffer.from(orderStringify(header)));
+  const encodedPayload = encodeBase64(Buffer.from(orderStringify(claims)));
   const message = encodedHeader + '.' + encodedPayload;
   if (header.alg === 'EdDsa') {
     sig = ed25519.sign(message, privateKey);
@@ -342,7 +317,7 @@ function timestamp(claims: Object): Object {
 }
 
 function validateClaims(claims: Object, meta: Object, subject?: Object): Promise<Object> {
-  return calcClaimsId(claims).then((claimsId) => {
+  return calcId('jti', claims).then((id) => {
     const schema = getClaimsSchema(claims.typ);
     if (!validateSchema(claims, schema)) {
       throw new Error('claims has invalid schema: ' + JSON.stringify(claims, null, 2));
@@ -351,34 +326,34 @@ function validateClaims(claims: Object, meta: Object, subject?: Object): Promise
     if (claims.iat > rightNow) {
       throw new Error('iat cannot be later than now');
     }
-    if (claims.jti !== claimsId) {
-      throw new Error(`expected jti=${claims.jti}; got ` + claimsId);
+    if (claims.jti !== id) {
+      throw new Error(`expected jti=${claims.jti}; got ` + id);
     }
     let promise = Promise.resolve();
     if (claims.typ === 'Create') {
       promise = validateMeta(meta).then(() => {
-        const metaId = getMetaId(meta);
-        if (claims.sub !== metaId) {
-          throw new Error(`expected sub=${claims.sub}; got ` + metaId);
+        if (claims.sub !== meta['@id']) {
+          throw new Error(`expected sub=${claims.sub}; got ` + meta['@id']);
         }
         switch(meta['@type']) {
           case 'Album':
-            if (!meta.artist.some((addr) => {
-              return claims.iss === addr;
-            })) throw new Error('iss should be album artist addr');
-            return claims;
+            if (!meta.artist.some((id) => {
+              return claims.iss === id;
+            })) throw new Error('iss should be album artist');
+            break;
           case 'Composition':
-            if (!meta.composer.concat(meta.lyricist).some((addr) => {
-              return claims.iss === addr;
-            })) throw new Error('iss should be composer or lyricist addr');
-            return claims;
+            if (!meta.composer.concat(meta.lyricist).some((id) => {
+              return claims.iss === id;
+            })) throw new Error('iss should be composer or lyricist');
+            break;
           case 'Recording':
-            if (!meta.performer.concat(meta.producer).some((addr) => {
-              return claims.iss === addr;
+            if (!meta.performer.concat(meta.producer).some((id) => {
+              return claims.iss === id;
             })) throw new Error('iss should be performer or producer addr');
-            return claims;
+            break;
           //..
         }
+        return claims;
       });
     }
     if (claims.typ === 'License') {
@@ -405,8 +380,8 @@ function validateClaims(claims: Object, meta: Object, subject?: Object): Promise
       if (!subject) {
         throw new Error('no subject with license');
       }
-      if (claims.iat <= subject.iat) {
-        throw new Error('iat should be after subject iat');
+      if (claims.iat < subject.iat) {
+        throw new Error('iat cannot be before subject iat');
       }
       if (claims.iss !== subject.iss) {
         throw new Error('iss should equal subject iss');
@@ -428,57 +403,44 @@ function verifyClaims(claims: Object, header: Object, meta: Object, signature: B
     if (!validateSchema(header, Header)) {
         throw new Error('header has invalid schema: ' + JSON.stringify(header, null, 2));
     }
-    const encodedHeader = encodeBase64(new Buffer(JSON.stringify(header)));
-    let encodedPayload = encodeBase64(new Buffer(JSON.stringify(claims)));
+    const encodedHeader = encodeBase64(Buffer.from(orderStringify(header)));
+    let encodedPayload = encodeBase64(Buffer.from(orderStringify(claims)));
     let message = encodedHeader + '.' + encodedPayload;
     let publicKey, verify = () => {};
     if (header.alg === 'EdDsa') {
         publicKey = decodeBase64(header.jwk.x);
-        if (claims.iss !== calcAddr(publicKey)) {
-            throw new Error('publicKey does not match addr');
-        }
         verify = ed25519.verify;
     }
     if (header.alg === 'ES256') {
-        publicKey = secp256k1.compress(
-            decodeBase64(header.jwk.x),
-            decodeBase64(header.jwk.y)
-        )
-        if (claims.iss !== calcAddr(publicKey)) {
-            throw new Error('public-key does not match addr');
-        }
+        const x = decodeBase64(header.jwk.x);
+        const y = decodeBase64(header.jwk.y);
+        publicKey = secp256k1.compress(x, y);
         verify = secp256k1.verify;
     }
     if (header.alg === 'RS256') {
         const pem = jwk2pem(header.jwk).slice(0, -1);
         publicKey = rsa.importPublicKey(pem);
-        if (claims.iss !== calcAddr(publicKey)) {
-            throw new Error('public-key does not match addr');
-        }
         verify = rsa.verify;
     }
     if (!verify(message, publicKey, signature)) {
-      throw new Error(`invalid signature`);
+      throw new Error('invalid signature');
     }
     if (subject) {
-      encodedPayload = encodeBase64(new Buffer(JSON.stringify(subject)));
+      encodedPayload = encodeBase64(Buffer.from(orderStringify(subject)));
       message = encodedHeader + '.' + encodedPayload;
       if (!verify(message, publicKey, subjectSignature)) {
-        throw new Error(`invalid subject signature`);
+        throw new Error('invalid subject signature');
       }
     }
     return claims;
   });
 }
 
-exports.ClaimsId = ClaimsId;
-exports.calcClaimsId = calcClaimsId;
-exports.getClaimsId = getClaimsId;
 exports.getClaimsSchema = getClaimsSchema;
+exports.newClaims = newClaims;
 exports.newEd25519Header = newEd25519Header;
 exports.newSecp256k1Header = newSecp256k1Header;
 exports.newRsaHeader = newRsaHeader;
-exports.setClaimsId = setClaimsId;
 exports.signClaims = signClaims;
 exports.timestamp = timestamp;
 exports.validateClaims = validateClaims;

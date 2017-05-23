@@ -1,18 +1,14 @@
 'use strict';
 
-const meta = require('../lib/meta.js');
-const util = require('../lib/util.js');
-
 const {
   arrayFromObject,
-  getId,
   isArray,
   isBoolean,
   isNumber,
   isObject,
   isString,
   recurse
-} = util;
+} = require('../lib/util.js');
 
 // @flow
 
@@ -51,8 +47,6 @@ function generateElement(obj: Object, defs: Object): HTMLElement {
         return newInput('number');
       case 'object':
         const fieldset = document.createElement('fieldset');
-        const id = getId(obj.properties);
-        if (isObject(id)) { obj = Object.assign({}, obj, { properties: id }); }
         const form = generateForm(obj);
         if (form != null) {
           form.forEach((div) => {

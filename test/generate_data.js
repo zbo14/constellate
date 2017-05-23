@@ -1,14 +1,14 @@
-const { waterfall } = require('async');
 const { writeFile } = require('fs');
 const ed25519 = require('../lib/ed25519.js');
 const rsa = require('../lib/rsa.js');
 const secp256k1 = require('../lib/secp256k1.js');
+const { now } = require('../lib/util.js');
+const { newClaims } = require('../lib/jwt.js');
 
 const {
   ArtistContext,
   OrganizationContext,
-  getAddr,
-  setAddr
+  newParty
 } = require('../lib/party.js');
 
 const {
@@ -17,11 +17,8 @@ const {
   CompositionContext,
   ImageContext,
   RecordingContext,
-  getMetaId, setMetaId
+  newMeta
 } = require('../lib/meta.js');
-
-const { setClaimsId, timestamp } = require('../lib/jwt.js');
-const { now } = require('../lib/util.js');
 
 const composerKeypair = ed25519.keypairFromPassword('muzaq');
 const lyricistKeypair = rsa.generateKeypair();
@@ -60,89 +57,17 @@ writeFile(
   secp256k1.encodeKeypair(recordLabelKeypair)
 );
 
-const composer = setAddr({
-  '@context': ArtistContext,
-  '@type': 'Artist',
-  email: 'composer@example.com',
-  homepage: 'http://composer.com',
-  name: 'composer',
-  profile: ['http://facebook-profile.com'],
-}, composerKeypair.publicKey);
+let composer, lyricist, performer, producer, publisher, recordLabel,
+    album, audio, composition, image, recording,
+    createAlbum, createComposition, createRecording;
 
-const lyricist = setAddr({
-  '@context': ArtistContext,
-  '@type': 'Artist',
-  email: 'lyricist@example.com',
-  homepage: 'http://lyricist.com',
-  name: 'lyricist'
-}, lyricistKeypair.publicKey);
-
-const performer = setAddr({
-  '@context': ArtistContext,
-  '@type': 'Artist',
-  email: 'performer@example.com',
-  homepage: 'http://performer.com',
-  name: 'performer',
-  profile: ['http://bandcamp-page.com']
-}, performerKeypair.publicKey);
-
-const producer = setAddr({
-  '@context': ArtistContext,
-  '@type': 'Artist',
-  homepage: 'http://producer.com',
-  name: 'producer',
-  profile: ['http://soundcloud-page.com']
-}, producerKeypair.publicKey);
-
-const publisher = setAddr({
-  '@context': OrganizationContext,
-  '@type': 'Organization',
-  email: 'publisher@example.com',
-  homepage: 'http://publisher.com',
-  name: 'publisher'
-}, publisherKeypair.publicKey);
-
-const recordLabel = setAddr({
-  '@context': OrganizationContext,
-  '@type': 'Organization',
-  email: 'recordLabel@example.com',
-  homepage: 'http://recordLabel.com',
-  name: 'recordLabel'
-}, recordLabelKeypair.publicKey);
-
-writeFile(
-  __dirname + '/parties/composer.json',
-  JSON.stringify(composer)
-);
-
-writeFile(
-  __dirname + '/parties/lyricist.json',
-  JSON.stringify(lyricist)
-);
-
-writeFile(
-  __dirname + '/parties/performer.json',
-  JSON.stringify(performer)
-);
-
-writeFile(
-  __dirname + '/parties/producer.json',
-  JSON.stringify(producer)
-);
-
-writeFile(
-  __dirname + '/parties/publisher.json',
-  JSON.stringify(publisher)
-);
-
-writeFile(
-  __dirname + '/parties/recordLabel.json',
-  JSON.stringify(recordLabel)
-);
-
-let album, audio, composition, image, recording;
-
-[ newComposition,
+[ newComposer,
+  newLyricist,
+  newPerformer,
+  newProducer,
+  newPublisher,
+  newRecordLabel,
+  newComposition,
   newAudio,
   newImage,
   newRecording,
@@ -155,16 +80,96 @@ let album, audio, composition, image, recording;
   newLicenseAlbum
 ].reduce((p, fn) => {
   return p.then(fn);
-}, Promise.resolve()).catch(console.error);
+}, Promise.resolve()).catch((reason) => console.error(reason));
+
+function newComposer() {
+  return newParty({
+    '@context': ArtistContext,
+    '@type': 'Artist',
+    email: 'composer@example.com',
+    homepage: 'http://composer.com',
+    name: 'composer',
+    profile: ['http://facebook-profile.com'],
+  }).then((obj) => {
+    composer = obj;
+    writeFile(__dirname + '/parties/composer.json', JSON.stringify(composer));
+  });
+}
+
+function newLyricist() {
+  return newParty({
+    '@context': ArtistContext,
+    '@type': 'Artist',
+    email: 'lyricist@example.com',
+    homepage: 'http://lyricist.com',
+    name: 'lyricist'
+  }).then((obj) => {
+    lyricist = obj;
+    writeFile(__dirname + '/parties/lyricist.json', JSON.stringify(lyricist));
+  });
+}
+
+function newPerformer() {
+  return newParty({
+    '@context': ArtistContext,
+    '@type': 'Artist',
+    email: 'performer@example.com',
+    homepage: 'http://performer.com',
+    name: 'performer',
+    profile: ['http://bandcamp-page.com']
+  }, performerKeypair.publicKey).then((obj) => {
+    performer = obj;
+    writeFile(__dirname + '/parties/performer.json', JSON.stringify(performer));
+  });
+}
+
+function newProducer() {
+  return newParty({
+    '@context': ArtistContext,
+    '@type': 'Artist',
+    homepage: 'http://producer.com',
+    name: 'producer',
+    profile: ['http://soundcloud-page.com']
+  }).then((obj) => {
+    producer = obj;
+    writeFile(__dirname + '/parties/producer.json', JSON.stringify(producer));
+  });
+}
+
+function newPublisher() {
+  return newParty({
+   '@context': OrganizationContext,
+   '@type': 'Organization',
+   email: 'publisher@example.com',
+   homepage: 'http://publisher.com',
+   name: 'publisher'
+ }).then((obj) => {
+   publisher = obj;
+   writeFile(__dirname + '/parties/publisher.json', JSON.stringify(publisher));
+ });
+}
+
+function newRecordLabel() {
+  return newParty({
+    '@context': OrganizationContext,
+    '@type': 'Organization',
+    email: 'recordLabel@example.com',
+    homepage: 'http://recordLabel.com',
+    name: 'recordLabel'
+  }, recordLabelKeypair.publicKey).then((obj) => {
+    recordLabel = obj;
+    writeFile(__dirname + '/parties/recordLabel.json', JSON.stringify(recordLabel));
+  });
+}
 
 function newComposition() {
-  return setMetaId({
+  return newMeta({
     '@context': CompositionContext,
     '@type': 'Composition',
-    composer: [getMetaId(composer)],
+    composer: [composer['@id']],
     iswcCode: 'T-034.524.680-1',
-    lyricist: [getMetaId(lyricist)],
-    publisher: [getMetaId(publisher)],
+    lyricist: [lyricist['@id']],
+    publisher: [publisher['@id']],
     title: 'fire-song'
   }).then((obj) => {
     composition = obj;
@@ -173,7 +178,7 @@ function newComposition() {
 }
 
 function newAudio() {
-  return setMetaId({
+  return newMeta({
     '@context': AudioContext,
     '@type': 'Audio',
     contentUrl: 'QmYKAhVW2d4e28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE',
@@ -185,7 +190,7 @@ function newAudio() {
 }
 
 function newImage() {
-  return setMetaId({
+  return newMeta({
     '@context': ImageContext,
     '@type': 'Image',
     contentUrl: 'QmYKAhvW2d4f28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE',
@@ -197,14 +202,14 @@ function newImage() {
 }
 
 function newRecording() {
-  return setMetaId({
+  return newMeta({
     '@context': RecordingContext,
     '@type': 'Recording',
-    audio: [getMetaId(audio)],
-    performer: [getMetaId(performer)],
-    producer: [getMetaId(producer)],
-    recordingOf: getMetaId(composition),
-    recordLabel: [getMetaId(recordLabel)]
+    audio: [audio['@id']],
+    performer: [performer['@id']],
+    producer: [producer['@id']],
+    recordingOf: composition['@id'],
+    recordLabel: [recordLabel['@id']]
   }).then((obj) => {
     recording = obj;
     writeFile(__dirname + '/metas/recording.json', JSON.stringify(recording));
@@ -212,16 +217,16 @@ function newRecording() {
 }
 
 function newAlbum() {
-  return setMetaId({
+  return newMeta({
     '@context': AlbumContext,
     '@type': 'Album',
-    art: getMetaId(image),
-    artist: [performer, producer].map(getAddr),
+    art: image['@id'],
+    artist: [performer['@id'], producer['@id']],
     productionType: 'DemoAlbum',
-    recordLabel: [getAddr(recordLabel)],
+    recordLabel: [recordLabel['@id']],
     releaseType: 'SingleRelease',
     title: 'ding-ding-dooby-doo',
-    track: [getMetaId(recording)]
+    track: [recording['@id']]
   }).then((obj) => {
     album = obj;
     writeFile(__dirname + '/metas/album.json', JSON.stringify(album));
@@ -229,67 +234,70 @@ function newAlbum() {
 }
 
 function newCreateComposition() {
-  return setClaimsId(timestamp({
-    iss: getAddr(composer),
-    sub: getMetaId(composition),
+  return newClaims({
+    iss: composer['@id'],
+    sub: composition['@id'],
     typ: 'Create'
-  })).then((createComposition) => {
+  }).then((obj) => {
+    createComposition = obj;
     writeFile(__dirname + '/claims/createComposition.json', JSON.stringify(createComposition));
   });
 }
 
 function newCreateRecording() {
-  return setClaimsId(timestamp({
-    iss: getAddr(performer),
-    sub: getMetaId(recording),
+  return newClaims({
+    iss: performer['@id'],
+    sub: recording['@id'],
     typ: 'Create'
-  })).then((createRecording) => {
+  }).then((obj) => {
+    createRecording = obj;
     writeFile(__dirname + '/claims/createRecording.json', JSON.stringify(createRecording));
   });
 }
 
 function newCreateAlbum() {
-  return setClaimsId(timestamp({
-    iss: getAddr(performer),
-    sub: getMetaId(album),
+  return newClaims({
+    iss: performer['@id'],
+    sub: album['@id'],
     typ: 'Create'
-  })).then((createAlbum) => {
+  }).then((obj) => {
+    createAlbum = obj;
     writeFile(__dirname + '/claims/createAlbum.json', JSON.stringify(createAlbum));
   });
 }
 
 function newLicenseComposition() {
-  return setClaimsId(timestamp({
-    aud: [getAddr(publisher)],
+  return newClaims({
+    aud: [publisher['@id']],
     exp: now() + 1000,
-    iss: getAddr(lyricist),
-    sub: getMetaId(composition),
+    iss: composer['@id'],
+    sub: createComposition['jti'],
     typ: 'License'
-  })).then((licenseComposition) => {
+  }).then((licenseComposition) => {
     writeFile(__dirname + '/claims/licenseComposition.json', JSON.stringify(licenseComposition));
   });
 }
 
 function newLicenseRecording() {
-  return setClaimsId(timestamp({
-    aud: [getAddr(recordLabel)],
+  return newClaims({
+    aud: [recordLabel['@id']],
     exp: now() + 2000,
-    iss: getAddr(producer),
-    sub: getMetaId(recording),
+    iss: performer['@id'],
+    sub: createRecording['jti'],
     typ: 'License'
-  })).then((licenseRecording) => {
+  }).then((licenseRecording) => {
     writeFile(__dirname + '/claims/licenseRecording.json', JSON.stringify(licenseRecording));
   });
 }
 
 function newLicenseAlbum() {
-  return setClaimsId(timestamp({
-    aud: [getAddr(recordLabel)],
+  return newClaims({
+    aud: [recordLabel['@id']],
     exp: now() + 3000,
-    iss: getAddr(producer),
-    sub: getMetaId(album),
+    iss: performer['@id'],
+    sub: createAlbum['jti'],
     typ: 'License'
-  })).then((licenseAlbum) => {
+  }).then((licenseAlbum) => {
     writeFile(__dirname + '/claims/licenseAlbum.json', JSON.stringify(licenseAlbum));
   });
 }

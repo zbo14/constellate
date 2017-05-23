@@ -32,14 +32,10 @@ THE SOFTWARE.
 
 'use strict';
 
-const dagPB = require('ipld-dag-pb');
-const DAGNode = dagPB.DAGNode;
 const IPFS = require('ipfs');
 const fileType = require('file-type');
-const multihash = require('multihashes');
 const os = require('os');
 const path = require('path');
-const Unixfs = require('ipfs-unixfs');
 const { encodeBase58, readFileInput } = require('../lib/util.js');
 
 // @flow
@@ -64,18 +60,6 @@ function addFileInput(input: HTMLInputElement): Promise<Object> {
     const buf = Buffer.from(ab);
     const path = input.files[0].name;
     return addFile(buf, path);
-  });
-}
-
-// https://github.com/ipfs/faq/issues/208
-// https://github.com/ipfs/js-ipfs-unixfs#create-an-unixfs-data-element
-function calcIPFSHash(buf: Buffer): Promise<string> {
-  const data = new Unixfs('file', buf);
-  return new Promise((resolve, reject) => {
-    DAGNode.create(data.marshal(), (err, node) => {
-      if (err) return reject(err);
-      resolve(encodeBase58(node._multihash));
-    });
   });
 }
 
@@ -124,7 +108,7 @@ function refreshPeers() {
   });
 }
 
-function startNode() {
+function start() {
   node = new IPFS({
     config: {
       Addresses: {
@@ -161,7 +145,6 @@ function startNode() {
 
 exports.addFile = addFile;
 exports.addFileInput = addFileInput;
-exports.calcIPFSHash = calcIPFSHash;
 exports.connect2Peer = connect2Peer;
 exports.getFile = getFile;
-exports.startNode = startNode;
+exports.start = start;

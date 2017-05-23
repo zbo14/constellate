@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('../lib/crypto.js');
+const ethjsUtil = require('ethereumjs-util');
 const secp256k1 = require('secp256k1/js');
 const { decodeBase58, digestSHA256, encodeBase58 } = require('../lib/util.js');
 
@@ -55,6 +56,11 @@ function generateKeypair(): Object {
   }
 }
 
+function publicKeyToAddress(publicKey: Buffer): string {
+  const buf = secp256k1.publicKeyConvert(publicKey, false).slice(1);
+  return '0x' + ethjsUtil.pubToAddress(buf).toString('hex');
+}
+
 function sign(message: string, privateKey: Buffer): Buffer {
   const hash = digestSHA256(message);
   return secp256k1.sign(hash, privateKey).signature;
@@ -77,6 +83,7 @@ exports.compress = compress;
 exports.decodeKeypair = decodeKeypair;
 exports.encodeKeypair = encodeKeypair;
 exports.generateKeypair = generateKeypair;
+exports.publicKeyToAddress = publicKeyToAddress;
 exports.sign = sign;
 exports.uncompress = uncompress;
 exports.verify = verify;

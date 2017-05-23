@@ -1,9 +1,13 @@
 'use strict';
 
 const bs58 = require('bs58');
+const dagPB = require('ipld-dag-pb');
+const DAGNode = dagPB.DAGNode;
 const RIPEMD160 = require('ripemd160');
+const isBuffer = require('is-buffer');
 const sha256 = require('js-sha256').sha256;
 const sha3_256 = require('js-sha3').sha3_256;
+const Unixfs = require('ipfs-unixfs');
 const urlsafeBase64  = require('urlsafe-base64');
 
 // @flow
@@ -16,8 +20,21 @@ function arrayFromObject(obj: Object): any[][] {
   return Object.keys(obj).map((key) => [key, obj[key]]);
 }
 
-function calcId(key: string, obj: Object): string {
-  return encodeBase64(digestSHA256(orderStringify(withoutKeys(obj, key))));
+function calcId(key: string, obj: Object): Promise<string> {
+  const buf = Buffer.from(orderStringify(withoutKeys(obj, key)));
+  return calcIpfsHash(buf);
+}
+
+// https://github.com/ipfs/faq/issues/208
+// https://github.com/ipfs/js-ipfs-unixfs#create-an-unixfs-data-element
+function calcIpfsHash(buf: Buffer): Promise<string> {
+  const data = new Unixfs('file', buf);
+  return new Promise((resolve, reject) => {
+    DAGNode.create(data.marshal(), (err, node) => {
+      if (err) return reject(err);
+      resolve(encodeBase58(node._multihash));
+    });
+  });
 }
 
 function clone(obj: Object): Object {
@@ -52,14 +69,6 @@ function encodeBase58(buf: Buffer): string {
 
 function encodeBase64(buf: Buffer): string {
   return urlsafeBase64.encode(buf).toString('utf-8', 0, 3);
-}
-
-function getId(key: string, obj: Object): string {
-  let id = '';
-  if (obj && obj.hasOwnProperty(key) && obj[key]) {
-    id = obj[key];
-  }
-  return id;
 }
 
 function hasKey(obj: Object, key: string): boolean {
@@ -133,6 +142,12 @@ function recurse(x: any, fn: Function): any {
   return x;
 }
 
+function setId(key: string, obj: Object): Promise<Object> {
+  return calcId(key, obj).then((id) => {
+    return Object.assign({}, obj, { [key] : id });
+  });
+}
+
 function withoutKeys(obj: Object, ...keys: string[]): Object {
   return Object.keys(obj).reduce((result, key) => {
     if (keys.includes(key)) { return result; }
@@ -142,6 +157,7 @@ function withoutKeys(obj: Object, ...keys: string[]): Object {
 
 exports.arrayFromObject = arrayFromObject;
 exports.calcId = calcId;
+exports.calcIpfsHash = calcIpfsHash;
 exports.clone = clone;
 exports.decodeBase58 = decodeBase58;
 exports.decodeBase64 = decodeBase64;
@@ -150,7 +166,6 @@ exports.digestSHA256 = digestSHA256;
 exports.digestSHA3 = digestSHA3;
 exports.encodeBase58 = encodeBase58;
 exports.encodeBase64 = encodeBase64;
-exports.getId = getId;
 exports.hasKeys = hasKeys;
 exports.isArray = isArray;
 exports.isBoolean = isBoolean;
@@ -162,4 +177,5 @@ exports.objectFromArray = objectFromArray;
 exports.orderStringify = orderStringify;
 exports.readFileInput = readFileInput;
 exports.recurse = recurse;
+exports.setId = setId;
 exports.withoutKeys = withoutKeys;

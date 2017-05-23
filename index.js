@@ -1,10 +1,9 @@
 const { encodeKeypair } = require('./lib/crypto.js');
 const ed25519 = require('./lib/ed25519.js');
-const ipfs = require('./lib/ipfs.js');
+const ipfsNode = require('./lib/ipfs-node.js');
 const rsa = require('./lib/rsa.js');
 const secp256k1 = require('./lib/secp256k1.js');
 const FileSaver = require('file-saver');
-const multihash = require('multihashes');
 const { generateForm, parseForm } = require('./lib/form.js');
 const { generateFrames, readTags, writeTags } = require('./lib/id3.js');
 require('setimmediate');
@@ -18,25 +17,24 @@ const {
 
 const {
   getClaimsSchema,
+  newClaims,
   newEd25519Header,
   newRsaHeader,
   newSecp256k1Header,
-  setClaimsId,
   signClaims,
-  timestamp,
   validateClaims,
   verifyClaims
 } = require('./lib/jwt.js');
 
 const {
   getMetaSchema,
-  setMetaId,
+  newMeta,
   validateMeta
 } = require('./lib/meta.js');
 
 const {
   getPartySchema,
-  setAddr,
+  newParty,
   validateParty
 } = require('./lib/party.js');
 
@@ -69,12 +67,12 @@ const startNodeBtn = document.getElementById('start-node-btn');
 const verifySigBtn = document.getElementById('verify-sig-btn');
 
 startNodeBtn.addEventListener('click', () => {
-  ipfs.startNode().then((info) => {
+  ipfsNode.startNode().then((info) => {
     console.log('Peer info:', info);
     addFileBtn.addEventListener('click', () => {
       if (content.files && schemaSelect.value) {
         if (schemaSelect.value.toLowerCase() === content.files[0].type.split('/')[0]) {
-          ipfs.addFileInput(content).then((result) => {
+          ipfsNode.addFileInput(content).then((result) => {
             console.log('Added file:', result);
             multihash.value = result.hash;
             const label = Array.from(document.querySelectorAll('label')).find((label) => {
@@ -83,15 +81,15 @@ startNodeBtn.addEventListener('click', () => {
                      && !label.nextElementSibling.value
             });
             label.nextElementSibling.value = result.hash;
-          }, (reason) => console.error(reason));
+          }, console.error);
         }
       }
     });
     getFileBtn.addEventListener('click', () => {
       if (multihash.value) {
-        ipfs.getFile(multihash.value).then((link) => {
+        ipfsNode.getFile(multihash.value).then((link) => {
           links.appendChild(link);
-        }, (reason) => console.error(reason));
+        }, console.error);
       }
     });
   });
@@ -100,16 +98,16 @@ startNodeBtn.addEventListener('click', () => {
 addMetaBtn.addEventListener('click', () => {
   const metaObj = withoutKeys(JSON.parse(meta.textContent), '@id');
   const buf = new Buffer.from(orderStringify(metaObj));
-  ipfs.addFile(buf, '').then((result) => {
+  ipfsNode.addFile(buf, '').then((result) => {
     console.log('Added meta:', result);
-  }, (reason) => console.error(reason));
+  }, console.error);
 });
 
 /*
 readTagsBtn.addEventListener('click', () => {
   readTags(content).then((tags) => {
     console.log(tags);
-  }, (reason) => console.error(reason));
+  }, console.error);
 });
 
 writeTagsBtn.addEventListener('click', () => {
@@ -117,7 +115,7 @@ writeTagsBtn.addEventListener('click', () => {
   console.log(frames);
   writeTags(content, frames).then((writer) => {
     FileSaver.saveAs(writer.getBlob(), 'test.mp3');
-  }, (reason) => console.error(reason));
+  }, console.error);
 });
 */
 
@@ -192,14 +190,14 @@ verifySigBtn.addEventListener('click', () => {
   if (schemaSelect.value === 'Create') {
     verifyClaims(createObj, header, metaObj, createSignature).then(() => {
       console.log('Verified create claims:', JSON.stringify(createObj, null, 2));
-    }, (reason) => console.error(reason));
+    }, console.error);
   }
   if (schemaSelect.value === 'License') {
     const licenseObj = JSON.parse(license.textContent);
     const licenseSignature = decodeBase58(licenseSig.value);
     verifyClaims(licenseObj, header, metaObj, licenseSignature, createObj, createSignature).then(() => {
       console.log('Verified license claims:', JSON.stringify(licenseObj, null, 2));
-    }, (reason) => console.error(reason));
+    }, console.error);
   }
 });
 
@@ -310,41 +308,35 @@ form.addEventListener('submit', (event) => {
   if (!obj) return;
   switch(mode.value) {
     case 'party':
-      let publicKey;
-      if (keySelect.value === 'ed25519' || keySelect.value === 'secp256k1') {
-        publicKey = decodeBase58(pub.textContent);
-      }
-      if (keySelect.value === 'rsa') {
-        publicKey = rsa.importPublicKey(pub.textContent);
-      }
-      const partyObj = setAddr(obj, publicKey);
-      if (validateParty(partyObj, publicKey)) {
+      newParty(obj).then((partyObj) => {
+        return validateParty(partyObj);
+      }).then((partyObj) => {
         party.textContent = JSON.stringify(partyObj, null, 2);
-      }
+      }, console.error);
       return;
     case 'meta':
-      setMetaId(obj).then((metaObj) => {
+      newMeta(obj).then((metaObj) => {
         return validateMeta(metaObj);
       }).then((metaObj) => {
         meta.textContent = JSON.stringify(metaObj, null, 2);
-      }).catch((reason) => console.error(reason));
+      }, console.error);
       return;
     case 'claims':
       const metaObj = JSON.parse(meta.textContent)
       if (schemaSelect.value === 'Create') {
-        setClaimsId(timestamp(obj)).then((createObj) => {
+        newClaims(obj).then((createObj) => {
           return validateClaims(createObj, metaObj);
         }).then((createObj) => {
           create.textContent = JSON.stringify(createObj, null, 2);
-        }).catch((reason) => console.error(reason));
+        }, console.error);
       }
       if (schemaSelect.value === 'License') {
         const createObj = JSON.parse(create.textContent);
-        setClaimsId(timestamp(obj)).then((licenseObj) => {
+        newClaims(obj).then((licenseObj) => {
           return validateClaims(licenseObj, metaObj, createObj);
         }).then((licenseObj) => {
           license.textContent = JSON.stringify(licenseObj, null, 2);
-        }).catch((reason) => console.error(reason));
+        }, console.error);
       }
       return;
     default:

@@ -1,36 +1,20 @@
 'use strict';
 
-const { Addr } = require('../lib/party.js');
-const { calcIPFSHash } = require('../lib/ipfs.js');
+const { calcId, setId } = require('../lib/util.js');
 
 const {
   Draft,
-  // Url,
+  Id,
   contextIRI,
   contextPrefix,
   validateSchema
 } = require('../lib/schema.js');
-
-const {
-  calcId,
-  digestRIPEMD160,
-  digestSHA256,
-  encodeBase64,
-  getId,
-  orderStringify,
-  withoutKeys
-} = require('../lib/util.js');
 
 // @flow
 
 /**
 * @module constellate/src/meta
 */
-
-const MetaId = {
-  type: 'string',
-  pattern: '^[1-9A-HJ-NP-Za-km-z]{46}$'
-}
 
 const Album = {
   $schema: Draft,
@@ -70,11 +54,11 @@ const Album = {
       enum: ['Album'],
       readonly: true
     },
-    '@id': Object.assign({}, MetaId, { readonly: true }),
-    art: MetaId,
+    '@id': Object.assign({}, Id, { readonly: true }),
+    art: Id,
     artist: {
       type: 'array',
-      items: Addr,
+      items: Id,
       minItems: 1,
       uniqueItems: true
     },
@@ -93,7 +77,7 @@ const Album = {
     },
     recordLabel: {
       type: 'array',
-      items: Addr,
+      items: Id,
       minItems: 1,
       uniqueItems: true
     },
@@ -110,7 +94,7 @@ const Album = {
     },
     track: {
       type: 'array',
-      items: MetaId,
+      items: Id,
       minItems: 1,
       uniqueItems: true
     }
@@ -170,7 +154,7 @@ const Audio = {
       enum: ['Audio'],
       readonly: true
     },
-    '@id': Object.assign({}, MetaId, { readonly: true }),
+    '@id': Object.assign({}, Id, { readonly: true }),
     contentUrl: {
       type: 'string'
     },
@@ -223,10 +207,10 @@ const Composition = {
       enum: ['Composition'],
       readonly: true
     },
-    '@id': Object.assign({}, MetaId, { readonly: true }),
+    '@id': Object.assign({}, Id, { readonly: true }),
     composer: {
       type: 'array',
-      items: Addr,
+      items: Id,
       minItems: 1,
       uniqueItems: true
     },
@@ -236,13 +220,13 @@ const Composition = {
     },
     lyricist: {
       type: 'array',
-      items: Addr,
+      items: Id,
       minItems: 1,
       uniqueItems: true
     },
     publisher: {
       type: 'array',
-      items: Addr,
+      items: Id,
       minItems: 1,
       uniqueItems: true
     },
@@ -300,7 +284,7 @@ const Image = {
       enum: ['Image'],
       readonly: true
     },
-    '@id': Object.assign({}, MetaId, { readonly: true }),
+    '@id': Object.assign({}, Id, { readonly: true }),
     contentUrl: {
       type: 'string'
     },
@@ -357,10 +341,10 @@ const Recording = {
       enum: ['Recording'],
       readonly: true
     },
-    '@id': Object.assign({}, MetaId, { readonly: true }),
+    '@id': Object.assign({}, Id, { readonly: true }),
     audio: {
       type: 'array',
-      items: MetaId,
+      items: Id,
       minItems: 1,
       uniqueItems: true
     },
@@ -370,20 +354,20 @@ const Recording = {
     },
     performer: {
       type: 'array',
-      items:  Addr,
+      items:  Id,
       minItems: 1,
       uniqueItems: true
     },
     producer: {
       type: 'array',
-      items: Addr,
+      items: Id,
       minItems: 1,
       uniqueItems: true
     },
-    recordingOf: MetaId,
+    recordingOf: Id,
     recordLabel: {
       type: 'array',
-      items: Addr,
+      items: Id,
       minItems: 1,
       uniqueItems: true
     },
@@ -421,13 +405,8 @@ const RecordingContext = {
   title: 'schema:name'
 }
 
-function calcMetaId(meta: Object): Promise<string> {
-  const buf = new Buffer.from(orderStringify(withoutKeys(meta, '@id')));
-  return calcIPFSHash(buf);
-}
-
-function getMetaId(meta: Object): string {
-  return getId('@id', meta);
+function newMeta(meta: Object): Promise<Object> {
+  return setId('@id', meta);
 }
 
 function getMetaSchema(type: string): Object {
@@ -447,20 +426,14 @@ function getMetaSchema(type: string): Object {
   }
 }
 
-function setMetaId(meta: Object): Promise<Object> {
-  return calcMetaId(meta).then((id) => {
-    return Object.assign({}, meta, { '@id': id });
-  });
-}
-
 function validateMeta(meta: Object): Promise<Object> {
-  return calcMetaId(meta).then((id) => {
+  return calcId('@id', meta).then((id) => {
     const schema = getMetaSchema(meta['@type']);
     if (!validateSchema(meta, schema)) {
       throw new Error('meta has invalid schema: ' + JSON.stringify(meta, null, 2));
     }
     if (meta['@id'] !== id) {
-      throw new Error(`expected metaId=${meta['@id']}; got ` + id);
+      throw new Error(`expected id=${meta['@id']}; got ` + id);
     }
     return meta;
   });
@@ -470,11 +443,7 @@ exports.AlbumContext = AlbumContext;
 exports.AudioContext = AudioContext;
 exports.CompositionContext = CompositionContext;
 exports.ImageContext = ImageContext;
-exports.MetaId = MetaId;
 exports.RecordingContext = RecordingContext;
-
-exports.calcMetaId = calcMetaId;
-exports.getMetaId = getMetaId;
 exports.getMetaSchema = getMetaSchema;
-exports.setMetaId = setMetaId;
+exports.newMeta = newMeta;
 exports.validateMeta = validateMeta;
