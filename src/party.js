@@ -2,16 +2,10 @@
 
 const secp256k1 = require('../lib/secp256k1.js');
 
-const {
-  calcId,
-  setId
-} = require('../lib/util.js');
-
 const{
   Address,
   Draft,
   Email,
-  Id,
   Url,
   contextPrefix,
   validateSchema
@@ -57,7 +51,6 @@ const Artist = {
       enum: ['Artist'],
       readonly: true
     },
-    '@id': Object.assign({}, Id, { readonly: true }),
     address: Address,
     email: Email,
     homepage: Url,
@@ -71,7 +64,11 @@ const Artist = {
       uniqueItems: true
     }
   },
-  required: ['@context', '@id', '@type', 'name']
+  required: [
+    '@context',
+    '@type',
+    'name'
+  ]
 }
 
 const ArtistContext = {
@@ -117,7 +114,6 @@ const Organization = {
       enum: ['Organization'],
       readonly: true
     },
-    '@id': Object.assign({}, Id, { readonly: true }),
     address: Address,
     email: Email,
     homepage: Url,
@@ -131,7 +127,11 @@ const Organization = {
       uniqueItems: true
     }
   },
-  required: ['@context', '@id', '@type', 'name']
+  required: [
+    '@context',
+    '@type',
+    'name'
+  ]
 }
 
 const OrganizationContext = {
@@ -144,20 +144,6 @@ const OrganizationContext = {
   profile: 'schema:sameAs'
 }
 
-function newParty(party: Object, publicKey?: Buffer): Promise<Object> {
-  return new Promise((resolve, reject) => {
-    if (publicKey) {
-      if (publicKey.length !== 33) {
-        return reject(`expected public-key length=33; got ` + publicKey.length);
-      }
-      party.address = secp256k1.publicKeyToAddress(publicKey);
-    }
-    setId('@id', party).then((party) => {
-      resolve(party);
-    });
-  });
-}
-
 function getPartySchema(type: string): Object {
   if (type === 'Artist') {
     return Artist;
@@ -168,30 +154,24 @@ function getPartySchema(type: string): Object {
   throw new Error('unexpected party @type: ' + type);
 }
 
-function validateParty(party: Object, publicKey?: Buffer): Promise<Object> {
-  return calcId('@id', party).then((id) => {
-    const schema = getPartySchema(party['@type']);
-    if (!validateSchema(party, schema)) {
-      throw new Error('party has invalid schema: ' + JSON.stringify(party, null, 2));
+function validateParty(party: Object, publicKey?: Buffer): boolean {
+  const schema = getPartySchema(party['@type']);
+  if (!validateSchema(party, schema)) {
+    throw new Error('party has invalid schema: ' + JSON.stringify(party, null, 2));
+  }
+  if (publicKey) {
+    if (publicKey.length !== 33) {
+      throw new Error(`expected public-key length=33; got ` + publicKey.length);
     }
-    if (party['@id'] !== id) {
-      throw new Error(`expected id=${party['@id']}; got ` + id);
+    const addr = secp256k1.publicKeyToAddress(publicKey);
+    if (party.address !== addr) {
+      throw new Error(`expected addr=${party['address']}; got ` + addr)
     }
-    if (publicKey) {
-      if (publicKey.length !== 33) {
-        throw new Error(`expected public-key length=33; got ` + publicKey.length);
-      }
-      const addr = secp256k1.publicKeyToAddress(publicKey);
-      if (party.address !== addr) {
-        throw new Error(`expected addr=${party['address']}; got ` + addr)
-      }
-    }
-    return party;
-  });
+  }
+  return true;
 }
 
 exports.ArtistContext = ArtistContext;
 exports.OrganizationContext = OrganizationContext;
 exports.getPartySchema = getPartySchema;
-exports.newParty = newParty;
 exports.validateParty = validateParty;

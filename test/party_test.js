@@ -1,45 +1,57 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
-import { readFileSync } from 'fs';
+import { readTestFile } from './fs.js';
 import { validateParty } from '../lib/party.js';
 
 const ed25519 = require('../lib/ed25519.js');
 const rsa = require('../lib/rsa.js');
 const secp256k1 = require('../lib/secp256k1.js');
 
-const composer = JSON.parse(readFileSync(__dirname +'/parties/composer.json'));
-const lyricist = JSON.parse(readFileSync(__dirname +'/parties/lyricist.json'));
-const performer = JSON.parse(readFileSync(__dirname +'/parties/performer.json'));
-const producer = JSON.parse(readFileSync(__dirname +'/parties/producer.json'));
-const publisher = JSON.parse(readFileSync(__dirname +'/parties/publisher.json'));
-const recordLabel = JSON.parse(readFileSync(__dirname +'/parties/recordLabel.json'));
+const composer = JSON.parse(readTestFile('/parties/composer.json'));
+const lyricist = JSON.parse(readTestFile('/parties/lyricist.json'));
+const performer = JSON.parse(readTestFile('/parties/performer.json'));
+const producer = JSON.parse(readTestFile('/parties/producer.json'));
+const publisher = JSON.parse(readTestFile('/parties/publisher.json'));
+const recordLabel = JSON.parse(readTestFile('/parties/recordLabel.json'));
 
-const performerKeypair = secp256k1.decodeKeypair(readFileSync(__dirname + '/keys/performerKeypair.json'));
-const recordLabelKeypair = secp256k1.decodeKeypair(readFileSync(__dirname + '/keys/recordLabelKeypair.json'));
+const performerKeypair = secp256k1.decodeKeypair(readTestFile('/keys/performerKeypair.json'));
+const recordLabelKeypair = secp256k1.decodeKeypair(readTestFile('/keys/recordLabelKeypair.json'));
 
 describe('Party', () => {
-  it('validates composer', (done) => {
-    validateParty(composer)
-      .then(() => done(), done);
+  it('validates composer', () => {
+    assert.isOk(
+      validateParty(composer),
+      'should validate composer'
+    );
   });
-  it('validates lyricist', (done) => {
-    validateParty(lyricist)
-      .then(() => done(), done);
+  it('validates lyricist', () => {
+    assert.isOk(
+      validateParty(lyricist),
+      'should validate lyricist'
+    );
   });
-  it('validates performer', (done) => {
-    validateParty(performer, performerKeypair.publicKey)
-      .then(() => done(), done);
+  it('validates performer', () => {
+    assert.isOk(
+      validateParty(performer, performerKeypair.publicKey),
+      'should validate performer'
+    );
   });
-  it('validates producer', (done) => {
-    validateParty(producer).catch(done)
-      .then(() => done(), done);
+  it('validates producer', () => {
+    assert.isOk(
+      validateParty(producer),
+      'should validate producer'
+    );
   });
-  it('validates publisher', (done) => {
-    validateParty(publisher).catch(done)
-      .then(() => done(), done);
+  it('validates publisher', () => {
+    assert.isOk(
+      validateParty(publisher),
+      'should validate publisher'
+    );
   });
-  it('validates recordLabel', (done) => {
-    validateParty(recordLabel, recordLabelKeypair.publicKey)
-      .then(() => done(), done);
+  it('validates recordLabel', () => {
+    assert.isOk(
+      validateParty(recordLabel, recordLabelKeypair.publicKey),
+      'should validate recordLabel'
+    );
   });
 });

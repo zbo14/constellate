@@ -4,20 +4,17 @@
   </head>
   <body>
     <button id='start-node-btn'>start node</button><br>
-    <label>add file</label>
-    <input type='file' id='content' accept='audio/*,image/*' />
-    <button id='add-file-btn'>add</button><br>
-    <label>get file</label>
-    <input type='text' id='multihash' \>
-    <button id='get-file-btn'>get</button><br>
-    <label>links</label><br>
-    <div id='links'></div>
     <!--
+    <input type='file' id='content' accept='audio/*,image/*' />
+    <button id='add-file-btn'>add file</button><br>
+    <input type='text' id='multihash' \>
+    <button id='get-file-btn'>get file</button><br>
+    <div id='links'></div>
     <hr>
     <button id='read-tags-btn'>read tags</button>
     <button id='write-tags-btn'>write tags</button><br>
-    -->
     <hr>
+    -->
     <select id='schema-select'>
       <option selected disabled>--</option>
       <optgroup label='party'>
@@ -37,11 +34,13 @@
       </optgroup>
     </select><br>
     <button id='new-keypair-btn' hidden>new keypair</button>
-    <button id='add-meta-btn' hidden>add meta</button>
     <button id='sign-claims-btn' hidden>sign claims</button>
     <button id='verify-sig-btn' hidden>verify signature</button><br><br>
     <form></form>
     <hr>
+    <button id='add-data-btn'>add data</button><br>
+    <button id='get-data-btn'>get data</button>
+    <input type='text' id='@id' /><br>
     <input type='text' id='mode' hidden /><br>
     <label>public-key</label>
     <select id='key-select'>

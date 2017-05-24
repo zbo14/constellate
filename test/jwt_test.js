@@ -1,6 +1,6 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
-import { readFileSync } from 'fs';
+import { readTestFile } from './fs.js';
 import { getAddr } from '../lib/party.js';
 import { now } from '../lib/util.js';
 
@@ -16,24 +16,24 @@ const ed25519 = require('../lib/ed25519.js');
 const rsa = require('../lib/rsa.js');
 const secp256k1 = require('../lib/secp256k1.js');
 
-const composerKeypair = ed25519.decodeKeypair(readFileSync(__dirname + '/keys/composerKeypair.json'));
-const performerKeypair = secp256k1.decodeKeypair(readFileSync(__dirname + '/keys/performerKeypair.json'));
-const publisherKeypair = rsa.decodeKeypair(readFileSync(__dirname + '/keys/publisherKeypair.json'));
-const recordLabelKeypair = secp256k1.decodeKeypair(readFileSync(__dirname + '/keys/recordLabelKeypair.json'));
+const composerKeypair = ed25519.decodeKeypair(readTestFile('/keys/composerKeypair.json'));
+const performerKeypair = secp256k1.decodeKeypair(readTestFile('/keys/performerKeypair.json'));
+const publisherKeypair = rsa.decodeKeypair(readTestFile('/keys/publisherKeypair.json'));
+const recordLabelKeypair = secp256k1.decodeKeypair(readTestFile('/keys/recordLabelKeypair.json'));
 
-const album = JSON.parse(readFileSync(__dirname + '/metas/album.json'));
-const composition = JSON.parse(readFileSync(__dirname + '/metas/composition.json'));
-const recording = JSON.parse(readFileSync(__dirname + '/metas/recording.json'));
+const album = JSON.parse(readTestFile('/metas/album.json'));
+const composition = JSON.parse(readTestFile('/metas/composition.json'));
+const recording = JSON.parse(readTestFile('/metas/recording.json'));
 
 const composerHeader = newEd25519Header(composerKeypair.publicKey);
 const performerHeader = newSecp256k1Header(performerKeypair.publicKey);
 
-const createComposition = JSON.parse(readFileSync(__dirname + '/claims/createComposition.json'));
-const createRecording = JSON.parse(readFileSync(__dirname + '/claims/createRecording.json'));
-const createAlbum = JSON.parse(readFileSync(__dirname + '/claims/createAlbum.json'));
-const licenseComposition = JSON.parse(readFileSync(__dirname + '/claims/licenseComposition.json'));
-const licenseRecording = JSON.parse(readFileSync(__dirname + '/claims/licenseRecording.json'));
-const licenseAlbum = JSON.parse(readFileSync(__dirname + '/claims/licenseAlbum.json'));
+const createComposition = JSON.parse(readTestFile('/claims/createComposition.json'));
+const createRecording = JSON.parse(readTestFile('/claims/createRecording.json'));
+const createAlbum = JSON.parse(readTestFile('/claims/createAlbum.json'));
+const licenseComposition = JSON.parse(readTestFile('/claims/licenseComposition.json'));
+const licenseRecording = JSON.parse(readTestFile('/claims/licenseRecording.json'));
+const licenseAlbum = JSON.parse(readTestFile('/claims/licenseAlbum.json'));
 
 const createCompositionSig = signClaims(createComposition, composerHeader, composerKeypair.privateKey);
 const createRecordingSig = signClaims(createRecording, performerHeader, performerKeypair.privateKey);

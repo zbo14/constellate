@@ -237,35 +237,34 @@ function isDescendant(parent: HTMLElement, child: HTMLElement): boolean {
 }
 
 function generateForm(schema: Object): HTMLElement[] {
-  let form: HTMLElement[] = [];
-  try {
-    if (!isObject(schema.properties)) {
-      throw new Error('schema properties should be object');
-    }
-    const defs = schema.definitions;
-    const props = schema.properties;
-    const reqs = schema.required;
-    const elems = recurse(props, (obj, key) => {
-      const elem = arrayFromObject(obj).reduce((result, [k, v]) => {
-        return setAttribute(result, k, v);
-      }, generateElement(obj, defs));
-      if (!isArray(reqs) || !reqs.includes(key)) return elem;
-      return setAttribute(elem, 'required', 'true');
-    });
-    form = Object.keys(elems).reduce((result, key) => {
-      if (elems[key] == null) return result;
-      const div = document.createElement('div');
-      const label = document.createElement('label');
-      label.textContent = key;
-      if (elems[key].hasAttribute('hidden')) label.hidden = true;
-      div.appendChild(label);
-      div.appendChild(elems[key]);
-      return result.concat(div);
-    }, []);
-  } catch(err) {
-    console.error(err);
+  if (!isObject(schema.properties)) {
+    throw new Error('schema properties should be object');
   }
-  return form;
+  const defs = schema.definitions;
+  const props = schema.properties;
+  const reqs = schema.required;
+  const elems = recurse(props, (obj, key) => {
+    const elem = arrayFromObject(obj).reduce((result, [k, v]) => {
+      return setAttribute(result, k, v);
+    }, generateElement(obj, defs));
+    if (!isArray(reqs) || !reqs.includes(key)) return elem;
+    return setAttribute(elem, 'required', 'true');
+  });
+  return Object.keys(elems).reduce((result, key) => {
+    if (elems[key] == null) return result;
+    const div = document.createElement('div');
+    const label = document.createElement('label');
+    label.textContent = key;
+    if (elems[key].hasAttribute('hidden')) label.hidden = true;
+    div.appendChild(label);
+    div.appendChild(elems[key]);
+    return result.concat(div);
+  }, []);
+}
+
+function addRequired(reqs: string[], elem: HTMLElement, label: HTMLElement): string[] {
+  if (!elem.hasAttribute('required')) return reqs;
+  return reqs.concat(label.textContent);
 }
 
 function addValue(obj: Object, elem: HTMLElement, label: HTMLElement): Object {
@@ -275,70 +274,58 @@ function addValue(obj: Object, elem: HTMLElement, label: HTMLElement): Object {
 }
 
 function parseForm(form: HTMLElement[]): Object {
-  let obj = {};
-  try {
-    obj = form.reduce((result, div) => {
-      if (div.nodeName !== 'DIV') {
-        throw new Error('expected <div>; got ' + div.nodeName);
-      }
-      if (!div.children.length) {
-        throw new Error('<div> has no children');
-      }
-      const children = Array.from(div.children);
-      if (children.length !== 2) {
-        throw new Error('<div> should have 2 children; has ' + children.length);
-      }
-      const label = children[0];
-      if (label.nodeName !== 'LABEL') {
-        throw new Error('expected label; got ' + label.nodeName);
-      }
-      const elem = children[1];
-      return addValue(result, elem, label);
-    }, {});
-  } catch(err) {
-    console.error(err);
-  }
-  return obj;
+  return form.reduce((result, div) => {
+    if (div.nodeName !== 'DIV') {
+      throw new Error('expected <div>; got ' + div.nodeName);
+    }
+    if (!div.children.length) {
+      throw new Error('<div> has no children');
+    }
+    const children = Array.from(div.children);
+    if (children.length !== 2) {
+      throw new Error('<div> should have 2 children; has ' + children.length);
+    }
+    const label = children[0];
+    if (label.nodeName !== 'LABEL') {
+      throw new Error('expected label; got ' + label.nodeName);
+    }
+    const elem = children[1];
+    return addValue(result, elem, label);
+  }, {});
 }
 
 function schemafyForm(form: HTMLElement[]): Object  {
-  let schema = {};
-  try {
-    schema = form.reduce((result, div) => {
-      if (div.nodeName !== 'DIV') {
-        throw new Error('expected <div>; got ' + div.nodeName);
-      }
-      if (!div.children.length) {
-        throw new Error('<div> has no children');
-      }
-      const children = Array.from(div.children);
-      if (children.length !== 2) {
-        throw new Error('<div> should have 2 children; has ' + children.length);
-      }
-      const label = children[0];
-      if (label.nodeName !== 'LABEL') {
-        throw new Error('expected label; got ' + label.nodeName);
-      }
-      const elem = children[1];
-      const obj = parseElement(elem);
-      if (!isObject(obj)) {
-        throw new Error('expected valid object; got ' + JSON.stringify(obj));
-      }
-      return Object.assign({}, result, {
-        properties: Object.assign({}, result.properties,
-          { [label.textContent]: getAttributes(elem, obj) }
-        ),
-        required: addRequired(result.required, elem, label)
-      });
-    }, {
-      properties: {},
-      required: [],
-      type: 'object'
+  return form.reduce((result, div) => {
+    if (div.nodeName !== 'DIV') {
+      throw new Error('expected <div>; got ' + div.nodeName);
+    }
+    if (!div.children.length) {
+      throw new Error('<div> has no children');
+    }
+    const children = Array.from(div.children);
+    if (children.length !== 2) {
+      throw new Error('<div> should have 2 children; has ' + children.length);
+    }
+    const label = children[0];
+    if (label.nodeName !== 'LABEL') {
+      throw new Error('expected label; got ' + label.nodeName);
+    }
+    const elem = children[1];
+    const obj = parseElement(elem);
+    if (!isObject(obj)) {
+      throw new Error('expected valid object; got ' + JSON.stringify(obj));
+    }
+    return Object.assign({}, result, {
+      properties: Object.assign({}, result.properties,
+        { [label.textContent]: getAttributes(elem, obj) }
+      ),
+      required: addRequired(result.required, elem, label)
     });
-  } catch(err) {
-    console.error(err);
-  }
-  return schema;
+  }, {
+    properties: {},
+    required: [],
+    type: 'object'
+  });
 }
 
 exports.generateForm = generateForm;

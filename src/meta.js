@@ -1,10 +1,8 @@
 'use strict';
 
-const { calcId, setId } = require('../lib/util.js');
-
 const {
   Draft,
-  Id,
+  IPFSHash,
   contextIRI,
   contextPrefix,
   validateSchema
@@ -25,8 +23,7 @@ const Album = {
       type: 'object',
       properties: {
         schema: {
-          type: 'string',
-          default: 'http://schema.org/'
+          enum: ['http://schema.org/']
         },
         Album: contextPrefix('schema', 'MusicAlbum'),
         art: contextIRI('schema', 'image'),
@@ -54,11 +51,10 @@ const Album = {
       enum: ['Album'],
       readonly: true
     },
-    '@id': Object.assign({}, Id, { readonly: true }),
-    art: Id,
+    art: IPFSHash,
     artist: {
       type: 'array',
-      items: Id,
+      items: IPFSHash,
       minItems: 1,
       uniqueItems: true
     },
@@ -77,7 +73,7 @@ const Album = {
     },
     recordLabel: {
       type: 'array',
-      items: Id,
+      items: IPFSHash,
       minItems: 1,
       uniqueItems: true
     },
@@ -94,12 +90,18 @@ const Album = {
     },
     track: {
       type: 'array',
-      items: Id,
+      items: IPFSHash,
       minItems: 1,
       uniqueItems: true
     }
   },
-  required: ['@context', '@id', '@type', 'artist', 'title', 'track']
+  required: [
+    '@context',
+    '@type',
+    'artist',
+    'title',
+    'track'
+  ]
 }
 
 const AlbumContext = {
@@ -135,8 +137,7 @@ const Audio = {
       type: 'object',
       properties: {
         schema: {
-          type: 'string',
-          default: 'http://schema.org/'
+          enum: ['http://schema.org/']
         },
         Audio: contextPrefix('schema', 'AudioObject'),
         contentUrl: contextPrefix('schema', 'contentUrl'),
@@ -154,16 +155,17 @@ const Audio = {
       enum: ['Audio'],
       readonly: true
     },
-    '@id': Object.assign({}, Id, { readonly: true }),
-    contentUrl: {
-      type: 'string'
-    },
+    contentUrl: IPFSHash,
     encodingFormat: {
       enum: ['mp3', 'mpeg4']
     }
     //..
   },
-  require: ['@context', '@id', '@type', 'contentUrl']
+  require: [
+    '@context',
+    '@type',
+    'contentUrl'
+  ]
 }
 
 const AudioContext = {
@@ -182,8 +184,7 @@ const Composition = {
       type: 'object',
       properties: {
         schema: {
-          type: 'string',
-          default: 'http://schema.org/'
+          enum: ['http://schema.org/']
         },
         composer: contextIRI('schema', 'composer'),
         Composition: contextPrefix('schema', 'MusicComposition'),
@@ -207,10 +208,9 @@ const Composition = {
       enum: ['Composition'],
       readonly: true
     },
-    '@id': Object.assign({}, Id, { readonly: true }),
     composer: {
       type: 'array',
-      items: Id,
+      items: IPFSHash,
       minItems: 1,
       uniqueItems: true
     },
@@ -220,13 +220,13 @@ const Composition = {
     },
     lyricist: {
       type: 'array',
-      items: Id,
+      items: IPFSHash,
       minItems: 1,
       uniqueItems: true
     },
     publisher: {
       type: 'array',
-      items: Id,
+      items: IPFSHash,
       minItems: 1,
       uniqueItems: true
     },
@@ -234,7 +234,12 @@ const Composition = {
       type: 'string'
     }
   },
-  required: ['@context', '@id', '@type', 'composer', 'title']
+  required: [
+    '@context',
+    '@type',
+    'composer',
+    'title'
+  ]
 }
 
 const CompositionContext = {
@@ -265,8 +270,7 @@ const Image = {
       type: 'object',
       properties: {
         schema: {
-          type: 'string',
-          default: 'http://schema.org/'
+          enum: ['http://schema.org/']
         },
         contentUrl: contextPrefix('schema', 'contentUrl'),
         Image: contextPrefix('schema', 'ImageObject'),
@@ -284,16 +288,17 @@ const Image = {
       enum: ['Image'],
       readonly: true
     },
-    '@id': Object.assign({}, Id, { readonly: true }),
-    contentUrl: {
-      type: 'string'
-    },
+    contentUrl: IPFSHash,
     encodingFormat: {
       enum: ['jpeg', 'png']
     }
     //..
   },
-  require: ['@context', '@id', '@type', 'contentUrl']
+  require: [
+    '@context',
+    '@type',
+    'contentUrl'
+  ]
 }
 
 const ImageContext = {
@@ -312,8 +317,7 @@ const Recording = {
       type: 'object',
       properties: {
         schema: {
-          type: 'string',
-          default: 'http://schema.org/'
+          enum: ['http://schema.org/']
         },
         audio: contextIRI('schema', 'audio'),
         isrc: contextPrefix('schema', 'isrcCode'),
@@ -341,10 +345,9 @@ const Recording = {
       enum: ['Recording'],
       readonly: true
     },
-    '@id': Object.assign({}, Id, { readonly: true }),
     audio: {
       type: 'array',
-      items: Id,
+      items: IPFSHash,
       minItems: 1,
       uniqueItems: true
     },
@@ -354,20 +357,20 @@ const Recording = {
     },
     performer: {
       type: 'array',
-      items:  Id,
+      items:  IPFSHash,
       minItems: 1,
       uniqueItems: true
     },
     producer: {
       type: 'array',
-      items: Id,
+      items: IPFSHash,
       minItems: 1,
       uniqueItems: true
     },
-    recordingOf: Id,
+    recordingOf: IPFSHash,
     recordLabel: {
       type: 'array',
-      items: Id,
+      items: IPFSHash,
       minItems: 1,
       uniqueItems: true
     },
@@ -375,7 +378,13 @@ const Recording = {
       type: 'string'
     }
   },
-  required: ['@context', '@id', '@type', 'audio', 'performer', 'recordingOf']
+  required: [
+    '@context',
+    '@type',
+    'audio',
+    'performer',
+    'recordingOf'
+  ]
 }
 
 const RecordingContext = {
@@ -405,10 +414,6 @@ const RecordingContext = {
   title: 'schema:name'
 }
 
-function newMeta(meta: Object): Promise<Object> {
-  return setId('@id', meta);
-}
-
 function getMetaSchema(type: string): Object {
   switch(type) {
     case 'Album':
@@ -426,17 +431,12 @@ function getMetaSchema(type: string): Object {
   }
 }
 
-function validateMeta(meta: Object): Promise<Object> {
-  return calcId('@id', meta).then((id) => {
-    const schema = getMetaSchema(meta['@type']);
-    if (!validateSchema(meta, schema)) {
-      throw new Error('meta has invalid schema: ' + JSON.stringify(meta, null, 2));
-    }
-    if (meta['@id'] !== id) {
-      throw new Error(`expected id=${meta['@id']}; got ` + id);
-    }
-    return meta;
-  });
+function validateMeta(meta: Object): boolean {
+  const schema = getMetaSchema(meta['@type']);
+  if (!validateSchema(meta, schema)) {
+    throw new Error('meta has invalid schema: ' + JSON.stringify(meta, null, 2));
+  }
+  return true;
 }
 
 exports.AlbumContext = AlbumContext;
@@ -445,5 +445,4 @@ exports.CompositionContext = CompositionContext;
 exports.ImageContext = ImageContext;
 exports.RecordingContext = RecordingContext;
 exports.getMetaSchema = getMetaSchema;
-exports.newMeta = newMeta;
 exports.validateMeta = validateMeta;

@@ -36,7 +36,15 @@ const IPFS = require('ipfs');
 const fileType = require('file-type');
 const os = require('os');
 const path = require('path');
-const { encodeBase58, readFileInput } = require('../lib/util.js');
+const Unixfs = require('ipfs-unixfs');
+const { DAGLink, DAGNode } = require('ipld-dag-pb');
+
+const {
+  encodeBase58,
+  orderStringify,
+  readFileInput,
+  withoutKeys
+} = require('../lib/util.js');
 
 // @flow
 
@@ -63,10 +71,27 @@ function addFileInput(input: HTMLInputElement): Promise<Object> {
   });
 }
 
+// https://github.com/ipfs/faq/issues/208
+// https://github.com/ipfs/js-ipfs-unixfs#create-an-unixfs-data-element
+function calcIPFSHash(obj: Object): Promise<string> {
+  const buf = Buffer.from(orderStringify(obj));
+  const data = new Unixfs('file', buf);
+  return new Promise((resolve, reject) => {
+    DAGNode.create(data.marshal(), (err, node) => {
+      if (err) return reject(err);
+      resolve(encodeBase58(node._multihash));
+    });
+  });
+}
+
 function connect2Peer(multiaddr: string) {
   node.swarm.connect(multiaddr).then(() => {
     console.log('Connected to peer:', multiaddr);
   });
+}
+
+function getDAGNode(multihash: string): Promise<Object> {
+  return node.dag.get(multihash);
 }
 
 function getFile(multihash: string): Promise<HTMLAnchorElement> {
@@ -102,13 +127,40 @@ function newBlobURL(data: any[], ext: string, multihash: string): HTMLAnchorElem
   return link;
 }
 
+function newDAGLinks(...links: Object[]): Promise<Object[]> {
+    return links.reduce((result, link) => {
+        console.log(link);
+        return result.then((dagLinks) => {
+            console.log(dagLinks);
+            return getDAGNode(link.multihash).then((dagNode) => {
+                console.log(dagNode);
+                return dagLinks.concat(new DAGLink(link.name, dagNode.size, link.multihash));
+            });
+        });
+    }, Promise.resolve([]));
+}
+
+function newDAGNode(obj: Object, ...links: Object[]): Promise<Object> {
+    return newDAGLinks(...links).then((dagLinks) => {
+        const buf = Buffer.from(orderStringify(obj));
+        return DAGNode.create(buf, dagLinks, 'sha2-256');
+    });
+}
+
+function putDAGNode(dagNode: Object): Promise<string> {
+  return node.dag.put(dagNode, {
+    format: 'dag-pb',
+    hashAlg: 'sha2-256'
+  });
+}
+
 function refreshPeers() {
   node.swarm.peers().then((peers) => {
     console.log('Refreshed peers:', peers);
   });
 }
 
-function start() {
+function startNode() {
   node = new IPFS({
     config: {
       Addresses: {
@@ -145,6 +197,11 @@ function start() {
 
 exports.addFile = addFile;
 exports.addFileInput = addFileInput;
+exports.calcIPFSHash = calcIPFSHash;
 exports.connect2Peer = connect2Peer;
+exports.getDAGNode = getDAGNode;
 exports.getFile = getFile;
-exports.start = start;
+exports.newDAGLinks = newDAGLinks;
+exports.newDAGNode = newDAGNode;
+exports.putDAGNode = putDAGNode;
+exports.startNode = startNode;

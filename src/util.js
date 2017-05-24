@@ -1,13 +1,10 @@
 'use strict';
 
 const bs58 = require('bs58');
-const dagPB = require('ipld-dag-pb');
-const DAGNode = dagPB.DAGNode;
+const fs = require('fs');
 const RIPEMD160 = require('ripemd160');
-const isBuffer = require('is-buffer');
 const sha256 = require('js-sha256').sha256;
 const sha3_256 = require('js-sha3').sha3_256;
-const Unixfs = require('ipfs-unixfs');
 const urlsafeBase64  = require('urlsafe-base64');
 
 // @flow
@@ -18,23 +15,6 @@ const urlsafeBase64  = require('urlsafe-base64');
 
 function arrayFromObject(obj: Object): any[][] {
   return Object.keys(obj).map((key) => [key, obj[key]]);
-}
-
-function calcId(key: string, obj: Object): Promise<string> {
-  const buf = Buffer.from(orderStringify(withoutKeys(obj, key)));
-  return calcIpfsHash(buf);
-}
-
-// https://github.com/ipfs/faq/issues/208
-// https://github.com/ipfs/js-ipfs-unixfs#create-an-unixfs-data-element
-function calcIpfsHash(buf: Buffer): Promise<string> {
-  const data = new Unixfs('file', buf);
-  return new Promise((resolve, reject) => {
-    DAGNode.create(data.marshal(), (err, node) => {
-      if (err) return reject(err);
-      resolve(encodeBase58(node._multihash));
-    });
-  });
 }
 
 function clone(obj: Object): Object {
@@ -142,12 +122,6 @@ function recurse(x: any, fn: Function): any {
   return x;
 }
 
-function setId(key: string, obj: Object): Promise<Object> {
-  return calcId(key, obj).then((id) => {
-    return Object.assign({}, obj, { [key] : id });
-  });
-}
-
 function withoutKeys(obj: Object, ...keys: string[]): Object {
   return Object.keys(obj).reduce((result, key) => {
     if (keys.includes(key)) { return result; }
@@ -156,8 +130,6 @@ function withoutKeys(obj: Object, ...keys: string[]): Object {
 }
 
 exports.arrayFromObject = arrayFromObject;
-exports.calcId = calcId;
-exports.calcIpfsHash = calcIpfsHash;
 exports.clone = clone;
 exports.decodeBase58 = decodeBase58;
 exports.decodeBase64 = decodeBase64;
@@ -177,5 +149,4 @@ exports.objectFromArray = objectFromArray;
 exports.orderStringify = orderStringify;
 exports.readFileInput = readFileInput;
 exports.recurse = recurse;
-exports.setId = setId;
 exports.withoutKeys = withoutKeys;
