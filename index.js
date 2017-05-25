@@ -4,6 +4,7 @@ const rsa = require('./lib/rsa.js');
 const secp256k1 = require('./lib/secp256k1.js');
 const FileSaver = require('file-saver');
 const { generateForm, parseForm } = require('./lib/form.js');
+const { validateLinkedData } = require('./lib/linked-data.js');
 const { getMetaSchema, validateMeta } = require('./lib/meta.js');
 const { getPartySchema, validateParty } = require('./lib/party.js');
 const { getLinks } = require('./lib/schema.js');
@@ -338,31 +339,36 @@ form.addEventListener('submit', (event) => {
             party.textContent = JSON.stringify(obj, null, 2);
             break;
         case 'meta':
-            validateMeta(obj);
+            // validateMeta(obj);
+            validateLinkedData(obj).then((result) => {
+              console.log('result:', JSON.stringify(result, null, 2));
+              meta.textContent = JSON.stringify(obj, null, 2);
+            });
             schema = getMetaSchema(schemaSelect.value);
-            meta.textContent = JSON.stringify(obj, null, 2);
             break;
         case 'claims':
             obj = timestamp(obj);
             schema = getClaimsSchema(schemaSelect.value);
             const metaObj = JSON.parse(meta.textContent);
             if (schemaSelect.value === 'Create') {
-                validateClaims(obj, metaObj);
-                create.textContent = JSON.stringify(obj, null, 2);
+                validateClaims(obj, metaObj).then(() => {
+                  create.textContent = JSON.stringify(obj, null, 2);
+                });
             }
             if (schemaSelect.value === 'License') {
                 const createObj = JSON.parse(create.textContent);
-                validateClaims(obj, metaObj, createObj);
-                license.textContent = JSON.stringify(obj, null, 2);
+                validateClaims(obj, metaObj, createObj).then(() => {
+                  license.textContent = JSON.stringify(obj, null, 2);
+                });
             }
             break;
         default:
             throw new Error('unexpected mode: ' + mode.value);
     }
     const links = getLinks(obj, schema);
-    ipfs.calcIPFSHash(obj).then((id) => {
-      console.log(id);
-    });
+    // ipfs.calcIPFSHash(obj).then((id) => {
+    //  console.log(id);
+    // });
     ipfs.newDAGNode(obj, links).then((dagNode) => {
       id.setAttribute('value', encodeBase58(dagNode._multihash));
     }, console.error);

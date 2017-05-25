@@ -38,6 +38,7 @@ const os = require('os');
 const path = require('path');
 const Unixfs = require('ipfs-unixfs');
 const { DAGLink, DAGNode } = require('ipld-dag-pb');
+const {  }
 
 const {
   encodeBase58,
