@@ -54,6 +54,7 @@ const schemaSelect = document.getElementById('schema-select');
 
 const addDataBtn = document.getElementById('add-data-btn');
 // const addFileBtn = document.getElementById('add-file-btn');
+const getDataBtn = document.getElementById('get-data-btn');
 // const getFileBtn = document.getElementById('get-file-btn');
 const newKeypairBtn = document.getElementById('new-keypair-btn');
 // const readTagsBtn = document.getElementById('read-tags-btn');
@@ -65,6 +66,45 @@ const verifySigBtn = document.getElementById('verify-sig-btn');
 startNodeBtn.addEventListener('click', () => {
     ipfs.startNode().then((info) => {
         console.log('Peer info:', info);
+        addDataBtn.addEventListener('click', () => {
+            let obj, schema;
+            switch (mode.value) {
+                case 'party':
+                    obj = JSON.parse(party.textContent);
+                    schema = getPartySchema(schemaSelect.value);
+                    break;
+                case 'meta':
+                    obj = JSON.parse(meta.textContent);
+                    schema = getMetaSchema(schemaSelect.value);
+                    break;
+                case 'claims':
+                    if (schemaSelect.value === 'Create') {
+                      obj = JSON.parse(create.textContent);
+                    }
+                    if (schemaSelect.value === 'License') {
+                      obj = JSON.parse(license.textContent);
+                    }
+                    schema = getClaimsSchema(schemaSelect.value);
+                    break;
+                default:
+                    return console.error('unexpected mode: ' + mode.value);
+            }
+            const links = getLinks(obj, schema);
+            ipfs.newDAGNode(obj, links).then((dagNode) => {
+                return ipfs.putDAGNode(dagNode);
+            }).then((cid) => {
+                console.log(cid);
+            }, console.error);
+        });
+        getDataBtn.addEventListener('click', () => {
+          ipfs.getDAGNode(id.value).then((dagNode) => {
+            const data = dagNode.value._data;
+            const json = dagNode.value._json;
+            console.log(Object.assign(json, {
+              data: Buffer.from(data).toString('utf8')
+            }));
+          }, console.error);
+        });
         /*
         addFileBtn.addEventListener('click', () => {
             if (content.files && schemaSelect.value) {
@@ -82,33 +122,6 @@ startNodeBtn.addEventListener('click', () => {
                 }
             }
         });
-        */
-        addDataBtn.addEventListener('click', () => {
-            let obj, schema;
-            switch (mode.value) {
-                case 'party':
-                    obj = JSON.parse(party.textContent);
-                    schema = getPartySchema(schemaSelect.value);
-                    break;
-                case 'meta':
-                    obj = JSON.parse(meta.textContent);
-                    schema = getMetaSchema(schemaSelect.value);
-                    break;
-                case 'claims':
-                    obj = JSON.parse(claims.textContent);
-                    schema = getClaimsSchema(schemaSelect.value);
-                    break;
-                default:
-                    return console.error('unexpected mode: ' + mode.value);
-            }
-            const links = getLinks(obj, schema);
-            console.log(links);
-            ipfs.newDAGNode(obj, links).then((dagNode) => {
-                console.log(dagNode);
-                return ipfs.putDAGNode(dagNode);
-            }).then(console.log, console.error);
-        });
-        /*
         getFileBtn.addEventListener('click', () => {
             if (multihash.value) {
                 ipfs.getFile(multihash.value).then((link) => {
@@ -317,18 +330,21 @@ form.addEventListener('submit', (event) => {
                div.children.length === 2 &&
                includeElement(div.lastChild, div.firstChild);
     });
-    let obj = parseForm(divs);
+    let obj = parseForm(divs), schema;
     switch (mode.value) {
         case 'party':
             validateParty(obj);
+            schema = getPartySchema(schemaSelect.value);
             party.textContent = JSON.stringify(obj, null, 2);
             break;
         case 'meta':
             validateMeta(obj);
+            schema = getMetaSchema(schemaSelect.value);
             meta.textContent = JSON.stringify(obj, null, 2);
             break;
         case 'claims':
             obj = timestamp(obj);
+            schema = getClaimsSchema(schemaSelect.value);
             const metaObj = JSON.parse(meta.textContent);
             if (schemaSelect.value === 'Create') {
                 validateClaims(obj, metaObj);
@@ -343,5 +359,11 @@ form.addEventListener('submit', (event) => {
         default:
             throw new Error('unexpected mode: ' + mode.value);
     }
-    ipfs.calcIPFSHash(obj).then((hash) => id.setAttribute('value', hash));
+    const links = getLinks(obj, schema);
+    ipfs.calcIPFSHash(obj).then((id) => {
+      console.log(id);
+    });
+    ipfs.newDAGNode(obj, links).then((dagNode) => {
+      id.setAttribute('value', encodeBase58(dagNode._multihash));
+    }, console.error);
 });

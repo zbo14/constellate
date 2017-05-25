@@ -75,11 +75,10 @@ function addFileInput(input: HTMLInputElement): Promise<Object> {
 // https://github.com/ipfs/js-ipfs-unixfs#create-an-unixfs-data-element
 function calcIPFSHash(obj: Object): Promise<string> {
   const buf = Buffer.from(orderStringify(obj));
-  const data = new Unixfs('file', buf);
   return new Promise((resolve, reject) => {
-    DAGNode.create(data.marshal(), (err, node) => {
+    DAGNode.create(buf, (err, dagNode) => {
       if (err) return reject(err);
-      resolve(encodeBase58(node._multihash));
+      resolve(encodeBase58(dagNode._multihash));
     });
   });
 }
@@ -91,7 +90,12 @@ function connect2Peer(multiaddr: string) {
 }
 
 function getDAGNode(multihash: string): Promise<Object> {
-  return node.dag.get(multihash);
+  return new Promise((resolve, reject) => {
+    node.dag.get(multihash, (err, dagNode) => {
+      if (err) return reject(err);
+      resolve(dagNode);
+    });
+  });
 }
 
 function getFile(multihash: string): Promise<HTMLAnchorElement> {
@@ -127,24 +131,34 @@ function newBlobURL(data: any[], ext: string, multihash: string): HTMLAnchorElem
   return link;
 }
 
-function newDAGLinks(...links: Object[]): Promise<Object[]> {
+function newDAGLinks(links: Object[]): Promise<Object[]> {
     return links.reduce((result, link) => {
-        console.log(link);
         return result.then((dagLinks) => {
-            console.log(dagLinks);
             return getDAGNode(link.multihash).then((dagNode) => {
-                console.log(dagNode);
-                return dagLinks.concat(new DAGLink(link.name, dagNode.size, link.multihash));
+                return dagLinks.concat(
+                  new DAGLink(link.name, dagNode.value._size, link.multihash)
+                );
             });
         });
     }, Promise.resolve([]));
 }
 
-function newDAGNode(obj: Object, ...links: Object[]): Promise<Object> {
-    return newDAGLinks(...links).then((dagLinks) => {
-        const buf = Buffer.from(orderStringify(obj));
-        return DAGNode.create(buf, dagLinks, 'sha2-256');
+function newDAGNode(obj: Object, links?: Object[]): Promise<Object> {
+  return new Promise((resolve, reject) => {
+    const buf = Buffer.from(orderStringify(obj));
+    if (!links || !links.length) {
+      return DAGNode.create(buf, (err, node) => {
+        if (err) return reject(err)
+        resolve(node);
+      });
+    }
+    return newDAGLinks(links).then((dagLinks) => {
+      return DAGNode.create(buf, dagLinks, (err, node) => {
+        if (err) return reject(err);
+        resolve(node);
+      });
     });
+  });
 }
 
 function putDAGNode(dagNode: Object): Promise<string> {

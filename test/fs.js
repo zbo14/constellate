@@ -1,11 +1,11 @@
 const fs = require('fs');
 
 function readTestFile(path) {
-  return fs.readFileSync(__dirname + path, 'utf8');
+  return fs.readFileSync(__dirname + path);
 }
 
 function writeTestFile(path, data) {
-  fs.writeFileSync(__dirname + path, data, 'utf8');
+  fs.writeFileSync(__dirname + path, data);
 }
 
 exports.readTestFile = readTestFile;

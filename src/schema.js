@@ -64,30 +64,28 @@ function contextPrefix(prefix: string, key: string): Object {
 
 function getLinks(obj: Object, schema: Object): Object[] {
   const ipfsHash = JSON.stringify(IPFSHash);
-  if (!isObject(schema.properties))  {
-    throw new Error('expected non-empty object for schema properties');
-  }
-  return arrayFromObject(schema.properties).reduce((result, [name, prop]) => {
-    if (JSON.stringify(prop) !== ipfsHash
-     && JSON.stringify(prop.items) !== ipfsHash) return result;
-    const val = obj[name];
-    if (isString(val)) {
-      return result.concat({
-        multihash: val,
-        name: key
-      });
-    }
-    if (isArray(val)) {
-      return result.concat(
-        val.map((v, i) => {
-          return {
-            multihash: v,
-            name: key + '-' + (i + 1)
+  return arrayFromObject(schema.properties).reduce((result, [key, prop]) => {
+    if (JSON.stringify(prop) === ipfsHash ||
+        JSON.stringify(prop.items) === ipfsHash) {
+          const val = obj[key];
+          if (isString(val)) {
+            return result.concat({
+              multihash: val,
+              name: key
+            });
           }
-        })
-      );
-    }
-    throw new Error(`expected string/array for key=${key}; got ` + typeof val);
+          if (isArray(val)) {
+            return result.concat(
+              val.map((v, i) => {
+                return {
+                  multihash: v,
+                  name: key + '-' + (i + 1)
+                }
+              })
+            );
+          }
+        }
+    return result;
   }, []);
 }
 
