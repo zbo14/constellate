@@ -11,14 +11,14 @@ const { getLinks, validateSchema } = require('../lib/schema.js');
 
 function getSchema(type: string): Object {
   switch(type) {
-    case 'Artist':
+    case 'MusicGroup':
     case 'Organization':
       return getPartySchema(type);
-    case 'Album':
-    case 'Audio':
-    case 'Composition':
-    case 'Image':
-    case 'Recording':
+    case 'AudioObject':
+    case 'ImageObject':
+    case 'MusicAlbum':
+    case 'MusicComposition':
+    case 'MusicRecording':
       return getMetaSchema(type);
     //..
     default:

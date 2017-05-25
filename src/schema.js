@@ -30,9 +30,15 @@ const Email = {
   pattern: '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'
 }
 
-const IPFSHash = {
-  type: 'string',
-  pattern: '^[1-9A-HJ-NP-Za-km-z]{46}$'
+const Link = {
+  type: 'object',
+  properties: {
+    '/': {
+      type: 'string',
+      pattern: '^\/ipfs\/[1-9A-HJ-NP-Za-km-z]{46}$'
+    }
+  },
+  required: ['/']
 }
 
 const Url = {
@@ -41,32 +47,11 @@ const Url = {
   pattern: '^https?:\/\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%_\\+.~#?&\/\/=]*)$'
 }
 
-function contextIRI(prefix: string, key: string): Object {
-  return {
-    type: 'object',
-    properties: {
-      '@id': contextPrefix(prefix, key),
-      '@type': {
-        type: 'string',
-        default: '@id'
-      }
-    },
-    required: ['@id', '@type']
-  }
-}
-
-function contextPrefix(prefix: string, key: string): Object {
-  return {
-    type: 'string',
-    default: prefix + ':' + key
-  }
-}
-
 function getLinks(obj: Object, schema: Object): Object[] {
-  const ipfsHash = JSON.stringify(IPFSHash);
+  const link = JSON.stringify(Link);
   return arrayFromObject(schema.properties).reduce((result, [key, prop]) => {
-    if (JSON.stringify(prop) === ipfsHash ||
-        JSON.stringify(prop.items) === ipfsHash) {
+    if (JSON.stringify(prop) === link ||
+        JSON.stringify(prop.items) === link) {
           const val = obj[key];
           if (isString(val)) {
             return result.concat({
@@ -96,10 +81,8 @@ function validateSchema(obj: Object, schema: Object): boolean {
 exports.Address = Address;
 exports.Draft = Draft;
 exports.Email = Email;
-exports.IPFSHash = IPFSHash;
+exports.Link = Link;
 exports.Url = Url;
 
-exports.contextIRI = contextIRI;
-exports.contextPrefix = contextPrefix;
 exports.getLinks = getLinks;
 exports.validateSchema = validateSchema;

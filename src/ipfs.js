@@ -38,7 +38,6 @@ const os = require('os');
 const path = require('path');
 const Unixfs = require('ipfs-unixfs');
 const { DAGLink, DAGNode } = require('ipld-dag-pb');
-const {  }
 
 const {
   encodeBase58,
@@ -74,12 +73,12 @@ function addFileInput(input: HTMLInputElement): Promise<Object> {
 
 // https://github.com/ipfs/faq/issues/208
 // https://github.com/ipfs/js-ipfs-unixfs#create-an-unixfs-data-element
-function calcIPFSHash(obj: Object): Promise<string> {
+function calcHash(obj: Object): Promise<string> {
   const buf = Buffer.from(orderStringify(obj));
   return new Promise((resolve, reject) => {
     DAGNode.create(buf, (err, dagNode) => {
       if (err) return reject(err);
-      resolve(encodeBase58(dagNode._multihash));
+      resolve('/ipfs/' + encodeBase58(dagNode._multihash));
     });
   });
 }
@@ -212,7 +211,7 @@ function startNode() {
 
 exports.addFile = addFile;
 exports.addFileInput = addFileInput;
-exports.calcIPFSHash = calcIPFSHash;
+exports.calcHash = calcHash;
 exports.connect2Peer = connect2Peer;
 exports.getDAGNode = getDAGNode;
 exports.getFile = getFile;

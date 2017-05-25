@@ -1,1 +1,1 @@
-{"@context":{"schema":"http://schema.org/","address":"schema:address","Artist":"schema:MusicGroup","email":"schema:email","homepage":"schema:url","name":"schema:name","profile":"schema:sameAs"},"@type":"Artist","email":"composer@example.com","homepage":"http://composer.com","name":"composer","profile":["http://facebook-profile.com"]}
+{"@context":"http://schema.org/","@type":"MusicGroup","email":"composer@example.com","name":"composer","sameAs":["http://facebook-sameAs.com"],"url":"http://composer.com"}

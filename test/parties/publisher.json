@@ -1,1 +1,1 @@
-{"@context":{"schema":"http://schema.org/","address":"schema:address","email":"schema:email","homepage":"schema:url","name":"schema:name","Organization":"schema:Organization","profile":"schema:sameAs"},"@type":"Organization","email":"publisher@example.com","homepage":"http://publisher.com","name":"publisher"}
+{"@context":"http://schema.org/","@type":"Organization","email":"publisher@example.com","name":"publisher","url":"http://publisher.com"}

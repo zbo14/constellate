@@ -1,1 +1,1 @@
-{"@context":{"schema":"http://schema.org/","address":"schema:address","Artist":"schema:MusicGroup","email":"schema:email","homepage":"schema:url","name":"schema:name","profile":"schema:sameAs"},"@type":"Artist","email":"lyricist@example.com","homepage":"http://lyricist.com","name":"lyricist"}
+{"@context":"http://schema.org/","@type":"MusicGroup","email":"lyricist@example.com","name":"lyricist","url":"http://lyricist.com"}

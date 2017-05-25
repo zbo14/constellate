@@ -1,1 +1,1 @@
-{"@context":{"schema":"http://schema.org/","address":"schema:address","email":"schema:email","homepage":"schema:url","name":"schema:name","Organization":"schema:Organization","profile":"schema:sameAs"},"@type":"Organization","address":"0xb29f37d6d5ae5c6163a0e95123713f2e16fc647a","email":"recordLabel@example.com","homepage":"http://recordLabel.com","name":"recordLabel"}
+{"@context":"http://schema.org/","@type":"Organization","address":"0x8496cffd290563c89e2f300d696d7fa17239010f","email":"recordLabel@example.com","name":"recordLabel","url":"http://recordLabel.com"}

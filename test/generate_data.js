@@ -2,24 +2,11 @@ const ed25519 = require('../lib/ed25519.js');
 const rsa = require('../lib/rsa.js');
 const secp256k1 = require('../lib/secp256k1.js');
 const { writeTestFile } = require('./fs.js');
-const { calcIPFSHash } = require('../lib/ipfs.js');
+const { calcHash } = require('../lib/ipfs.js');
 const { timestamp } = require('../lib/jwt.js');
 const { now } = require('../lib/util.js');
 
-const {
-    ArtistContext,
-    OrganizationContext
-} = require('../lib/party.js');
-
-const {
-    AlbumContext,
-    AudioContext,
-    CompositionContext,
-    ImageContext,
-    RecordingContext
-} = require('../lib/meta.js');
-
-const ids = {};
+const hashes = {};
 const objs = {};
 
 function promiseSeq(...fns) {
@@ -29,8 +16,8 @@ function promiseSeq(...fns) {
 }
 
 function setId(name) {
-    return calcIPFSHash(objs[name]).then((id) => {
-        return ids[name] = id;
+    return calcHash(objs[name]).then((hash) => {
+        return hashes[name] = hash;
     })
 }
 
@@ -49,55 +36,55 @@ writeTestFile('/keys/publisherKeypair.json', rsa.encodeKeypair(publisherKeypair)
 writeTestFile('/keys/recordLabelKeypair.json', secp256k1.encodeKeypair(recordLabelKeypair));
 
 objs.composer = {
-    '@context': ArtistContext,
-    '@type': 'Artist',
+    '@context': 'http://schema.org/',
+    '@type': 'MusicGroup',
     email: 'composer@example.com',
-    homepage: 'http://composer.com',
     name: 'composer',
-    profile: ['http://facebook-profile.com'],
+    sameAs: ['http://facebook-sameAs.com'],
+    url: 'http://composer.com'
 }
 
 objs.lyricist = {
-    '@context': ArtistContext,
-    '@type': 'Artist',
+    '@context': 'http://schema.org/',
+    '@type': 'MusicGroup',
     email: 'lyricist@example.com',
-    homepage: 'http://lyricist.com',
-    name: 'lyricist'
+    name: 'lyricist',
+    url: 'http://lyricist.com'
 }
 
 objs.performer = {
-    '@context': ArtistContext,
-    '@type': 'Artist',
+    '@context': 'http://schema.org/',
+    '@type': 'MusicGroup',
     address: secp256k1.publicKeyToAddress(performerKeypair.publicKey),
     email: 'performer@example.com',
-    homepage: 'http://performer.com',
     name: 'performer',
-    profile: ['http://bandcamp-page.com']
+    sameAs: ['http://bandcamp-page.com'],
+    url: 'http://performer.com'
 }
 
 objs.producer = {
-    '@context': ArtistContext,
-    '@type': 'Artist',
-    homepage: 'http://producer.com',
+    '@context': 'http://schema.org/',
+    '@type': 'MusicGroup',
     name: 'producer',
-    profile: ['http://soundcloud-page.com']
+    sameAs: ['http://soundcloud-page.com'],
+    url: 'http://producer.com'
 }
 
 objs.publisher = {
-    '@context': OrganizationContext,
+    '@context': 'http://schema.org/',
     '@type': 'Organization',
     email: 'publisher@example.com',
-    homepage: 'http://publisher.com',
-    name: 'publisher'
+    name: 'publisher',
+    url: 'http://publisher.com'
 }
 
 objs.recordLabel = {
-    '@context': OrganizationContext,
+    '@context': 'http://schema.org/',
     '@type': 'Organization',
     address: secp256k1.publicKeyToAddress(recordLabelKeypair.publicKey),
     email: 'recordLabel@example.com',
-    homepage: 'http://recordLabel.com',
-    name: 'recordLabel'
+    name: 'recordLabel',
+    url: 'http://recordLabel.com'
 }
 
 writeTestFile('/parties/composer.json', JSON.stringify(objs.composer));
@@ -118,26 +105,26 @@ promiseSeq(
 ).then(() => {
 
     objs.audio = {
-        '@context': AudioContext,
-        '@type': 'Audio',
-        contentUrl: 'QmYKAhVW2d4e28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE',
+        '@context': 'http://schema.org/',
+        '@type': 'AudioObject',
+        contentUrl:  { '/': '/ipfs/QmYKAhVW2d4e28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE' },
         encodingFormat: 'mp3'
     }
 
     objs.composition = {
-        '@context': CompositionContext,
-        '@type': 'Composition',
-        composer: [ids.composer],
+        '@context': 'http://schema.org/',
+        '@type': 'MusicComposition',
+        composer: [{ '/': hashes.composer }],
         iswcCode: 'T-034.524.680-1',
-        lyricist: [ids.lyricist],
-        publisher: [ids.publisher],
-        title: 'fire-song'
+        lyricist: [{ '/': hashes.lyricist }],
+        name: 'song-title',
+        publisher: [{ '/': hashes.publisher }]
     }
 
     objs.image = {
-        '@context': ImageContext,
-        '@type': 'Image',
-        contentUrl: 'QmYKAhvW2d4f28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE',
+        '@context': 'http://schema.org/',
+        '@type': 'ImageObject',
+        contentUrl: { '/': '/ipfs/QmYKAhvW2d4f28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE' },
         encodingFormat: 'png'
     }
 
@@ -154,13 +141,13 @@ promiseSeq(
 }).then(() => {
 
     objs.recording = {
-        '@context': RecordingContext,
-        '@type': 'Recording',
-        audio: [ids.audio],
-        performer: [ids.performer],
-        producer: [ids.producer],
-        recordingOf: ids.composition,
-        recordLabel: [ids.recordLabel]
+        '@context': 'http://schema.org/',
+        '@type': 'MusicRecording',
+        audio: [{ '/': hashes.audio }],
+        performer: [{ '/': hashes.performer }],
+        producer: [{ '/': hashes.producer }],
+        recordingOf: { '/': hashes.composition },
+        recordLabel: [{ '/': hashes.recordLabel }]
     }
 
     writeTestFile('/metas/recording.json', JSON.stringify(objs.recording));
@@ -170,15 +157,18 @@ promiseSeq(
 }).then(() => {
 
     objs.album = {
-        '@context': AlbumContext,
-        '@type': 'Album',
-        art: ids.image,
-        artist: [ids.performer, ids.producer],
-        productionType: 'DemoAlbum',
-        recordLabel: [ids.recordLabel],
-        releaseType: 'SingleRelease',
-        title: 'ding-ding-dooby-doo',
-        track: [ids.recording]
+        '@context': 'http://schema.org/',
+        '@type': 'MusicAlbum',
+        albumProductionType: 'DemoAlbum',
+        albumReleaseType: 'SingleRelease',
+        byArtist: [
+          { '/': hashes.performer },
+          { '/': hashes.producer }
+        ],
+        image: { '/': hashes.image },
+        name: 'ding-ding-dooby-doo',
+        recordLabel: [{ '/': hashes.recordLabel }],
+        track: [{ '/': hashes.recording }]
     }
 
     writeTestFile('/metas/album.json', JSON.stringify(objs.album));
@@ -188,20 +178,20 @@ promiseSeq(
 }).then(() => {
 
     objs.createComposition = timestamp({
-        iss: ids.composer,
-        sub: ids.composition,
+        iss: { '/': hashes.composer },
+        sub: { '/': hashes.composition },
         typ: 'Create'
     });
 
     objs.createRecording = timestamp({
-        iss: ids.performer,
-        sub: ids.recording,
+        iss: { '/': hashes.performer },
+        sub: { '/': hashes.recording },
         typ: 'Create'
     });
 
     objs.createAlbum = timestamp({
-        iss: ids.performer,
-        sub: ids.album,
+        iss: { '/': hashes.performer },
+        sub: { '/': hashes.album },
         typ: 'Create'
     });
 
@@ -218,26 +208,26 @@ promiseSeq(
 }).then(() => {
 
     objs.licenseComposition = timestamp({
-        aud: [ids.publisher],
+        aud: [{ '/': hashes.publisher }],
         exp: now() + 1000,
-        iss: ids.composer,
-        sub: ids.createComposition,
+        iss: { '/': hashes.composer },
+        sub: { '/': hashes.createComposition },
         typ: 'License'
     });
 
     objs.licenseRecording = timestamp({
-        aud: [ids.recordLabel],
+        aud: [{ '/': hashes.recordLabel }],
         exp: now() + 2000,
-        iss: ids.performer,
-        sub: ids.createRecording,
+        iss: { '/': hashes.performer },
+        sub: { '/': hashes.createRecording },
         typ: 'License'
     });
 
     objs.licenseAlbum = timestamp({
-        aud: [ids.recordLabel],
+        aud: [{ '/': hashes.recordLabel }],
         exp: now() + 3000,
-        iss: ids.performer,
-        sub: ids.createAlbum,
+        iss: { '/': hashes.performer },
+        sub: { '/': hashes.createAlbum },
         typ: 'License'
     });
 

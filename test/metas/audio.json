@@ -1,1 +1,1 @@
-{"@context":{"schema":"http://schema.org/","Audio":"schema:AudioObject","contentUrl":"schema:contentUrl","encodingFormat":"schema:encodingFormat"},"@type":"Audio","contentUrl":"QmYKAhVW2d4e28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE","encodingFormat":"mp3"}
+{"@context":"http://schema.org/","@type":"AudioObject","contentUrl":{"/":"/ipfs/QmYKAhVW2d4e28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE"},"encodingFormat":"mp3"}
