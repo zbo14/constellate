@@ -4,17 +4,19 @@
   </head>
   <body>
     <button id='start-peer-btn'>start peer</button><br>
+    <button id='add-data-btn'>add data</button><br>
+    <button id='get-data-btn'>get data</button><input type='text' id='data-hash' /><br><br>
     <!--
-    <input type='file' id='content' accept='audio/*,image/*' />
-    <button id='add-file-btn'>add file</button><br>
-    <input type='text' id='file-hash' \>
-    <button id='get-file-btn'>get file</button><br>
-    <div id='links'></div>
-    <hr>
-    <button id='read-tags-btn'>read tags</button>
-    <button id='write-tags-btn'>write tags</button><br>
-    <hr>
+    <label>public-key</label><br>
+    <select id='key-select'>
+      <option value='ed25519'>ed25519</option>
+      <option value='rsa'>rsa</option>
+      <option value='secp256k1'>secp256k1</option>
+    </select><br>
+    <button id='new-keypair-btn'>new keypair</button>
+    <textarea id='pub'></textarea><br>
     -->
+    <hr>
     <select id='schema-select'>
       <option selected disabled>--</option>
       <optgroup label='party'>
@@ -28,39 +30,10 @@
         <option value='ImageObject'>image</option>
         <option value='MusicRecording'>recording</option>
       </optgroup>
-      <optgroup label='claims'>
-        <option value='Create'>create</option>
-        <option value='License'>license</option>
-      </optgroup>
     </select><br>
-    <button id='new-keypair-btn' hidden>new keypair</button>
-    <button id='sign-claims-btn' hidden>sign claims</button>
-    <button id='verify-sig-btn' hidden>verify signature</button><br><br>
-    <form></form>
-    <hr>
-    <button id='add-data-btn'>add data</button><br>
-    <button id='get-data-btn'>get data</button>
-    <input type='text' id='data-hash' /><br>
-    <input type='text' id='mode' hidden /><br>
-    <label>public-key</label>
-    <select id='key-select'>
-      <option value='ed25519'>ed25519</option>
-      <option value='rsa'>rsa</option>
-      <option value='secp256k1'>secp256k1</option>
-    </select>
-    <textarea id='pub'></textarea><br>
-    <label>create signature</label>
-    <input type='text' id='create-sig' /><br>
-    <label>license signature</label>
-    <input type='text' id='license-sig' /><br>
-    <h4>party</h4>
-    <textarea id='party'></textarea>
-    <h4>meta</h4>
-    <textarea id='meta'></textarea>
-    <h4>create</h4>
-    <textarea id='create'></textarea>
-    <h4>license</h4>
-    <textarea id='license'></textarea>
+    <form></form><br>
+    <h4>Data</h4>
+    <textarea></textarea>
   </body>
   <script src='./bundle.js'></script>
 </html>

@@ -3,8 +3,6 @@ const rsa = require('../lib/rsa.js');
 const secp256k1 = require('../lib/secp256k1.js');
 const { writeTestFile } = require('./fs.js');
 const { calcHash } = require('../lib/ipfs.js');
-const { timestamp } = require('../lib/jwt.js');
-const { now } = require('../lib/util.js');
 
 const hashes = {};
 const objs = {};
@@ -174,65 +172,5 @@ promiseSeq(
     writeTestFile('/metas/album.json', JSON.stringify(objs.album));
 
     return setId('album');
-
-}).then(() => {
-
-    objs.createComposition = timestamp({
-        iss: { '/': hashes.composer },
-        sub: { '/': hashes.composition },
-        typ: 'Create'
-    });
-
-    objs.createRecording = timestamp({
-        iss: { '/': hashes.performer },
-        sub: { '/': hashes.recording },
-        typ: 'Create'
-    });
-
-    objs.createAlbum = timestamp({
-        iss: { '/': hashes.performer },
-        sub: { '/': hashes.album },
-        typ: 'Create'
-    });
-
-    writeTestFile('/claims/createComposition.json', JSON.stringify(objs.createComposition));
-    writeTestFile('/claims/createRecording.json', JSON.stringify(objs.createRecording));
-    writeTestFile('/claims/createAlbum.json', JSON.stringify(objs.createAlbum));
-
-    return promiseSeq(
-        () => setId('createComposition'),
-        () => setId('createRecording'),
-        () => setId('createAlbum')
-    );
-
-}).then(() => {
-
-    objs.licenseComposition = timestamp({
-        aud: [{ '/': hashes.publisher }],
-        exp: now() + 1000,
-        iss: { '/': hashes.composer },
-        sub: { '/': hashes.createComposition },
-        typ: 'License'
-    });
-
-    objs.licenseRecording = timestamp({
-        aud: [{ '/': hashes.recordLabel }],
-        exp: now() + 2000,
-        iss: { '/': hashes.performer },
-        sub: { '/': hashes.createRecording },
-        typ: 'License'
-    });
-
-    objs.licenseAlbum = timestamp({
-        aud: [{ '/': hashes.recordLabel }],
-        exp: now() + 3000,
-        iss: { '/': hashes.performer },
-        sub: { '/': hashes.createAlbum },
-        typ: 'License'
-    });
-
-    writeTestFile('/claims/licenseComposition.json', JSON.stringify(objs.licenseComposition));
-    writeTestFile('/claims/licenseRecording.json', JSON.stringify(objs.licenseRecording));
-    writeTestFile('/claims/licenseAlbum.json', JSON.stringify(objs.licenseAlbum));
-
+    
 });

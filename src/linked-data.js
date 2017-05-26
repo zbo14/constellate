@@ -1,7 +1,18 @@
 const { getDAGNode } = require('../lib/ipfs.js');
-const { getMetaSchema } = require('../lib/meta.js');
-const { getPartySchema } = require('../lib/party.js');
 const { validateSchema } = require('../lib/schema.js');
+
+const {
+  AudioObject,
+  ImageObject,
+  MusicAlbum,
+  MusicComposition,
+  MusicRecording
+} = require('../lib/meta.js');
+
+const {
+  MusicGroup,
+  Organization
+} = require('../lib/party.js');
 
 const {
   arrayFromObject,
@@ -9,7 +20,6 @@ const {
   isObject,
   recurse
 } = require('../lib/util.js');
-
 
 // @flow
 
@@ -20,14 +30,19 @@ const {
 function getSchema(type: string): Object {
   switch(type) {
     case 'MusicGroup':
+      return MusicGroup;
     case 'Organization':
-      return getPartySchema(type);
+      return Organization;
     case 'AudioObject':
+      return AudioObject;
     case 'ImageObject':
+      return ImageObject;
     case 'MusicAlbum':
+      return MusicAlbum;
     case 'MusicComposition':
+      return MusicComposition;
     case 'MusicRecording':
-      return getMetaSchema(type);
+      return MusicRecording;
     //..
     default:
       throw new Error('unexpected @type: ' + type);
@@ -80,7 +95,7 @@ function getLinks(obj: Object): Object[] {
   }, []);
 }
 
-function validateLinkedData(obj: Object, format: string): Promise<Object> {
+function validate(obj: Object, format: string): Promise<Object> {
     return new Promise((resolve, reject) => {
         const schema = getSchema(obj['@type']);
         if (!validateSchema(obj, schema)) {
@@ -94,10 +109,15 @@ function validateLinkedData(obj: Object, format: string): Promise<Object> {
                 return getDAGNode(link.multihash);
             }).then((dagNode) => {
                 if (format === 'dag-cbor') {
-                    nodeValue = recurse(dagNode.value, (val, key) => {
-                        if (key !== '/') return val;
-                        return multibase.encode('base58btc', Buffer.from(val));
-                    });
+                  nodeValue = recurse(dagNode.value, (val, key) => {
+                    if (key === '/') {
+                      return multibase.encode('base58btc', Buffer.from(val)).toString('utf8');
+                    }
+                    if (isObject(val) && val['/']) {
+                      return multibase.encode('base58btc', Buffer.from(val['/'])).toString('utf8');
+                    }
+                    return val;
+                  });
                 } else if (format === 'dag-pb') {
                     nodeValue = JSON.parse(Buffer.from(dagNode.value._data).toString('utf8'));
                 } else {
@@ -111,14 +131,14 @@ function validateLinkedData(obj: Object, format: string): Promise<Object> {
                       expected ${type}; got ${nodeValue['@type']}`)
                     );
                 }
-                return validateLinkedData(nodeValue, format);
-            }).then((val) => {
+                return validate(nodeValue, format);
+            }).then((validated) => {
                 if (parts.length === 1) {
-                  obj = Object.assign({}, obj, { [link.name]: val });
+                  obj = Object.assign({}, obj, { [link.name]: validated });
                 } else if (parseInt(parts[1]) === 1) {
-                  obj = Object.assign({}, obj, { [parts[0]]: [val] });
+                  obj = Object.assign({}, obj, { [parts[0]]: [validated] });
                 } else {
-                  obj = Object.assign({}, obj, { [parts[0]]: obj[parts[0]].concat(val) });
+                  obj = Object.assign({}, obj, { [parts[0]]: obj[parts[0]].concat(validated) });
                 }
             });
         }, Promise.resolve()).then(() => {
@@ -127,5 +147,5 @@ function validateLinkedData(obj: Object, format: string): Promise<Object> {
     });
 }
 
-
-exports.validateLinkedData = validateLinkedData;
+exports.getSchema = getSchema;
+exports.validate = validate;

@@ -1,10 +1,6 @@
 'use strict';
 
-const {
-  Draft,
-  Link,
-  validateSchema
-} = require('../lib/schema.js');
+const { Draft, Link } = require('../lib/schema.js');
 
 // @flow
 
@@ -12,9 +8,61 @@ const {
 * @module constellate/src/meta
 */
 
-const Album = {
+const AudioObject = {
   $schema: Draft,
-  title: 'Album',
+  title: 'AudioObject',
+  type: 'object',
+  properties: {
+    '@context': {
+      enum: ['http://schema.org/'],
+      readonly: true
+    },
+    '@type': {
+      enum: ['AudioObject'],
+      readonly: true
+    },
+    contentUrl: Link,
+    encodingFormat: {
+      enum: ['mp3', 'mpeg4']
+    }
+    //..
+  },
+  required: [
+    '@context',
+    '@type',
+    'contentUrl'
+  ]
+}
+
+const ImageObject = {
+  $schema: Draft,
+  title: 'ImageObject',
+  type: 'object',
+  properties: {
+    '@context': {
+      enum: ['http://schema.org/'],
+      readonly: true
+    },
+    '@type': {
+      enum: ['ImageObject'],
+      readonly: true
+    },
+    contentUrl: Link,
+    encodingFormat: {
+      enum: ['jpeg', 'png']
+    }
+    //..
+  },
+  required: [
+    '@context',
+    '@type',
+    'contentUrl'
+  ]
+}
+
+const MusicAlbum = {
+  $schema: Draft,
+  title: 'MusicAlbum',
   type: 'object',
   properties: {
     '@context': {
@@ -78,35 +126,9 @@ const Album = {
   ]
 }
 
-const Audio = {
+const MusicComposition = {
   $schema: Draft,
-  title: 'Audio',
-  type: 'object',
-  properties: {
-    '@context': {
-      enum: ['http://schema.org/'],
-      readonly: true
-    },
-    '@type': {
-      enum: ['AudioObject'],
-      readonly: true
-    },
-    contentUrl: Link,
-    encodingFormat: {
-      enum: ['mp3', 'mpeg4']
-    }
-    //..
-  },
-  required: [
-    '@context',
-    '@type',
-    'contentUrl'
-  ]
-}
-
-const Composition = {
-  $schema: Draft,
-  title: 'Composition',
+  title: 'MusicComposition',
   type: 'object',
   properties: {
     '@context': {
@@ -151,35 +173,9 @@ const Composition = {
   ]
 }
 
-const Image = {
+const MusicRecording = {
   $schema: Draft,
-  title: 'Image',
-  type: 'object',
-  properties: {
-    '@context': {
-      enum: ['http://schema.org/'],
-      readonly: true
-    },
-    '@type': {
-      enum: ['ImageObject'],
-      readonly: true
-    },
-    contentUrl: Link,
-    encodingFormat: {
-      enum: ['jpeg', 'png']
-    }
-    //..
-  },
-  required: [
-    '@context',
-    '@type',
-    'contentUrl'
-  ]
-}
-
-const Recording = {
-  $schema: Draft,
-  title: 'Recording',
+  title: 'MusicRecording',
   type: 'object',
   properties: {
     '@context': {
@@ -233,30 +229,8 @@ const Recording = {
   ]
 }
 
-function getMetaSchema(type: string): Object {
-  switch(type) {
-    case 'MusicAlbum':
-      return Album;
-    case 'AudioObject':
-      return Audio;
-    case 'MusicComposition':
-      return Composition;
-    case 'ImageObject':
-      return Image;
-    case 'MusicRecording':
-      return Recording;
-    default:
-      throw new Error('unexpected meta @type: ' + type);
-  }
-}
-
-function validateMeta(meta: Object): boolean {
-  const schema = getMetaSchema(meta['@type']);
-  if (!validateSchema(meta, schema)) {
-    throw new Error('meta has invalid schema: ' + JSON.stringify(meta, null, 2));
-  }
-  return true;
-}
-
-exports.getMetaSchema = getMetaSchema;
-exports.validateMeta = validateMeta;
+exports.AudioObject = AudioObject;
+exports.ImageObject = ImageObject;
+exports.MusicAlbum = MusicAlbum;
+exports.MusicComposition = MusicComposition;
+exports.MusicRecording = MusicRecording;

@@ -1,15 +1,11 @@
 'use strict';
 
-const secp256k1 = require('../lib/secp256k1.js');
-
 const{
   Address,
   Draft,
   Email,
   Link,
-  Url,
-  contextPrefix,
-  validateSchema
+  Url
 } = require('../lib/schema.js');
 
 // @flow
@@ -18,9 +14,9 @@ const{
 * @module constellate/src/party
 */
 
-const Artist = {
+const MusicGroup = {
   $schema: Draft,
-  title: 'Artist',
+  title: 'MusicGroup',
   type: 'object',
   properties: {
     '@context': {
@@ -90,40 +86,5 @@ const Organization = {
   ]
 }
 
-function getPartySchema(type: string): Object {
-  switch(type) {
-    case 'MusicGroup':
-    case 'byArtist':
-    case 'composer':
-    case 'lyricist':
-    case 'performer':
-    case 'producer':
-      return Artist;
-    case 'Organization':
-    case 'publisher':
-    case 'recordLabel':
-      return Organization;
-    default:
-      throw new Error('unexpected party ' + type);
-  }
-}
-
-function validateParty(party: Object, publicKey?: Buffer): boolean {
-  const schema = getPartySchema(party['@type']);
-  if (!validateSchema(party, schema)) {
-    throw new Error('party has invalid schema: ' + JSON.stringify(party, null, 2));
-  }
-  if (publicKey) {
-    if (publicKey.length !== 33) {
-      throw new Error(`expected public-key length=33; got ` + publicKey.length);
-    }
-    const addr = secp256k1.publicKeyToAddress(publicKey);
-    if (party.address !== addr) {
-      throw new Error(`expected addr=${party['address']}; got ` + addr)
-    }
-  }
-  return true;
-}
-
-exports.getPartySchema = getPartySchema;
-exports.validateParty = validateParty;
+exports.MusicGroup = MusicGroup;
+exports.Organization = Organization;

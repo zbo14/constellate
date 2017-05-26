@@ -34,6 +34,11 @@ const Link = {
   required: ['/']
 }
 
+const Uri = {
+  type: 'string',
+  format: 'uri'
+}
+
 const Url = {
   type: 'string',
   // from http://stackoverflow.com/a/3809435
@@ -48,6 +53,7 @@ exports.Address = Address;
 exports.Draft = Draft;
 exports.Email = Email;
 exports.Link = Link;
+exports.Uri = Uri;
 exports.Url = Url;
 
 exports.validateSchema = validateSchema;
