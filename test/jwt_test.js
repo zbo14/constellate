@@ -44,27 +44,27 @@ const licenseAlbumSig = signClaims(licenseAlbum, performerHeader, performerKeypa
 
 describe('JWT', () => {
   it('verifies create composition claims', (done) => {
-    verifyClaims(createComposition, composerHeader, composition, createCompositionSig)
+    verifyClaims('dag-cbor', createComposition, composerHeader, composition, createCompositionSig)
       .then(() => done(), done);
   });
   it('verifies create recording claims', (done) => {
-    verifyClaims(createRecording, performerHeader, recording, createRecordingSig)
+    verifyClaims('dag-cbor', createRecording, performerHeader, recording, createRecordingSig)
       .then(() => done(), done);
   });
   it('verifies create album claims', (done) => {
-    verifyClaims(createAlbum, performerHeader, album, createAlbumSig)
+    verifyClaims('dag-cbor', createAlbum, performerHeader, album, createAlbumSig)
       .then(() => done(), done);
   });
   it('verifies license composition claims', (done) => {
-    verifyClaims(licenseComposition, composerHeader, composition, licenseCompositionSig, createComposition, createCompositionSig)
+    verifyClaims('dag-cbor', licenseComposition, composerHeader, composition, licenseCompositionSig, createComposition, createCompositionSig)
       .then(() => done(), done);
   });
   it('verifies license recording claims', (done) => {
-    verifyClaims(licenseRecording, performerHeader, recording, licenseRecordingSig, createRecording, createRecordingSig)
+    verifyClaims('dag-cbor', licenseRecording, performerHeader, recording, licenseRecordingSig, createRecording, createRecordingSig)
       .then(() => done(), done);
   });
   it('verifies license album claims', (done) => {
-    verifyClaims(licenseAlbum, performerHeader, album, licenseAlbumSig, createAlbum, createAlbumSig)
+    verifyClaims('dag-cbor', licenseAlbum, performerHeader, album, licenseAlbumSig, createAlbum, createAlbumSig)
       .then(() => done(), done);
   });
 });

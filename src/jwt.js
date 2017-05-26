@@ -305,7 +305,7 @@ function timestamp(claims: Object): Object {
   return Object.assign({}, claims, { iat: now() });
 }
 
-function validateClaims(claims: Object, meta: Object, subject?: Object): Promise<boolean> {
+function validateClaims(format: string, claims: Object, meta: Object, subject?: Object): Promise<boolean> {
   return new Promise((resolve, reject) => {
     const schema = getClaimsSchema(claims.typ);
     if (!validateSchema(claims, schema)) {
@@ -317,7 +317,7 @@ function validateClaims(claims: Object, meta: Object, subject?: Object): Promise
     }
     if (claims.typ === 'Create') {
       if (validateMeta(meta)) {
-        calcHash(meta).then((hash) => {
+        calcHash(meta, format).then((hash) => {
           if (claims.sub['/'] !== hash) {
             return reject(`expected sub=${claims.sub}; got ` + hash);
           }
@@ -373,7 +373,7 @@ function validateClaims(claims: Object, meta: Object, subject?: Object): Promise
       if (claims.iss['/'] !== subject.iss['/']) {
         return reject('iss should equal subject iss');
       }
-      calcHash(subject).then((hash) => {
+      calcHash(subject, format).then((hash) => {
         if (claims.sub['/'] !== hash) {
           return reject('sub should equal subject jti');
         }
@@ -383,12 +383,12 @@ function validateClaims(claims: Object, meta: Object, subject?: Object): Promise
   });
 }
 
-function verifyClaims(claims: Object, header: Object, meta: Object, signature: Buffer, subject?: Object, subjectSignature?: Buffer): Promise<boolean> {
+function verifyClaims(format: string, claims: Object, header: Object, meta: Object, signature: Buffer, subject?: Object, subjectSignature?: Buffer): Promise<boolean> {
   return new Promise((resolve, reject) => {
     if (!validateSchema(header, Header)) {
       return reject('header has invalid schema: ' + JSON.stringify(header, null, 2));
     }
-    validateClaims(claims, meta, subject).then(() => {
+    validateClaims(format, claims, meta, subject).then(() => {
       const encodedHeader = encodeBase64(Buffer.from(orderStringify(header)));
       let encodedPayload = encodeBase64(Buffer.from(orderStringify(claims)));
       let message = encodedHeader + '.' + encodedPayload;

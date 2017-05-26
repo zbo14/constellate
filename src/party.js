@@ -91,13 +91,21 @@ const Organization = {
 }
 
 function getPartySchema(type: string): Object {
-  if (type === 'MusicGroup') {
-    return Artist;
+  switch(type) {
+    case 'MusicGroup':
+    case 'byArtist':
+    case 'composer':
+    case 'lyricist':
+    case 'performer':
+    case 'producer':
+      return Artist;
+    case 'Organization':
+    case 'publisher':
+    case 'recordLabel':
+      return Organization;
+    default:
+      throw new Error('unexpected party ' + type);
   }
-  if (type === 'Organization') {
-    return Organization;
-  }
-  throw new Error('unexpected party @type: ' + type);
 }
 
 function validateParty(party: Object, publicKey?: Buffer): boolean {

@@ -16,7 +16,7 @@ function promiseSeq(...fns) {
 }
 
 function setId(name) {
-    return calcHash(objs[name]).then((hash) => {
+    return calcHash(objs[name], 'dag-cbor').then((hash) => {
         return hashes[name] = hash;
     })
 }
@@ -107,7 +107,7 @@ promiseSeq(
     objs.audio = {
         '@context': 'http://schema.org/',
         '@type': 'AudioObject',
-        contentUrl:  { '/': '/ipfs/QmYKAhVW2d4e28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE' },
+        contentUrl:  { '/': 'QmYKAhVW2d4e28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE' },
         encodingFormat: 'mp3'
     }
 
@@ -124,7 +124,7 @@ promiseSeq(
     objs.image = {
         '@context': 'http://schema.org/',
         '@type': 'ImageObject',
-        contentUrl: { '/': '/ipfs/QmYKAhvW2d4f28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE' },
+        contentUrl: { '/': 'QmYKAhvW2d4f28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE' },
         encodingFormat: 'png'
     }
 

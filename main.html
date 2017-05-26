@@ -3,11 +3,11 @@
     <title>constellate</title>
   </head>
   <body>
-    <button id='start-node-btn'>start node</button><br>
+    <button id='start-peer-btn'>start peer</button><br>
     <!--
     <input type='file' id='content' accept='audio/*,image/*' />
     <button id='add-file-btn'>add file</button><br>
-    <input type='text' id='multihash' \>
+    <input type='text' id='file-hash' \>
     <button id='get-file-btn'>get file</button><br>
     <div id='links'></div>
     <hr>
@@ -18,15 +18,15 @@
     <select id='schema-select'>
       <option selected disabled>--</option>
       <optgroup label='party'>
-        <option value='Artist'>artist</option>
+        <option value='MusicGroup'>artist</option>
         <option value='Organization'>organization</option>
       </optgroup>
       <optgroup label='meta'>
-        <option value='Album'>album</option>
-        <option value='Audio'>audio</option>
-        <option value='Composition'>composition</option>
-        <option value='Image'>image</option>
-        <option value='Recording'>recording</option>
+        <option value='MusicAlbum'>album</option>
+        <option value='AudioObject'>audio</option>
+        <option value='MusicComposition'>composition</option>
+        <option value='ImageObject'>image</option>
+        <option value='MusicRecording'>recording</option>
       </optgroup>
       <optgroup label='claims'>
         <option value='Create'>create</option>
@@ -40,7 +40,7 @@
     <hr>
     <button id='add-data-btn'>add data</button><br>
     <button id='get-data-btn'>get data</button>
-    <input type='text' id='@id' /><br>
+    <input type='text' id='data-hash' /><br>
     <input type='text' id='mode' hidden /><br>
     <label>public-key</label>
     <select id='key-select'>

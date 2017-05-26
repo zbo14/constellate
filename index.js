@@ -1,3 +1,4 @@
+const multibase = require('multibase');
 const ed25519 = require('./lib/ed25519.js');
 const ipfs = require('./lib/ipfs.js');
 const rsa = require('./lib/rsa.js');
@@ -7,7 +8,7 @@ const { generateForm, parseForm } = require('./lib/form.js');
 const { validateLinkedData } = require('./lib/linked-data.js');
 const { getMetaSchema, validateMeta } = require('./lib/meta.js');
 const { getPartySchema, validateParty } = require('./lib/party.js');
-const { getLinks } = require('./lib/schema.js');
+const { recurse } = require('./lib/util.js');
 require('setimmediate');
 
 const {
@@ -38,8 +39,9 @@ const {
 const content = document.getElementById('content');
 const create = document.getElementById('create');
 const createSig = document.getElementById('create-sig');
+const dataHash = document.getElementById('data-hash');
+// const fileHash = document.getElementById('file-hash');
 const form = document.querySelector('form');
-const id = document.getElementById('@id');
 const license = document.getElementById('license');
 const licenseSig = document.getElementById('license-sig');
 const meta = document.getElementById('meta');
@@ -60,23 +62,21 @@ const getDataBtn = document.getElementById('get-data-btn');
 const newKeypairBtn = document.getElementById('new-keypair-btn');
 // const readTagsBtn = document.getElementById('read-tags-btn');
 const signClaimsBtn = document.getElementById('sign-claims-btn');
-const startNodeBtn = document.getElementById('start-node-btn');
+const startPeerBtn = document.getElementById('start-peer-btn');
 // const writeTagsBtn = document.getElementById('write-tags-btn');
 const verifySigBtn = document.getElementById('verify-sig-btn');
 
-startNodeBtn.addEventListener('click', () => {
-    ipfs.startNode().then((info) => {
+startPeerBtn.addEventListener('click', () => {
+    ipfs.startPeer().then((info) => {
         console.log('Peer info:', info);
         addDataBtn.addEventListener('click', () => {
-            let obj, schema;
+            let obj;
             switch (mode.value) {
                 case 'party':
                     obj = JSON.parse(party.textContent);
-                    schema = getPartySchema(schemaSelect.value);
                     break;
                 case 'meta':
                     obj = JSON.parse(meta.textContent);
-                    schema = getMetaSchema(schemaSelect.value);
                     break;
                 case 'claims':
                     if (schemaSelect.value === 'Create') {
@@ -85,26 +85,33 @@ startNodeBtn.addEventListener('click', () => {
                     if (schemaSelect.value === 'License') {
                       obj = JSON.parse(license.textContent);
                     }
-                    schema = getClaimsSchema(schemaSelect.value);
                     break;
                 default:
                     return console.error('unexpected mode: ' + mode.value);
             }
-            const links = getLinks(obj, schema);
-            ipfs.newDAGNode(obj, links).then((dagNode) => {
-                return ipfs.putDAGNode(dagNode);
-            }).then((cid) => {
-                console.log(cid);
+            ipfs.putDAGNode(obj, 'dag-cbor').then((cid) => {
+              console.log(cid.toBaseEncodedString());
             }, console.error);
+            // const links = getLinks(obj, schema);
+            // ipfs.newDAGNode(obj, links).then((dagNode) => {
+            //    return ipfs.putDAGNode(dagNode);
+            // }).then((cid) => {
+            //    console.log(cid);
+            // }, console.error);
         });
         getDataBtn.addEventListener('click', () => {
-          ipfs.getDAGNode(id.value).then((dagNode) => {
-            const data = dagNode.value._data;
-            const json = dagNode.value._json;
-            console.log(Object.assign(json, {
-              data: Buffer.from(data).toString('utf8')
-            }));
+          ipfs.getDAGNode(dataHash.value).then((dagNode) => {
+            const nodeValue = recurse(dagNode.value, (val, key) => {
+              if (key !== '/') return val;
+              return multibase.encode('base58btc', Buffer.from(val));
+            });
+            console.log(JSON.stringify(nodeValue));
           }, console.error);
+          // const data = dagNode.value._data;
+          // const json = dagNode.value._json;
+          // console.log(Object.assign(json, {
+          // data: Buffer.from(data).toString('utf8')
+          // }));
         });
         /*
         addFileBtn.addEventListener('click', () => {
@@ -112,7 +119,7 @@ startNodeBtn.addEventListener('click', () => {
                 if (schemaSelect.value.toLowerCase() === content.files[0].type.split('/')[0]) {
                     ipfs.addFileInput(content).then((result) => {
                         console.log('Added file:', result);
-                        multihash.value = result.hash;
+                        fileHash.value = result.hash;
                         const label = Array.from(document.querySelectorAll('label')).find((label) => {
                             return label.textContent === 'contentUrl' &&
                                 label.nextElementSibling.type === 'text' &&
@@ -124,8 +131,8 @@ startNodeBtn.addEventListener('click', () => {
             }
         });
         getFileBtn.addEventListener('click', () => {
-            if (multihash.value) {
-                ipfs.getFile(multihash.value).then((link) => {
+            if (fileHash.value) {
+                ipfs.getFile(fileHash.value).then((link) => {
                     links.appendChild(link);
                 }, console.error);
             }
@@ -331,24 +338,21 @@ form.addEventListener('submit', (event) => {
                div.children.length === 2 &&
                includeElement(div.lastChild, div.firstChild);
     });
-    let obj = parseForm(divs), schema;
+    let obj = parseForm(divs);
     switch (mode.value) {
         case 'party':
             validateParty(obj);
-            schema = getPartySchema(schemaSelect.value);
             party.textContent = JSON.stringify(obj, null, 2);
             break;
         case 'meta':
             // validateMeta(obj);
-            validateLinkedData(obj).then((result) => {
+            validateLinkedData(obj, 'dag-cbor').then((result) => {
               console.log('result:', JSON.stringify(result, null, 2));
               meta.textContent = JSON.stringify(obj, null, 2);
             });
-            schema = getMetaSchema(schemaSelect.value);
             break;
         case 'claims':
             obj = timestamp(obj);
-            schema = getClaimsSchema(schemaSelect.value);
             const metaObj = JSON.parse(meta.textContent);
             if (schemaSelect.value === 'Create') {
                 validateClaims(obj, metaObj).then(() => {
@@ -365,11 +369,12 @@ form.addEventListener('submit', (event) => {
         default:
             throw new Error('unexpected mode: ' + mode.value);
     }
-    const links = getLinks(obj, schema);
-    // ipfs.calcIPFSHash(obj).then((id) => {
-    //  console.log(id);
-    // });
-    ipfs.newDAGNode(obj, links).then((dagNode) => {
-      id.setAttribute('value', encodeBase58(dagNode._multihash));
-    }, console.error);
+    ipfs.calcHash(obj, 'dag-cbor').then((hash) => {
+      dataHash.setAttribute('value', hash);
+    });
+    // const links = getLinks(obj, schema);
+    // ipfs.newDAGNode(obj, links).then((dagNode) => {
+    //  dataHash.setAttribute('value', encodeBase58(dagNode._multihash));
+    // }, console.error);
+
 });
