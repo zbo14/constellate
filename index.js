@@ -1,3 +1,4 @@
+const CID = require('cids');
 const multibase = require('multibase');
 // const ed25519 = require('./lib/ed25519.js');
 const ipfs = require('./lib/ipfs.js');
@@ -42,14 +43,14 @@ startPeerBtn.addEventListener('click', () => {
           ipfs.getDAGNode(dataHash.value).then((dagNode) => {
             const nodeValue = recurse(dagNode.value, (val, key) => {
               if (key === '/') {
-                return multibase.encode('base58btc', Buffer.from(val)).toString('utf8');
+                return new CID(val).toBaseEncodedString();
               }
               if (isObject(val) && val['/']) {
-                return multibase.encode('base58btc', Buffer.from(val['/'])).toString('utf8');
+                return { '/': new CID(val['/']).toBaseEncodedString() };
               }
               return val;
             });
-            console.log(JSON.stringify(nodeValue));
+            console.log(nodeValue);
           });
         });
     });

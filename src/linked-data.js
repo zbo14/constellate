@@ -1,5 +1,12 @@
+const CID = require('cids');
 const { getDAGNode } = require('../lib/ipfs.js');
 const { validateSchema } = require('../lib/schema.js');
+
+const {
+  Assertion,
+  Copyright,
+  Right
+} = require('../lib/coala.js');
 
 const {
   AudioObject,
@@ -43,31 +50,57 @@ function getSchema(type: string): Object {
       return MusicComposition;
     case 'MusicRecording':
       return MusicRecording;
+    case 'Assertion':
+      return Assertion;
+    case 'Copyright':
+      return Copyright;
+    case 'Right':
+      return Right;
     //..
     default:
       throw new Error('unexpected @type: ' + type);
   }
 }
 
-function getType(key: string): string {
+function getTypes(key: string): string[] {
   switch(key) {
     case 'byArtist':
     case 'composer':
     case 'lyricist':
     case 'performer':
     case 'producer':
-      return 'MusicGroup';
+      return ['MusicGroup'];
     case 'publisher':
     case 'recordLabel':
-      return 'Organization';
+      return ['Organization'];
     case 'audio':
-      return 'AudioObject';
+      return ['AudioObject'];
     case 'image':
-      return 'ImageObject';
+      return ['ImageObject'];
     case 'recordingOf':
-      return 'MusicComposition';
+      return ['MusicComposition'];
     case 'track':
-      return 'MusicRecording';
+      return ['MusicRecording'];
+    case 'rightsOf':
+      return [
+        'AudioObject',
+        'ImageObject',
+        'MusicAlbum',
+        'MusicComposition',
+        'MusicRecording'
+      ];
+    case 'source':
+      return ['Copyright'];
+    case 'asserter':
+      return ['MusicGroup', 'Organization'];
+    case 'assertionSubject':
+      return [
+        'AudioObject',
+        'ImageObject',
+        'MusicAlbum',
+        'MusicComposition',
+        'MusicRecording'
+      ];
     default:
       throw new Error('unexpected key: ' + key);
   }
@@ -111,10 +144,10 @@ function validate(obj: Object, format: string): Promise<Object> {
                 if (format === 'dag-cbor') {
                   nodeValue = recurse(dagNode.value, (val, key) => {
                     if (key === '/') {
-                      return multibase.encode('base58btc', Buffer.from(val)).toString('utf8');
+                      return new CID(val).toBaseEncodedString();
                     }
                     if (isObject(val) && val['/']) {
-                      return multibase.encode('base58btc', Buffer.from(val['/'])).toString('utf8');
+                      return { '/': new CID(val['/']).toBaseEncodedString() };
                     }
                     return val;
                   });
@@ -124,11 +157,10 @@ function validate(obj: Object, format: string): Promise<Object> {
                     return reject(new Error('unexpected format: ' + format));
                 }
                 parts = link.name.split('-');
-                const type = getType(parts[0]);
-                if (type !== nodeValue['@type']) {
-                    return reject(new Error(
-                      `invalid @type for ${parts[0]}\n
-                      expected ${type}; got ${nodeValue['@type']}`)
+                const types = getTypes(parts[0]);
+                if (!types.includes(nodeValue['@type'])) {
+                    return reject(
+                      new Error(`invalid @type for ${parts[0]}: ${nodeValue['@type']}`)
                     );
                 }
                 return validate(nodeValue, format);

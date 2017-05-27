@@ -17,10 +17,14 @@ const Address = {
   pattern: '^0x[a-fA-F0-9]{40}$'
 }
 
+const DateTime = {
+  type: 'string',
+  format: 'date-time'
+}
+
 const Email = {
   type: 'string',
-  format: 'email',
-  pattern: '^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'
+  format: 'email'
 }
 
 const Link = {
@@ -28,7 +32,7 @@ const Link = {
   properties: {
     '/': {
       type: 'string',
-      pattern: '^[1-9A-HJ-NP-Za-km-z]{46,49}$'
+      pattern: '^[1-9A-HJ-NP-Za-km-z]+$'
     }
   },
   required: ['/']
@@ -50,6 +54,7 @@ function validateSchema(obj: Object, schema: Object): boolean {
 }
 
 exports.Address = Address;
+exports.DateTime = DateTime;
 exports.Draft = Draft;
 exports.Email = Email;
 exports.Link = Link;

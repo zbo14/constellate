@@ -1,7 +1,16 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
 import { readTestFile } from './fs.js';
-import { validateMeta } from '../lib/meta.js';
+import { startPeer } from '../lib/ipfs.js';
+import { validateSchema } from '../lib/schema.js';
+
+import {
+  AudioObject,
+  ImageObject,
+  MusicAlbum,
+  MusicComposition,
+  MusicRecording
+} from '../lib/meta.js';
 
 const album = JSON.parse(readTestFile('/metas/album.json'));
 const audio = JSON.parse(readTestFile('/metas/audio.json'));
@@ -12,32 +21,32 @@ const recording = JSON.parse(readTestFile('/metas/recording.json'));
 describe('Meta', () => {
   it('validates composition metadata', () => {
     assert.isOk(
-      validateMeta(composition),
-      'should validate composition'
+      validateSchema(composition, MusicComposition),
+      'should validate composition metadata'
     );
   });
   it('validates audio metadata', () => {
     assert.isOk(
-      validateMeta(audio),
-      'should validate audio'
+      validateSchema(audio, AudioObject),
+      'should validate audio metadata'
     );
   });
   it('validates image metadata', () => {
     assert.isOk(
-      validateMeta(image),
-      'should validate image'
+      validateSchema(image, ImageObject),
+      'should validate image metadata'
     );
   });
   it('validates recording metadata', () => {
     assert.isOk(
-      validateMeta(recording),
-      'should validate recording'
+      validateSchema(recording, MusicRecording),
+      'should validate recording metadata'
     );
   });
   it ('validates album metadata', () => {
     assert.isOk(
-      validateMeta(album),
-      'should validate album'
+      validateSchema(album, MusicAlbum),
+      'should validate album metadata'
     );
   });
 });

@@ -1,11 +1,8 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
 import { readTestFile } from './fs.js';
-import { validateParty } from '../lib/party.js';
-
-const ed25519 = require('../lib/ed25519.js');
-const rsa = require('../lib/rsa.js');
-const secp256k1 = require('../lib/secp256k1.js');
+import { MusicGroup, Organization } from '../lib/party.js';
+import { validateSchema } from '../lib/schema.js';
 
 const composer = JSON.parse(readTestFile('/parties/composer.json'));
 const lyricist = JSON.parse(readTestFile('/parties/lyricist.json'));
@@ -14,43 +11,40 @@ const producer = JSON.parse(readTestFile('/parties/producer.json'));
 const publisher = JSON.parse(readTestFile('/parties/publisher.json'));
 const recordLabel = JSON.parse(readTestFile('/parties/recordLabel.json'));
 
-const performerKeypair = secp256k1.decodeKeypair(readTestFile('/keys/performerKeypair.json'));
-const recordLabelKeypair = secp256k1.decodeKeypair(readTestFile('/keys/recordLabelKeypair.json'));
-
 describe('Party', () => {
   it('validates composer', () => {
     assert.isOk(
-      validateParty(composer),
+      validateSchema(composer, MusicGroup),
       'should validate composer'
     );
   });
   it('validates lyricist', () => {
     assert.isOk(
-      validateParty(lyricist),
+      validateSchema(lyricist, MusicGroup),
       'should validate lyricist'
     );
   });
   it('validates performer', () => {
     assert.isOk(
-      validateParty(performer, performerKeypair.publicKey),
+      validateSchema(performer, MusicGroup),
       'should validate performer'
     );
   });
   it('validates producer', () => {
     assert.isOk(
-      validateParty(producer),
+      validateSchema(producer, MusicGroup),
       'should validate producer'
     );
   });
   it('validates publisher', () => {
     assert.isOk(
-      validateParty(publisher),
+      validateSchema(publisher, Organization),
       'should validate publisher'
     );
   });
   it('validates recordLabel', () => {
     assert.isOk(
-      validateParty(recordLabel, recordLabelKeypair.publicKey),
+      validateSchema(recordLabel, Organization),
       'should validate recordLabel'
     );
   });

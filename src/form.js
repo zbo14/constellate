@@ -35,10 +35,13 @@ function generateElement(obj: Object, defs: Object): HTMLElement {
   }
     switch(obj.type) {
       case 'array':
+        let li;
         const ol = document.createElement('ol');
-        const li = document.createElement('li');
-        li.appendChild(generateElement(obj.items, defs));
-        ol.appendChild(li);
+        [].concat(obj.items).forEach((item) => {
+          li = document.createElement('li');
+          li.appendChild(generateElement(item, defs));
+          ol.appendChild(li);
+        });
         return ol;
       case 'boolean':
         return newInput('checkbox');
