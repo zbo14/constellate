@@ -34,6 +34,26 @@ const AudioObject = {
   ]
 }
 
+const CreativeWork = {
+  $schema: Draft,
+  title: 'CreativeWork',
+  type: 'object',
+  properties: {
+    '@context': {
+      enum: ['http://schema.org/'],
+      readonly: true
+    },
+    '@type': {
+      enum: ['CreativeWork'],
+      readonly: true
+    },
+    text: {
+      type: 'string'
+    }
+  }
+  //..
+}
+
 const ImageObject = {
   $schema: Draft,
   title: 'ImageObject',
@@ -230,6 +250,7 @@ const MusicRecording = {
 }
 
 exports.AudioObject = AudioObject;
+exports.CreativeWork = CreativeWork;
 exports.ImageObject = ImageObject;
 exports.MusicAlbum = MusicAlbum;
 exports.MusicComposition = MusicComposition;

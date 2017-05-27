@@ -4,7 +4,7 @@ Adatped from..
   > https://github.com/ipfs/js-ipfs/blob/master/examples/basics/index.js
   > https://github.com/ipfs/js-ipfs/blob/master/examples/transfer-files/public/js/app.js
 
---------------------------------LICENSE--------------------------------
+------------------------------- LICENSE -------------------------------
 
 The MIT License (MIT)
 
@@ -65,10 +65,10 @@ function addFile(buf: Buffer, path: string): Promise<Object> {
   });
 }
 
-function addFileInput(input: HTMLInputElement): Promise<Object> {
-  return readFileInput(input).then((ab) => {
+function addFileInput(fileInput: HTMLInputElement): Promise<Object> {
+  return readFileInput(fileInput).then((ab) => {
     const buf = Buffer.from(ab);
-    const path = input.files[0].name;
+    const path = fileInput.files[0].name;
     return addFile(buf, path);
   });
 }
@@ -120,8 +120,8 @@ function getDAGNode(multihash: string): Promise<Object> {
 }
 
 function getFile(multihash: string): Promise<HTMLAnchorElement> {
-  return node.files.get(multihash).then((stream) => {
-    return new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
+    node.files.get(multihash).then((stream) => {
       stream.on('data', (file) => {
         if (!file.content) return reject('no file content');
         const data = [];
@@ -144,12 +144,12 @@ function getFile(multihash: string): Promise<HTMLAnchorElement> {
 function newBlobURL(data: any[], ext: string, multihash: string): HTMLAnchorElement {
   const blob = new Blob(data, {type: 'application/octet-binary'});
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', multihash + '.' + ext);
+  const a = document.createElement('a');
+  a.setAttribute('href', url);
+  a.setAttribute('download', multihash + '.' + ext);
   const date = (new Date()).toLocaleString();
-  link.innerText = date + '-' + multihash + '- Size: ' + blob.size;
-  return link;
+  a.innerText = date + '-' + multihash + '- Size: ' + blob.size;
+  return a;
 }
 
 function serializeCBOR(obj: Object): Promise<Object> {

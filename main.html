@@ -3,19 +3,12 @@
     <title>constellate</title>
   </head>
   <body>
-    <button id='start-peer-btn'>start peer</button><br>
+    <button id='start-peer-btn'>start peer</button><br><br>
     <button id='add-data-btn'>add data</button><br>
     <button id='get-data-btn'>get data</button><input type='text' id='data-hash' /><br><br>
-    <!--
-    <label>public-key</label><br>
-    <select id='key-select'>
-      <option value='ed25519'>ed25519</option>
-      <option value='rsa'>rsa</option>
-      <option value='secp256k1'>secp256k1</option>
-    </select><br>
-    <button id='new-keypair-btn'>new keypair</button>
-    <textarea id='pub'></textarea><br>
-    -->
+    <button id='add-file-btn'>add file</button><input type='file' id='file-input' accept='image/*,audio/*' /><br>
+    <button id='get-file-btn'>get file</button><input type='text' id='file-hash' /><br>
+    <div id='files'></div><br><br>
     <hr>
     <select id='schema-select'>
       <option selected disabled>--</option>
@@ -33,7 +26,9 @@
       <optgroup label='coala'>
         <option value='Assertion'>assertion</option>
         <option value='Copyright'>copyright</option>
+        <option value='CreativeWork'>license</option>
         <option value='Right'>right</option>
+        <option value='RightsAssignment'>rights assignment</option>
       </optgroup>
     </select><br>
     <form></form><br>

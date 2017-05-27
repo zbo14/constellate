@@ -1,8 +1,13 @@
 'use strict';
 
-const crypto = require('../lib/crypto.js');
+const crypto = require('crypto');
 const nacl = require('tweetnacl');
-const { decodeBase58, digestSHA256, encodeBase58 } = require('../lib/util.js');
+
+const {
+  decodeBase58,
+  digestSHA256,
+  encodeBase58
+} = require('../lib/util.js');
 
 // @flow
 
@@ -30,13 +35,13 @@ function generateKeypair(): Object {
 }
 
 function keypairFromPassword(password: string): Object {
-  const secret = crypto.generateSecret(password);
-  return keypairFromSeed(secret);
+  const hash = crypto.createHash('sha256').update(password).digest();
+  return keypairFromSeed(hash);
 }
 
 function keypairFromSeed(seed: ?Buffer): Object {
   if (!seed || seed.length !== 32) {
-    seed = crypto.generateSeed();
+    seed = crypto.randomBytes(32);
   };
   return keypairBuffers(nacl.sign.keyPair.fromSeed(seed));
 }

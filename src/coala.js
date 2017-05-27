@@ -88,6 +88,7 @@ const Right = {
     exclusive: {
       type: 'boolean'
     },
+    license: Link,
     numberOfUses: {
       type: 'number',
       minimum: 0,
@@ -122,6 +123,32 @@ const Right = {
   //..
 }
 
+const RightsAssignment = {
+  $schema: Draft,
+  type: 'object',
+  properties: {
+    '@context': {
+      type: 'array',
+      items: [
+        {
+          enum: ['http://schema.org/']
+        },
+        {
+          enum: ['http://coalaip.org/']
+        }
+      ],
+      readonly: true
+    },
+    '@type': {
+      enum: ['RightsTransferAction'],
+      readonly: true
+    },
+    transferContract: Link
+  }
+  //..
+}
+
 exports.Assertion = Assertion;
 exports.Copyright = Copyright;
 exports.Right = Right;
+exports.RightsAssignment = RightsAssignment;

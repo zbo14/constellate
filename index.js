@@ -1,9 +1,5 @@
 const CID = require('cids');
-const multibase = require('multibase');
-// const ed25519 = require('./lib/ed25519.js');
 const ipfs = require('./lib/ipfs.js');
-// const rsa = require('./lib/rsa.js');
-// const secp256k1 = require('./lib/secp256k1.js');
 const { generateForm, parseForm } = require('./lib/form.js');
 const { getSchema, validate } = require('./lib/linked-data.js');
 require('setimmediate');
@@ -15,9 +11,11 @@ const {
 } = require('./lib/util.js');
 
 const dataHash = document.getElementById('data-hash');
+const fileHash = document.getElementById('file-hash');
+const fileInput = document.getElementById('file-input');
+const files = document.getElementById('files');
 const form = document.querySelector('form');
 const ols = document.getElementsByTagName('ol');
-const pub = document.getElementById('pub');
 const submit = document.createElement('input');
 submit.type = 'submit';
 const textarea = document.querySelector('textarea');
@@ -26,59 +24,55 @@ const keySelect = document.getElementById('key-select');
 const schemaSelect = document.getElementById('schema-select');
 
 const addDataBtn = document.getElementById('add-data-btn');
+const addFileBtn = document.getElementById('add-file-btn');
 const getDataBtn = document.getElementById('get-data-btn');
-// const newKeypairBtn = document.getElementById('new-keypair-btn');
+const getFileBtn = document.getElementById('get-file-btn');
 const startPeerBtn = document.getElementById('start-peer-btn');
 
 startPeerBtn.addEventListener('click', () => {
-    ipfs.startPeer().then((info) => {
-        console.log('Peer info:', info);
-        addDataBtn.addEventListener('click', () => {
-          const obj = JSON.parse(textarea.textContent);
-          ipfs.putDAGNode(obj, 'dag-cbor').then((cid) => {
-            console.log(cid.toBaseEncodedString());
-          });
-        });
-        getDataBtn.addEventListener('click', () => {
-          ipfs.getDAGNode(dataHash.value).then((dagNode) => {
-            const nodeValue = recurse(dagNode.value, (val, key) => {
-              if (key === '/') {
-                return new CID(val).toBaseEncodedString();
-              }
-              if (isObject(val) && val['/']) {
-                return { '/': new CID(val['/']).toBaseEncodedString() };
-              }
-              return val;
-            });
-            console.log(nodeValue);
-          });
-        });
+  ipfs.startPeer().then((info) => {
+    console.log('Peer info:', info);
+    addDataBtn.addEventListener('click', () => {
+      const obj = JSON.parse(textarea.textContent);
+      ipfs.putDAGNode(obj, 'dag-cbor').then((cid) => {
+        const hash = cid.toBaseEncodedString();
+        if (dataHash.value !== hash) {
+          dataHash.setAttribute('value', hash);
+          console.log('got different data-hash');
+        }
+      });
     });
+    addFileBtn.addEventListener('click', () => {
+      if (fileInput.files) {
+        ipfs.addFileInput(fileInput).then((result) => {
+          console.log('Added file:', result);
+          fileHash.value = result.hash;
+        });
+      }
+    });
+    getDataBtn.addEventListener('click', () => {
+      ipfs.getDAGNode(dataHash.value).then((dagNode) => {
+        const nodeValue = recurse(dagNode.value, (val, key) => {
+          if (key === '/') {
+            return new CID(val).toBaseEncodedString();
+          }
+          if (isObject(val) && val['/']) {
+            return { '/': new CID(val['/']).toBaseEncodedString() };
+          }
+          return val;
+        });
+        console.log(nodeValue);
+      });
+    });
+    getFileBtn.addEventListener('click', () => {
+      if (fileHash.value) {
+        ipfs.getFile(fileHash.value).then((a) => {
+          files.appendChild(a);
+        });
+      }
+    });
+  });
 });
-
-/*
-newKeypairBtn.addEventListener('click', () => {
-    let keypair, publicKey;
-    if (keySelect.value === 'ed25519') {
-        const password = prompt('Please enter a password to generate ed25519 keypair', 'passwerd');
-        if (!password) return;
-        keypair = ed25519.keypairFromPassword(password);
-        publicKey = encodeBase58(keypair.publicKey);
-        console.log(encodeBase58(keypair.privateKey));
-    }
-    if (keySelect.value === 'rsa') {
-        keypair = rsa.generateKeypair();
-        publicKey = keypair.publicKey.toString();
-        console.log(keypair.privateKey.toString());
-    }
-    if (keySelect.value === 'secp256k1') {
-        keypair = secp256k1.generateKeypair();
-        publicKey = encodeBase58(keypair.publicKey);
-        console.log(encodeBase58(keypair.privateKey));
-    }
-    pub.textContent = publicKey;
-});
-*/
 
 function listModifiers() {
     const lis = Array.from(document.getElementsByTagName('li')).map((li) => {
@@ -161,7 +155,7 @@ form.addEventListener('submit', (event) => {
     });
     const obj = parseForm(divs);
     validate(obj, 'dag-cbor').then((validated) => {
-      console.log('validated:', JSON.stringify(validated, null, 2));
+      console.log('validated:', validated);
       textarea.textContent = JSON.stringify(obj, null, 2);
       return ipfs.calcHash(obj, 'dag-cbor');
     }).then((hash) => {

@@ -1,9 +1,14 @@
 'use strict';
 
-const crypto = require('../lib/crypto.js');
+const crypto = require('crypto');
 const ethjsUtil = require('ethereumjs-util');
 const secp256k1 = require('secp256k1/js');
-const { decodeBase58, digestSHA256, encodeBase58 } = require('../lib/util.js');
+
+const {
+  decodeBase58,
+  digestSHA256,
+  encodeBase58
+} = require('../lib/util.js');
 
 // @flow
 
@@ -47,7 +52,7 @@ function encodeKeypair(keypair: Object): string {
 function generateKeypair(): Object {
   let privateKey;
   do {
-    privateKey = crypto.generateSeed();
+    privateKey = crypto.randomBytes(32);
   } while (!secp256k1.privateKeyVerify(privateKey));
   const publicKey = secp256k1.publicKeyCreate(privateKey);
   return {

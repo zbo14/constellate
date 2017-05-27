@@ -1,15 +1,21 @@
 const CID = require('cids');
-const { getDAGNode } = require('../lib/ipfs.js');
 const { validateSchema } = require('../lib/schema.js');
+
+const {
+  getDAGNode,
+  getFile
+} = require('../lib/ipfs.js');
 
 const {
   Assertion,
   Copyright,
-  Right
+  Right,
+  RightsAssignment
 } = require('../lib/coala.js');
 
 const {
   AudioObject,
+  CreativeWork,
   ImageObject,
   MusicAlbum,
   MusicComposition,
@@ -23,6 +29,7 @@ const {
 
 const {
   arrayFromObject,
+  encodeBase58,
   isArray,
   isObject,
   recurse
@@ -42,6 +49,8 @@ function getSchema(type: string): Object {
       return Organization;
     case 'AudioObject':
       return AudioObject;
+    case 'CreativeWork':
+      return CreativeWork;
     case 'ImageObject':
       return ImageObject;
     case 'MusicAlbum':
@@ -56,6 +65,8 @@ function getSchema(type: string): Object {
       return Copyright;
     case 'Right':
       return Right;
+    case 'RightsAssignment':
+      return RightsAssignment;
     //..
     default:
       throw new Error('unexpected @type: ' + type);
@@ -75,12 +86,17 @@ function getTypes(key: string): string[] {
       return ['Organization'];
     case 'audio':
       return ['AudioObject'];
+    case 'contentUrl':
+      return [];
     case 'image':
       return ['ImageObject'];
     case 'recordingOf':
       return ['MusicComposition'];
     case 'track':
       return ['MusicRecording'];
+    case 'license':
+    case 'transferContract':
+      return ['CreativeWork'];
     case 'rightsOf':
       return [
         'AudioObject',
@@ -158,6 +174,9 @@ function validate(obj: Object, format: string): Promise<Object> {
                 }
                 parts = link.name.split('-');
                 const types = getTypes(parts[0]);
+                if (!types.length) {
+                  return { '/': new CID(link.multihash).toBaseEncodedString() };
+                }
                 if (!types.includes(nodeValue['@type'])) {
                     return reject(
                       new Error(`invalid @type for ${parts[0]}: ${nodeValue['@type']}`)

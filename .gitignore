@@ -2,3 +2,7 @@ bundle.*
 .DS_Store
 *.log
 node_modules
+
+*ed25519.js
+*rsa.js
+*secp256k1.js
