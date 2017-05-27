@@ -32,7 +32,9 @@ THE SOFTWARE.
 
 'use strict';
 
+const CID = require('cids');
 const IPFS = require('ipfs');
+const isIPFS = require('is-ipfs');
 const fileType = require('file-type');
 const os = require('os');
 const path = require('path');
@@ -43,8 +45,10 @@ const { decodeBase58 } = require('../lib/util.js');
 
 const {
   encodeBase58,
+  isObject,
   orderStringify,
   readFileInput,
+  recurse,
   withoutKeys
 } = require('../lib/util.js');
 
@@ -110,11 +114,27 @@ function deserializeCBOR(serialized: Buffer): Promise<Object> {
   })
 }
 
-function getDAGNode(multihash: string): Promise<Object> {
+function getDAGNode(cid: Object|string, format: string): Promise<Object> {
   return new Promise((resolve, reject) => {
-    node.dag.get(multihash, (err, dagNode) => {
+    node.dag.get(cid, (err, dagNode) => {
       if (err) return reject(err);
-      resolve(dagNode);
+      let obj;
+      if (format === 'dag-cbor') {
+        obj = recurse(dagNode.value, (val, key) => {
+          if (key === '/') {
+            return new CID(val).toBaseEncodedString();
+          }
+          if (isObject(val) && val['/']) {
+            return { '/': new CID(val['/']).toBaseEncodedString() };
+          }
+          return val;
+        });
+      } else if (format === 'dag-pb') {
+        obj = JSON.parse(Buffer.from(dagNode.value._data).toString('utf8'));
+      } else {
+        return reject(new Error('unexpected format: ' + format));
+      }
+      resolve(obj);
     });
   });
 }
@@ -139,6 +159,10 @@ function getFile(multihash: string): Promise<HTMLAnchorElement> {
       stream.resume();
     });
   });
+}
+
+function isMultihash(multihash: string): boolean {
+  return isIPFS.multihash(multihash);
 }
 
 function newBlobURL(data: any[], ext: string, multihash: string): HTMLAnchorElement {
@@ -246,6 +270,7 @@ exports.connectToPeer = connectToPeer;
 exports.deserializeCBOR = deserializeCBOR;
 exports.getDAGNode = getDAGNode;
 exports.getFile = getFile;
+exports.isMultihash = isMultihash;
 exports.newPBLinks = newPBLinks;
 exports.newPBNode = newPBNode;
 exports.putDAGNode = putDAGNode;

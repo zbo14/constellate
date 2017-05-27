@@ -126,7 +126,7 @@ function getLinks(obj: Object): Object[] {
   return arrayFromObject(obj).reduce((result, [key, val]) => {
     if (isObject(val) && val['/']) {
       result.push({
-        multihash: val['/'],
+        cid: val['/'],
         name: key
       });
     }
@@ -134,7 +134,7 @@ function getLinks(obj: Object): Object[] {
       val.forEach((v, i) => {
         if (isObject(v) && v['/']) {
           result.push({
-            multihash: v['/'],
+            cid: v['/'],
             name: key + '-' + (i + 1)
           });
         }
@@ -152,37 +152,22 @@ function validate(obj: Object, format: string): Promise<Object> {
         }
         const links = getLinks(obj);
         if (!links || !links.length) resolve(obj);
-        let nodeValue, parts;
+        let parts;
         links.reduce((result, link) => {
             return result.then(() => {
-                return getDAGNode(link.multihash);
+                return getDAGNode(link.cid, format);
             }).then((dagNode) => {
-                if (format === 'dag-cbor') {
-                  nodeValue = recurse(dagNode.value, (val, key) => {
-                    if (key === '/') {
-                      return new CID(val).toBaseEncodedString();
-                    }
-                    if (isObject(val) && val['/']) {
-                      return { '/': new CID(val['/']).toBaseEncodedString() };
-                    }
-                    return val;
-                  });
-                } else if (format === 'dag-pb') {
-                    nodeValue = JSON.parse(Buffer.from(dagNode.value._data).toString('utf8'));
-                } else {
-                    return reject(new Error('unexpected format: ' + format));
-                }
                 parts = link.name.split('-');
                 const types = getTypes(parts[0]);
                 if (!types.length) {
-                  return { '/': new CID(link.multihash).toBaseEncodedString() };
+                  return { '/': new CID(link.cid).toBaseEncodedString() };
                 }
-                if (!types.includes(nodeValue['@type'])) {
+                if (!types.includes(dagNode['@type'])) {
                     return reject(
-                      new Error(`invalid @type for ${parts[0]}: ${nodeValue['@type']}`)
+                      new Error(`invalid @type for ${parts[0]}: ${dagNode['@type']}`)
                     );
                 }
-                return validate(nodeValue, format);
+                return validate(dagNode, format);
             }).then((validated) => {
                 if (parts.length === 1) {
                   obj = Object.assign({}, obj, { [link.name]: validated });

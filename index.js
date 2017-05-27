@@ -1,8 +1,13 @@
 const CID = require('cids');
 const ipfs = require('./lib/ipfs.js');
-const { generateForm, parseForm } = require('./lib/form.js');
 const { getSchema, validate } = require('./lib/linked-data.js');
 require('setimmediate');
+
+const {
+  formToObject,
+  objectToForm,
+  schemaToForm
+} = require('./lib/form.js');
 
 const {
   encodeBase58,
@@ -10,6 +15,7 @@ const {
   recurse
 } = require('./lib/util.js');
 
+const data = document.getElementById('data');
 const dataHash = document.getElementById('data-hash');
 const fileHash = document.getElementById('file-hash');
 const fileInput = document.getElementById('file-input');
@@ -51,17 +57,11 @@ startPeerBtn.addEventListener('click', () => {
       }
     });
     getDataBtn.addEventListener('click', () => {
-      ipfs.getDAGNode(dataHash.value).then((dagNode) => {
-        const nodeValue = recurse(dagNode.value, (val, key) => {
-          if (key === '/') {
-            return new CID(val).toBaseEncodedString();
-          }
-          if (isObject(val) && val['/']) {
-            return { '/': new CID(val['/']).toBaseEncodedString() };
-          }
-          return val;
-        });
-        console.log(nodeValue);
+      ipfs.getDAGNode(dataHash.value, 'dag-cbor').then((dagNode) => {
+        return objectToForm(dagNode);
+      }).then((divs) => {
+        data.innerHTML = null;
+        divs.forEach((div) => data.appendChild(div));
       });
     });
     getFileBtn.addEventListener('click', () => {
@@ -111,7 +111,7 @@ function listModifiers() {
 schemaSelect.addEventListener('change', () => {
     form.innerHTML = null;
     const schema = getSchema(schemaSelect.value);
-    generateForm(schema).forEach((div) => form.appendChild(div));
+    schemaToForm(schema).forEach((div) => form.appendChild(div));
     form.appendChild(submit);
     listModifiers();
 });
@@ -153,9 +153,9 @@ form.addEventListener('submit', (event) => {
                div.children.length === 2 &&
                includeElement(div.lastChild, div.firstChild);
     });
-    const obj = parseForm(divs);
+    const obj = formToObject(divs);
     validate(obj, 'dag-cbor').then((validated) => {
-      console.log('validated:', validated);
+      console.log('validated:', JSON.stringify(validated));
       textarea.textContent = JSON.stringify(obj, null, 2);
       return ipfs.calcHash(obj, 'dag-cbor');
     }).then((hash) => {
