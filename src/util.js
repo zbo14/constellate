@@ -68,6 +68,13 @@ function isBoolean(bool: any): boolean {
   return bool != null && typeof bool === 'boolean';
 }
 
+function isDescendant(ancestor: HTMLElement, elem: HTMLElement): boolean {
+  if (!elem) return false;
+  if (ancestor == elem) return true;
+  const parent: HTMLElement = (elem.parentElement: any);
+  return isDescendant(ancestor, parent);
+}
+
 function isNumber(num: any): boolean {
   return num != null && typeof num === 'number' &&  num !== NaN;
 }
@@ -112,12 +119,12 @@ function readFileInput(input: HTMLInputElement): Promise<ArrayBuffer> {
   });
 }
 
-function recurse(x: any, fn: Function): any {
+function traverse(x: any, fn: Function): any {
   if (isArray(x)) {
-    return x.map((y) => recurse(fn(y), fn));
+    return x.map((y) => traverse(fn(y), fn));
   }
   if (isObject(x)) {
-    return Object.assign({}, ...Object.keys(x).map((k) => objectFromArray([[k, recurse(fn(x[k], k), fn)]])));
+    return Object.assign({}, ...Object.keys(x).map((k) => objectFromArray([[k, traverse(fn(x[k], k), fn)]])));
   }
   return x;
 }
@@ -141,6 +148,7 @@ exports.encodeBase64 = encodeBase64;
 exports.hasKeys = hasKeys;
 exports.isArray = isArray;
 exports.isBoolean = isBoolean;
+exports.isDescendant = isDescendant;
 exports.isNumber = isNumber;
 exports.isObject = isObject;
 exports.isString = isString;
@@ -148,5 +156,5 @@ exports.now = now;
 exports.objectFromArray = objectFromArray;
 exports.orderStringify = orderStringify;
 exports.readFileInput = readFileInput;
-exports.recurse = recurse;
+exports.traverse = traverse;
 exports.withoutKeys = withoutKeys;

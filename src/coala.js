@@ -4,9 +4,38 @@ const {
   Link
 } = require('../lib/schema.js');
 
-const Assertion = {
+const Copyright = {
   $schema: Draft,
   type: 'object',
+  title: 'Copyright',
+  properties: {
+    '@context': {
+      type: 'array',
+      items: [
+        {
+          enum: ['http://schema.org/']
+        },
+        {
+          enum: ['http://coalaip.org/']
+        }
+      ],
+      readonly: true
+    },
+    '@type': {
+      enum: [ 'Copyright' ],
+      readonly: true
+    },
+    rightsOf: Link,
+    validFrom: DateTime,
+    validThrough: DateTime
+  }
+  //..
+}
+
+const ReviewAction = {
+  $schema: Draft,
+  type: 'object',
+  title: 'ReviewAction',
   properties: {
     '@context': {
       type: 'array',
@@ -38,36 +67,10 @@ const Assertion = {
   //..
 }
 
-const Copyright = {
-  $schema: Draft,
-  type: 'object',
-  properties: {
-    '@context': {
-      type: 'array',
-      items: [
-        {
-          enum: ['http://schema.org/']
-        },
-        {
-          enum: ['http://coalaip.org/']
-        }
-      ],
-      readonly: true
-    },
-    '@type': {
-      enum: [ 'Copyright' ],
-      readonly: true
-    },
-    rightsOf: Link,
-    validFrom: DateTime,
-    validThrough: DateTime
-  }
-  //..
-}
-
 const Right = {
   $schema: Draft,
   type: 'object',
+  title: 'Right',
   properties: {
     '@context': {
       type: 'array',
@@ -121,9 +124,10 @@ const Right = {
   //..
 }
 
-const RightsAssignment = {
+const RightsTransferAction = {
   $schema: Draft,
   type: 'object',
+  title: 'RightsTransferAction',
   properties: {
     '@context': {
       type: 'array',
@@ -146,7 +150,7 @@ const RightsAssignment = {
   //..
 }
 
-exports.Assertion = Assertion;
 exports.Copyright = Copyright;
+exports.ReviewAction = ReviewAction;
 exports.Right = Right;
-exports.RightsAssignment = RightsAssignment;
+exports.RightsTransferAction = RightsTransferAction;

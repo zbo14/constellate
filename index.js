@@ -11,6 +11,7 @@ const {
 
 const {
   encodeBase58,
+  isDescendant,
   isObject,
   recurse
 } = require('./lib/util.js');
@@ -44,7 +45,8 @@ startPeerBtn.addEventListener('click', () => {
         const hash = cid.toBaseEncodedString();
         if (dataHash.value !== hash) {
           dataHash.setAttribute('value', hash);
-          console.log('got different data-hash');
+          console.log(`expected data-hash: ${dataHash.value}; got ` + hash);
+          console.log(typeof dataHash.value, typeof hash);
         }
       });
     });
@@ -75,37 +77,40 @@ startPeerBtn.addEventListener('click', () => {
 });
 
 function listModifiers() {
-    const lis = Array.from(document.getElementsByTagName('li')).map((li) => {
-        return li.cloneNode(true);
-    });
-    Array.from(ols).forEach((ol, idx) => {
-        const remover = document.createElement('button');
-        remover.className = 'remover';
-        remover.id = 'remover-' + idx;
-        remover.textContent = '-';
-        remover.addEventListener('click', (event) => {
-            event.preventDefault();
-            if (!ol.children.length) return;
-            if (ol.hasAttribute('required') &&
-                ol.hasAttribute('minimum') &&
-                parseInt(ol.attributes.minimum.value) === ol.children.length) {
-                const label = ol.previousElementSibling;
-                alert(label.textContent + ' is required');
-                return;
-            }
-            ol.removeChild(ol.lastChild);
-        });
-        form.insertBefore(remover, ol.parentElement);
-        const adder = document.createElement('button');
-        adder.className = 'adder';
-        adder.id = 'adder-' + idx;
-        adder.textContent = '+';
-        adder.addEventListener('click', (event) => {
-            event.preventDefault();
-            ol.appendChild(lis[idx].cloneNode(true));
-        });
-        form.insertBefore(adder, remover);
-    });
+  const lis = Array.from(document.getElementsByTagName('li')).reduce((result, li) => {
+    if (li.parentElement.hidden) return result;
+    return result.concat(li.cloneNode(true));
+  }, []);
+  Array.from(ols).forEach((ol, idx) => {
+    if (!ol.hidden && isDescendant(form, ol)) {
+      const remover = document.createElement('button');
+      remover.className = 'remover';
+      remover.id = 'remover-' + idx;
+      remover.textContent = '-';
+      remover.addEventListener('click', (event) => {
+          event.preventDefault();
+          if (!ol.children.length) return;
+          if (ol.hasAttribute('required') &&
+              ol.hasAttribute('minimum') &&
+              parseInt(ol.attributes.minimum.value) === ol.children.length) {
+              const label = ol.previousElementSibling;
+              alert(label.textContent + ' is required');
+              return;
+          }
+          ol.removeChild(ol.lastChild);
+      });
+      form.insertBefore(remover, ol.parentElement);
+      const adder = document.createElement('button');
+      adder.className = 'adder';
+      adder.id = 'adder-' + idx;
+      adder.textContent = '+';
+      adder.addEventListener('click', (event) => {
+          event.preventDefault();
+          ol.appendChild(lis[idx].cloneNode(true));
+      });
+      form.insertBefore(adder, remover);
+    }
+  });
 }
 
 schemaSelect.addEventListener('change', () => {

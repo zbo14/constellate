@@ -48,7 +48,7 @@ const {
   isObject,
   orderStringify,
   readFileInput,
-  recurse,
+  traverse,
   withoutKeys
 } = require('../lib/util.js');
 
@@ -120,7 +120,7 @@ function getDAGNode(cid: Object|string, format: string): Promise<Object> {
       if (err) return reject(err);
       let obj;
       if (format === 'dag-cbor') {
-        obj = recurse(dagNode.value, (val, key) => {
+        obj = traverse(dagNode.value, (val, key) => {
           if (key === '/') {
             return new CID(val).toBaseEncodedString();
           }

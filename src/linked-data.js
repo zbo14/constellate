@@ -7,10 +7,10 @@ const {
 } = require('../lib/ipfs.js');
 
 const {
-  Assertion,
   Copyright,
   Right,
-  RightsAssignment
+  ReviewAction,
+  RightsTransferAction
 } = require('../lib/coala.js');
 
 const {
@@ -31,8 +31,7 @@ const {
   arrayFromObject,
   encodeBase58,
   isArray,
-  isObject,
-  recurse
+  isObject
 } = require('../lib/util.js');
 
 // @flow
@@ -59,14 +58,14 @@ function getSchema(type: string): Object {
       return MusicComposition;
     case 'MusicRecording':
       return MusicRecording;
-    case 'Assertion':
-      return Assertion;
     case 'Copyright':
       return Copyright;
+    case 'ReviewAction':
+      return ReviewAction;
     case 'Right':
       return Right;
-    case 'RightsAssignment':
-      return RightsAssignment;
+    case 'RightsTransferAction':
+      return RightsTransferAction;
     //..
     default:
       throw new Error('unexpected @type: ' + type);
@@ -111,11 +110,9 @@ function getTypes(key: string): string[] {
       return ['MusicGroup', 'Organization'];
     case 'assertionSubject':
       return [
-        'AudioObject',
-        'ImageObject',
-        'MusicAlbum',
-        'MusicComposition',
-        'MusicRecording'
+        'Copyright',
+        'Right',
+        'RightsTransferAction'
       ];
     default:
       throw new Error('unexpected key: ' + key);

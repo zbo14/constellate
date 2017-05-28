@@ -15,7 +15,7 @@ const {
   isNumber,
   isObject,
   isString,
-  recurse
+  traverse
 } = require('../lib/util.js');
 
 // @flow
@@ -58,12 +58,10 @@ function elementToSchema(elem: HTMLElement): Object {
         throw new Error('<li> has no children');
       }
       const firstChild: HTMLElement = (li.firstChild: any);
-      const attributes: Object = (elem.attributes: any);
+      const attrs: Object = (elem.attributes: any);
       return {
         type: 'array',
-        items: elementToSchema(firstChild),
-        minItems: parseInt(attributes.minitems.value),
-        uniqueItems: elem.hasAttribute('uniqueitems')
+        items: elementToSchema(firstChild)
       }
     case 'SELECT':
       if (!elem.children.length) {
@@ -90,10 +88,10 @@ function elementToValue(elem: HTMLElement): any {
       const input: HTMLInputElement = (elem: any);
       switch(input.type) {
         case 'checkbox':
-          if (input.value !== 'true' && input.value !== 'false') {
-            throw new Error('input[type="checkbox"] is not true or false');
+          if (!isBoolean(input.checked !== 'boolean')) {
+            throw new Error('input[type="checkbox"]:checked is not boolean');
           }
-          return input.value;
+          return input.checked;
         case 'number':
           if (!isNumber(input.valueAsNumber)) {
             throw new Error('input[type="number"] has non-number value');
@@ -217,6 +215,10 @@ function getAttributes(elem: HTMLElement, schema: Object): Object {
       case 'disabled':
       case 'hidden':
         return Object.assign({}, result, { readonly: true });
+      case 'max':
+        return Object.assign({}, result, { maximum: parseInt(attr.value) });
+      case 'maxitems':
+        return Object.assign({}, result, { maxItems: parseInt(attr.value) });
       case 'min':
         return Object.assign({}, result, { minimum: parseInt(attr.value) });
       case 'minitems':
@@ -247,8 +249,15 @@ function setAttribute(elem: HTMLElement, key: string, val: string): HTMLElement 
     case 'default':
       input.defaultValue = val;
       break;
+    case 'maximum':
+      input.max = val;
+      break;
+    case 'maxItems':
+      elem.setAttribute('maxitems', val);
+      break;
     case 'minimum':
       input.min = val;
+      break;
     case 'minItems':
       elem.setAttribute('minitems', val);
       break;
@@ -282,13 +291,6 @@ function setAttribute(elem: HTMLElement, key: string, val: string): HTMLElement 
 //  }
 //  return Object.assign({}, defs[match[1]]);
 // }
-
-function isDescendant(ancestor: HTMLElement, elem: HTMLElement): boolean {
-  if (!elem) return false;
-  if (ancestor == elem) return true;
-  const parent: HTMLElement = (elem.parentElement: any);
-  return isDescendant(ancestor, parent);
-}
 
 function formToObject(divs: HTMLElement[]): Object {
   return divs.reduce((result, div) => {
@@ -347,7 +349,7 @@ function formToSchema(divs: HTMLElement[]): Object  {
 }
 
 function objectToForm(obj: Object): Promise<HTMLElement[]> {
-  const elems = recurse(obj, (val, key) => {
+  const elems = traverse(obj, (val, key) => {
       return valueToElement(val, key);
   });
   const divs = [];
@@ -373,7 +375,7 @@ function schemaToForm(schema: Object): HTMLElement[] {
   }
   const props = schema.properties;
   const reqs = schema.required;
-  const elems = recurse(props, (schema, key) => {
+  const elems = traverse(props, (schema, key) => {
     const elem = arrayFromObject(schema).reduce((result, [k, v]) => {
       return setAttribute(result, k, v);
     }, schemaToElement(schema));
