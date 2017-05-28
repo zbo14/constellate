@@ -1,18 +1,21 @@
 const { writeTestFile } = require('./fs.js');
-const { calcHash } = require('../lib/ipfs.js');
+const { promiseSeq } = require('../lib/util.js');
+
+const {
+  calcHash,
+  putDAGNode,
+  startPeer
+} = require('../lib/ipfs.js');
 
 const hashes = {};
 const objs = {};
 
-function promiseSeq(...fns) {
-    return fns.reduce((result, fn) => {
-        return result.then(fn);
-    }, Promise.resolve()).catch(console.error);
-}
-
 function setHash(name) {
-    return calcHash(objs[name], 'dag-cbor').then((hash) => {
-        return hashes[name] = hash;
+    // return calcHash(objs[name], 'dag-cbor').then((hash) => {
+    //    return hashes[name] = hash;
+    // });
+    return putDAGNode(objs[name], 'dag-cbor').then((cid) => {
+      return hashes[name] = cid.toBaseEncodedString();
     })
 }
 
@@ -21,7 +24,6 @@ objs.composer = {
     '@type': 'MusicGroup',
     email: 'composer@example.com',
     name: 'composer',
-    sameAs: ['http://facebook-sameAs.com'],
     url: 'http://composer.com'
 }
 
@@ -74,6 +76,7 @@ writeTestFile('/party/publisher.json', JSON.stringify(objs.publisher));
 writeTestFile('/party/recordLabel.json', JSON.stringify(objs.recordLabel));
 
 promiseSeq(
+    startPeer,
     () => setHash('composer'),
     () => setHash('lyricist'),
     () => setHash('performer'),
@@ -119,18 +122,6 @@ promiseSeq(
 
 }).then(() => {
 
-    objs.compositionLicense = {
-      '@context': 'http://schema.org/',
-      '@type': 'CreativeWork',
-      text: 'some text for composition license...'
-    }
-
-    objs.compositionRightContract = {
-      '@context': 'http://schema.org/',
-      '@type': 'CreativeWork',
-      text: 'some text saying composition right is assigned to publisher...'
-    }
-
     objs.recording = {
         '@context': 'http://schema.org/',
         '@type': 'MusicRecording',
@@ -141,15 +132,9 @@ promiseSeq(
         recordLabel: [{ '/': hashes.recordLabel }]
     }
 
-    writeTestFile('/meta/composition-license.json', JSON.stringify(objs.compositionLicense));
-    writeTestFile('/meta/composition-right-contract.json', JSON.stringify(objs.compositionRightContract));
     writeTestFile('/meta/recording.json', JSON.stringify(objs.recording));
 
-    return promiseSeq(
-      () => setHash('compositionLicense'),
-      () => setHash('compositionRightContract'),
-      () => setHash('recording')
-    );
+    return setHash('recording');
 
 }).then(() => {
 
@@ -168,27 +153,9 @@ promiseSeq(
         track: [{ '/': hashes.recording }]
     }
 
-    objs.recordingLicense = {
-      '@context': 'http://schema.org/',
-      '@type': 'CreativeWork',
-      text: 'some text for recording license...'
-    }
-
-    objs.recordingRightContract =  {
-      '@context': 'http://schema.org/',
-      '@type': 'CreativeWork',
-      text: 'some text saying recording right is assigned to record label...'
-    }
-
     writeTestFile('/meta/album.json', JSON.stringify(objs.album));
-    writeTestFile('/meta/recording-license.json', JSON.stringify(objs.recordingLicense));
-    writeTestFile('/meta/recording-right-contract.json', JSON.stringify(objs.recordingRightContract));
 
-    return promiseSeq(
-      () => setHash('album'),
-      () => setHash('recordingLicense'),
-      () => setHash('recordingRightContract')
-    );
+    return setHash('album');
 
 }).then(() => {
 
@@ -203,6 +170,18 @@ promiseSeq(
     validThrough: '2088-01-01T00:00:00Z'
   }
 
+  objs.compositionLicense = {
+    '@context': 'http://schema.org/',
+    '@type': 'CreativeWork',
+    text: 'some text for composition license...'
+  }
+
+  objs.compositionRightContract = {
+    '@context': 'http://schema.org/',
+    '@type': 'CreativeWork',
+    text: 'some text saying composition right is assigned to publisher...'
+  }
+
   objs.recordingCopyright = {
     '@context': [
       'http://schema.org/',
@@ -214,12 +193,33 @@ promiseSeq(
     validTo: '2076-10-01T00:00:00Z'
   }
 
+  objs.recordingLicense = {
+    '@context': 'http://schema.org/',
+    '@type': 'CreativeWork',
+    text: 'some text for recording license...'
+  }
+
+  objs.recordingRightContract =  {
+    '@context': 'http://schema.org/',
+    '@type': 'CreativeWork',
+    text: 'some text saying recording right is assigned to record label...'
+  }
+
   writeTestFile('/coala/composition-copyright.json', JSON.stringify(objs.compositionCopyright));
+  writeTestFile('/coala/composition-license.json', JSON.stringify(objs.compositionLicense));
+  writeTestFile('/coala/composition-right-contract.json', JSON.stringify(objs.compositionRightContract));
+
   writeTestFile('/coala/recording-copyright.json', JSON.stringify(objs.recordingCopyright));
+  writeTestFile('/coala/recording-license.json', JSON.stringify(objs.recordingLicense));
+  writeTestFile('/coala/recording-right-contract.json', JSON.stringify(objs.recordingRightContract));
 
   return promiseSeq(
     () => setHash('compositionCopyright'),
-    () => setHash('recordingCopyright')
+    () => setHash('compositionLicense'),
+    () => setHash('compositionRightContract'),
+    () => setHash('recordingCopyright'),
+    () => setHash('recordingLicense'),
+    () => setHash('recordingRightContract')
   );
 
 }).then(() => {
@@ -235,27 +235,6 @@ promiseSeq(
     error: 'composer'
   }
 
-  objs.recordingCopyrightAssertion = {
-    '@context': [
-      'http://schema.org/',
-      'http://coalaip.org/'
-    ],
-    '@type': 'ReviewAction',
-    asserter: { '/': hashes.performer },
-    assertionSubject: { '/': hashes.recordingCopyright },
-    error: 'performer'
-  }
-
-  writeTestFile('/coala/composition-copyright-assertion.json', JSON.stringify(objs.compositionCopyrightAssertion));
-  writeTestFile('/coala/recording-copyright-assertion.json', JSON.stringify(objs.recordingCopyrightAssertion));
-
-  return promiseSeq(
-    () => setHash('compositionCopyrightAssertion'),
-    () => setHash('recordingCopyrightAssertion')
-  );
-
-}).then(() => {
-
   objs.compositionRight = {
     '@context': [
       'http://schema.org/',
@@ -270,6 +249,26 @@ promiseSeq(
     source: { '/': hashes.compositionCopyright },
     validFrom: '2018-01-01T00:00:00Z',
     validThrough: '2068-01-01T00:00:00Z'
+  }
+
+  objs.compositionRightAssignment = {
+    '@context': [
+      'http://schema.org/',
+      'http://coalaip.org/'
+    ],
+    '@type': 'RightsTransferAction',
+    transferContract: { '/': hashes.compositionRightContract }
+  }
+
+  objs.recordingCopyrightAssertion = {
+    '@context': [
+      'http://schema.org/',
+      'http://coalaip.org/'
+    ],
+    '@type': 'ReviewAction',
+    asserter: { '/': hashes.performer },
+    assertionSubject: { '/': hashes.recordingCopyright },
+    error: 'performer'
   }
 
   objs.recordingRight = {
@@ -288,25 +287,6 @@ promiseSeq(
     validThrough: '2057-10-01T00:00:00Z'
   }
 
-  writeTestFile('/coala/composition-right.json', JSON.stringify(objs.compositionRight));
-  writeTestFile('/coala/recording-right.json', JSON.stringify(objs.recordingRight));
-
-  return promiseSeq(
-    () => setHash('compositionRight'),
-    () => setHash('recordingRight')
-  );
-
-}).then(() => {
-
-  objs.compositionRightAssignment = {
-    '@context': [
-      'http://schema.org/',
-      'http://coalaip.org/'
-    ],
-    '@type': 'RightsTransferAction',
-    transferContract: { '/': hashes.compositionRightContract }
-  }
-
   objs.recordingRightAssignment = {
     '@context': [
       'http://schema.org/',
@@ -316,12 +296,20 @@ promiseSeq(
     transferContract: { '/': hashes.recordingRightContract }
   }
 
+  writeTestFile('/coala/composition-copyright-assertion.json', JSON.stringify(objs.compositionCopyrightAssertion));
+  writeTestFile('/coala/composition-right.json', JSON.stringify(objs.compositionRight));
   writeTestFile('/coala/composition-right-assignment.json', JSON.stringify(objs.compositionRightAssignment));
+  writeTestFile('/coala/recording-copyright-assertion.json', JSON.stringify(objs.recordingCopyrightAssertion));
+  writeTestFile('/coala/recording-right.json', JSON.stringify(objs.recordingRight));
   writeTestFile('/coala/recording-right-assignment.json', JSON.stringify(objs.recordingRightAssignment));
 
   return promiseSeq(
+    () => setHash('compositionCopyrightAssertion'),
+    () => setHash('compositionRight'),
     () => setHash('compositionRightAssignment'),
+    () => setHash('recordingCopyrightAssertion'),
+    () => setHash('recordingRight'),
     () => setHash('recordingRightAssignment')
   );
 
-})
+}).then(() => console.log('done'));

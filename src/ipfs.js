@@ -60,9 +60,9 @@ const {
 
 let node;
 
-function addFile(buf: Buffer, path: string): Promise<Object> {
+function addFile(data: Buffer|ReadableStream, path: string): Promise<Object> {
   return node.files.add({
-    content: buf,
+    content: data,
     path: path
   }).then((result) => {
     return result[0];
@@ -223,9 +223,10 @@ function putDAGNode(obj: Object, format: string): Promise<string> {
 }
 
 function refreshPeers() {
-  node.swarm.peers().then((peers) => {
-    console.log('Refreshed peers:', peers);
-  });
+  return node.swarm.peers();
+  // node.swarm.peers().then((peers) => {
+  //    console.log('Refreshed peers:', peers);
+  // });
 }
 
 function startPeer() {

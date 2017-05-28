@@ -43,8 +43,6 @@ function getSchema(type: string): Object {
       return Organization;
     case 'AudioObject':
       return AudioObject;
-    case 'CreativeWork':
-      return CreativeWork;
     case 'ImageObject':
       return ImageObject;
     case 'MusicAlbum':
@@ -55,6 +53,8 @@ function getSchema(type: string): Object {
       return MusicRecording;
     case 'Copyright':
       return Copyright;
+    case 'CreativeWork':
+      return CreativeWork;
     case 'ReviewAction':
       return ReviewAction;
     case 'Right':
@@ -118,15 +118,14 @@ function getLinks(obj: Object): Object[] {
   return arrayFromObject(obj).reduce((result, [key, val]) => {
     if (isObject(val) && val['/']) {
       result.push({
-        cid: val['/'],
+        cid: new CID(val['/']),
         name: key
       });
-    }
-    if (isArray(val)) {
+    } else if (isArray(val)) {
       val.forEach((v, i) => {
         if (isObject(v) && v['/']) {
           result.push({
-            cid: v['/'],
+            cid: new CID(v['/']),
             name: key + '-' + (i + 1)
           });
         }
@@ -152,7 +151,7 @@ function validate(obj: Object, format: string): Promise<Object> {
                 parts = link.name.split('-');
                 const types = getTypes(parts[0]);
                 if (!types.length) {
-                  return { '/': new CID(link.cid).toBaseEncodedString() };
+                  return { '/': link.cid.toBaseEncodedString() };
                 }
                 if (!types.includes(dagNode['@type'])) {
                     return reject(

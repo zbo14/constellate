@@ -111,6 +111,12 @@ function orderStringify(obj: Object, space?: number): Object {
   return JSON.stringify(obj, keys.sort(), space);
 }
 
+function promiseSeq(...fns: Function[]): Promise<any> {
+    return fns.reduce((result, fn) => {
+        return result.then(fn);
+    }, Promise.resolve()).catch(console.error);
+}
+
 function readFileInput(input: HTMLInputElement): Promise<ArrayBuffer> {
   const reader = new FileReader();
   return new Promise((resolve, reject) => {
@@ -155,6 +161,7 @@ exports.isString = isString;
 exports.now = now;
 exports.objectFromArray = objectFromArray;
 exports.orderStringify = orderStringify;
+exports.promiseSeq = promiseSeq;
 exports.readFileInput = readFileInput;
 exports.traverse = traverse;
 exports.withoutKeys = withoutKeys;

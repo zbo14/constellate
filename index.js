@@ -38,11 +38,12 @@ startPeerBtn.addEventListener('click', () => {
       const obj = JSON.parse(textarea.textContent);
       ipfs.putDAGNode(obj, 'dag-cbor').then((cid) => {
         const hash = cid.toBaseEncodedString();
-        if (dataHash.value !== hash) {
-          dataHash.setAttribute('value', hash);
-          console.log(`expected data-hash: ${dataHash.value}; got ` + hash);
-          console.log(typeof dataHash.value, typeof hash);
-        }
+        dataHash.setAttribute('value', hash);
+        // if (dataHash.value !== hash) {
+        //   console.log(`expected data-hash: ${dataHash.value}; got ` + hash);
+        //   dataHash.setAttribute('value', hash);
+        //   console.log(typeof dataHash.value, typeof hash);
+        // }
       });
     });
     addFileBtn.addEventListener('click', () => {
@@ -155,10 +156,10 @@ form.addEventListener('submit', (event) => {
     });
     const obj = formToObject(divs);
     validate(obj, 'dag-cbor').then((validated) => {
-      console.log('validated:', JSON.stringify(validated));
       textarea.textContent = JSON.stringify(obj, null, 2);
-      return ipfs.calcHash(obj, 'dag-cbor');
-    }).then((hash) => {
-      dataHash.setAttribute('value', hash);
+    //   console.log('validated:', JSON.stringify(validated));
+    //   return ipfs.calcHash(obj, 'dag-cbor');
+    // }).then((hash) => {
+    //   dataHash.setAttribute('value', hash);
     });
 });

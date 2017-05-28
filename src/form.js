@@ -168,7 +168,6 @@ function valueToElement(val: any, key?: string): Promise<HTMLElement> {
         return result.then(() => {
           return valueToElement(v);
         }).then((elem) => {
-          console.log(elem);
           li = document.createElement('li');
           li.appendChild(elem);
           ol.appendChild(li);

@@ -14,12 +14,8 @@ import {
 const album = JSON.parse(readTestFile('/meta/album.json'));
 const audio = JSON.parse(readTestFile('/meta/audio.json'));
 const composition = JSON.parse(readTestFile('/meta/composition.json'));
-const compositionLicense = JSON.parse(readTestFile('/meta/composition-license.json'));
-const compositionRightContract = JSON.parse(readTestFile('/meta/composition-right-contract.json'));
 const image = JSON.parse(readTestFile('/meta/image.json'));
 const recording = JSON.parse(readTestFile('/meta/recording.json'));
-const recordingLicense = JSON.parse(readTestFile('/meta/recording-license.json'));
-const recordingRightContract = JSON.parse(readTestFile('/meta/recording-right-contract.json'));
 
 describe('Meta', () => {
   it('validates AudioObject schema', () => {
