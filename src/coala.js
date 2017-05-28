@@ -32,6 +32,29 @@ const Copyright = {
   //..
 }
 
+// CreativeWork is used for licenses and transfer contracts
+// Should there be subclass definitions?..
+
+const CreativeWork = {
+  $schema: Draft,
+  title: 'CreativeWork',
+  type: 'object',
+  properties: {
+    '@context': {
+      enum: ['http://schema.org/'],
+      readonly: true
+    },
+    '@type': {
+      enum: ['CreativeWork'],
+      readonly: true
+    },
+    text: {
+      type: 'string'
+    }
+  }
+  //..
+}
+
 const ReviewAction = {
   $schema: Draft,
   type: 'object',
@@ -151,6 +174,7 @@ const RightsTransferAction = {
 }
 
 exports.Copyright = Copyright;
+exports.CreativeWork = CreativeWork;
 exports.ReviewAction = ReviewAction;
 exports.Right = Right;
 exports.RightsTransferAction = RightsTransferAction;

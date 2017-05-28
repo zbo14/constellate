@@ -1,6 +1,7 @@
 const CID = require('cids');
 const ipfs = require('./lib/ipfs.js');
 const { getSchema, validate } = require('./lib/linked-data.js');
+const { isDescendant } = require('./lib/util.js');
 require('setimmediate');
 
 const {
@@ -9,12 +10,6 @@ const {
   schemaToForm
 } = require('./lib/form.js');
 
-const {
-  encodeBase58,
-  isDescendant,
-  isObject,
-  recurse
-} = require('./lib/util.js');
 
 const data = document.getElementById('data');
 const dataHash = document.getElementById('data-hash');

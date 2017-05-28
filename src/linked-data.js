@@ -1,13 +1,10 @@
 const CID = require('cids');
 const { validateSchema } = require('../lib/schema.js');
-
-const {
-  getDAGNode,
-  getFile
-} = require('../lib/ipfs.js');
+const { getDAGNode } = require('../lib/ipfs.js');
 
 const {
   Copyright,
+  CreativeWork,
   Right,
   ReviewAction,
   RightsTransferAction
@@ -15,7 +12,6 @@ const {
 
 const {
   AudioObject,
-  CreativeWork,
   ImageObject,
   MusicAlbum,
   MusicComposition,
@@ -29,7 +25,6 @@ const {
 
 const {
   arrayFromObject,
-  encodeBase58,
   isArray,
   isObject
 } = require('../lib/util.js');

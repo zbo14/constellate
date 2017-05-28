@@ -4,48 +4,48 @@ import { readTestFile } from './fs.js';
 import { MusicGroup, Organization } from '../lib/party.js';
 import { validateSchema } from '../lib/schema.js';
 
-const composer = JSON.parse(readTestFile('/parties/composer.json'));
-const lyricist = JSON.parse(readTestFile('/parties/lyricist.json'));
-const performer = JSON.parse(readTestFile('/parties/performer.json'));
-const producer = JSON.parse(readTestFile('/parties/producer.json'));
-const publisher = JSON.parse(readTestFile('/parties/publisher.json'));
-const recordLabel = JSON.parse(readTestFile('/parties/recordLabel.json'));
+const composer = JSON.parse(readTestFile('/party/composer.json'));
+const lyricist = JSON.parse(readTestFile('/party/lyricist.json'));
+const performer = JSON.parse(readTestFile('/party/performer.json'));
+const producer = JSON.parse(readTestFile('/party/producer.json'));
+const publisher = JSON.parse(readTestFile('/party/publisher.json'));
+const recordLabel = JSON.parse(readTestFile('/party/recordLabel.json'));
 
 describe('Party', () => {
-  it('validates composer', () => {
+  it('validates MusicGroup schema', () => {
     assert.isOk(
       validateSchema(composer, MusicGroup),
-      'should validate composer'
+      'should validate MusicGroup schema'
     );
   });
-  it('validates lyricist', () => {
+  it('validates MusicGroup schema', () => {
     assert.isOk(
       validateSchema(lyricist, MusicGroup),
-      'should validate lyricist'
+      'should validate MusicGroup schema'
     );
   });
-  it('validates performer', () => {
+  it('validates MusicGroup schema', () => {
     assert.isOk(
       validateSchema(performer, MusicGroup),
-      'should validate performer'
+      'should validate MusicGroup schema'
     );
   });
-  it('validates producer', () => {
+  it('validates MusicGroup schema', () => {
     assert.isOk(
       validateSchema(producer, MusicGroup),
-      'should validate producer'
+      'should validate MusicGroup schema'
     );
   });
-  it('validates publisher', () => {
+  it('validates Organization schema', () => {
     assert.isOk(
       validateSchema(publisher, Organization),
-      'should validate publisher'
+      'should validate Organization schema'
     );
   });
-  it('validates recordLabel', () => {
+  it('validates Organization schema', () => {
     assert.isOk(
       validateSchema(recordLabel, Organization),
-      'should validate recordLabel'
+      'should validate Organization schema'
     );
   });
 });
