@@ -1,6 +1,5 @@
 const CID = require('cids');
 const ipfs = require('./lib/ipfs.js');
-const { getSchema, validate } = require('./lib/linked-data.js');
 const { isDescendant } = require('./lib/util.js');
 require('setimmediate');
 
@@ -10,13 +9,19 @@ const {
   schemaToForm
 } = require('./lib/form.js');
 
+const {
+  getSchema,
+  validate
+} = require('./lib/linked-data.js');
 
 const data = document.getElementById('data');
 const dataHash = document.getElementById('data-hash');
+const exportHashes = document.getElementById('export-hashes');
 const fileHash = document.getElementById('file-hash');
 const fileInput = document.getElementById('file-input');
 const files = document.getElementById('files');
 const form = document.querySelector('form');
+const importHashes = document.getElementById('import-hashes');
 const ols = document.getElementsByTagName('ol');
 const submit = document.createElement('input');
 submit.type = 'submit';
@@ -27,9 +32,65 @@ const schemaSelect = document.getElementById('schema-select');
 
 const addDataBtn = document.getElementById('add-data-btn');
 const addFileBtn = document.getElementById('add-file-btn');
+const clearDataBtn = document.getElementById('clear-data-btn');
+const clearFilesBtn = document.getElementById('clear-files-btn');
+const exportHashesBtn = document.getElementById('export-hashes-btn');
 const getDataBtn = document.getElementById('get-data-btn');
 const getFileBtn = document.getElementById('get-file-btn');
+const importHashesBtn = document.getElementById('import-hashes-btn');
+const saveDataHashBtn = document.getElementById('save-data-hash-btn');
+const saveFileHashBtn = document.getElementById('save-file-hash-btn');
 const startPeerBtn = document.getElementById('start-peer-btn');
+
+let hashes = {};
+
+clearDataBtn.addEventListener('click', () => {
+  data.innerHTML = null;
+});
+
+clearFilesBtn.addEventListener('click', () => {
+  files.innerHTML = null;
+});
+
+exportHashesBtn.addEventListener('click', () => {
+  if (Object.keys(hashes).length) {
+    const blob = new Blob([JSON.stringify(hashes, null, 2)], { type: 'application/json' });
+    exportHashes.href = URL.createObjectURL(blob);
+  }
+});
+
+importHashesBtn.addEventListener('click', () => {
+  if (importHashes.files) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      hashes = JSON.parse(reader.result);
+      console.log('hashes:', JSON.stringify(hashes, null, 2));
+    }
+    reader.readAsText(importHashes.files[0]);
+  }
+});
+
+saveDataHashBtn.addEventListener('click', () => {
+  const hash = dataHash.value;
+  if (hash) {
+    const name = prompt('Enter a name for the hash', '');
+    if (name && name.length) {
+      hashes[name] = hash;
+      console.log('Saved data hash: ', JSON.stringify({name, hash}, null, 2));
+    }
+  }
+});
+
+saveFileHashBtn.addEventListener('click', () => {
+  const hash = fileHash.value;
+  if (hash) {
+    const name = prompt('Enter a name for the hash', '');
+    if (name && name.length) {
+      hashes[name] = hash;
+      console.log('Saved file hash: ', JSON.stringify({name, hash}, null, 2));
+    }
+  }
+});
 
 startPeerBtn.addEventListener('click', () => {
   ipfs.startPeer().then((info) => {
@@ -37,25 +98,21 @@ startPeerBtn.addEventListener('click', () => {
     addDataBtn.addEventListener('click', () => {
       const obj = JSON.parse(textarea.textContent);
       ipfs.putDAGNode(obj, 'dag-cbor').then((cid) => {
-        const hash = cid.toBaseEncodedString();
-        dataHash.setAttribute('value', hash);
-        // if (dataHash.value !== hash) {
-        //   console.log(`expected data-hash: ${dataHash.value}; got ` + hash);
-        //   dataHash.setAttribute('value', hash);
-        //   console.log(typeof dataHash.value, typeof hash);
-        // }
+        console.log('Added data!');
+        dataHash.value = cid.toBaseEncodedString();
       });
     });
     addFileBtn.addEventListener('click', () => {
       if (fileInput.files) {
         ipfs.addFileInput(fileInput).then((result) => {
-          console.log('Added file:', result);
+          console.log('Added file!');
           fileHash.value = result.hash;
         });
       }
     });
     getDataBtn.addEventListener('click', () => {
       ipfs.getDAGNode(dataHash.value, 'dag-cbor').then((dagNode) => {
+        console.log(dagNode);
         return objectToForm(dagNode);
       }).then((divs) => {
         data.innerHTML = null;
@@ -71,6 +128,19 @@ startPeerBtn.addEventListener('click', () => {
     });
   });
 });
+
+function nameToHash() {
+  document.querySelectorAll('input[type="text"]').forEach((textInput) => {
+    textInput.onkeyup = () => {
+      if (textInput.value[0] === '#') {
+        setTimeout(() => {
+          const name = textInput.value.slice(1);
+          if (hashes[name]) textInput.value = hashes[name];
+        }, 1000);
+      }
+    }
+  });
+}
 
 function listModifiers() {
   const lis = Array.from(document.getElementsByTagName('li')).reduce((result, li) => {
@@ -103,6 +173,7 @@ function listModifiers() {
       adder.addEventListener('click', (event) => {
           event.preventDefault();
           ol.appendChild(lis[idx].cloneNode(true));
+          nameToHash();
       });
       form.insertBefore(adder, remover);
     }
@@ -115,6 +186,7 @@ schemaSelect.addEventListener('change', () => {
     schemaToForm(schema).forEach((div) => form.appendChild(div));
     form.appendChild(submit);
     listModifiers();
+    nameToHash();
 });
 
 function includeElement(elem, label) {
@@ -157,9 +229,5 @@ form.addEventListener('submit', (event) => {
     const obj = formToObject(divs);
     validate(obj, 'dag-cbor').then((validated) => {
       textarea.textContent = JSON.stringify(obj, null, 2);
-    //   console.log('validated:', JSON.stringify(validated));
-    //   return ipfs.calcHash(obj, 'dag-cbor');
-    // }).then((hash) => {
-    //   dataHash.setAttribute('value', hash);
     });
 });

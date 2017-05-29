@@ -5,10 +5,14 @@
   <body>
     <button id='start-peer-btn'>start peer</button><br><br>
     <button id='add-data-btn'>add data</button><br>
-    <button id='get-data-btn'>get data</button><input type='text' id='data-hash' /><br><br>
+    <button id='get-data-btn'>get data</button><input type='text' id='data-hash' /><button id='save-data-hash-btn'>save hash</button><br>
+    <button id='clear-data-btn'>clear data</button><br>
+    <button id='export-hashes-btn'>export hashes</button><a id='export-hashes' download='hashes.json'>hashes</a><br>
+    <button id='import-hashes-btn'>import hashes</button><input id='import-hashes' type='file' accept='application/json' /><br><br>
     <div id='data'></div><br><br>
     <button id='add-file-btn'>add file</button><input type='file' id='file-input' accept='audio/*,image/*' /><br>
-    <button id='get-file-btn'>get file</button><input type='text' id='file-hash' /><br><br>
+    <button id='get-file-btn'>get file</button><input type='text' id='file-hash' /><button id='save-file-hash-btn'>save hash</button><br>
+    <button id='clear-files-btn'>clear files</button><br><br>
     <div id='files'></div><br><br>
     <hr>
     <select id='schema-select'>
@@ -21,15 +25,16 @@
         <option value='MusicAlbum'>album</option>
         <option value='AudioObject'>audio</option>
         <option value='MusicComposition'>composition</option>
-        <option value='CreativeWork'>license</option>
         <option value='ImageObject'>image</option>
         <option value='MusicRecording'>recording</option>
       </optgroup>
       <optgroup label='coala'>
         <option value='ReviewAction'>assertion</option>
         <option value='Copyright'>copyright</option>
+        <option value='CreativeWork'>license</option>
         <option value='Right'>right</option>
         <option value='RightsTransferAction'>rights assignment</option>
+        <option value='CreativeWork'>transfer contract</option>
       </optgroup>
     </select><br>
     <form></form><br>

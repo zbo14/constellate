@@ -33,7 +33,7 @@ const Copyright = {
 }
 
 // CreativeWork is used for licenses and transfer contracts
-// Should there be subclass definitions?..
+// Should there be subclass definitions for these instead?
 
 const CreativeWork = {
   $schema: Draft,
