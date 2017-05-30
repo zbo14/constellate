@@ -36,7 +36,7 @@ const {
 * @module constellate/src/linked-data
 */
 
-function getSchema(type: string): Object {
+function getTypeSchema(type: string): Object {
   switch(type) {
     case 'MusicGroup':
       return MusicGroup;
@@ -70,20 +70,52 @@ function getSchema(type: string): Object {
   }
 }
 
-function getTypes(key: string): string[] {
-  switch(key) {
+function isSubType(subType: string, type: string): boolean {
+  if (subType === type) return true;
+  switch(subType) {
+    case 'Action':
+    case 'CreativeWork':
+    case 'Intangible':
+    case 'Organization':
+    case 'Person':
+      return isSubType('Thing', type);
+    case 'MusicGroup':
+      return isSubType('Organization', type);
+    case 'MediaObject':
+    case 'MusicAlbum':
+    case 'MusicComposition':
+    case 'MusicRecording':
+      return isSubType('CreativeWork', type);
+    case 'AudioObject':
+    case 'ImageObject':
+      return isSubType('MediaObject', type);
+      return isSubType('MediaObject', type);
+    case 'Copyright':
+    case 'Right':
+      return isSubType('Intangible', type);
+    case 'ReviewAction':
+    case 'TransferAction':
+      return isSubType('Action', type);
+    case 'RightsTransferAction':
+      return isSubType('TransferAction', type);
+    default:
+      return false;
+  }
+}
+
+function getPropertyTypes(property: string): string[] {
+  switch(property) {
     case 'byArtist':
+      return ['MusicGroup'];
     case 'composer':
     case 'lyricist':
-    case 'performer':
     case 'producer':
-      return [
-        'MusicGroup',
-        'Person'
-      ];
     case 'publisher':
     case 'recordLabel':
-      return ['Organization'];
+      return [
+        'Organization',
+        'Person'
+      ];
     case 'audio':
       return ['AudioObject'];
     case 'contentUrl':
@@ -96,34 +128,19 @@ function getTypes(key: string): string[] {
       return ['MusicRecording'];
     case 'license':
     case 'transferContract':
-      return ['CreativeWork'];
     case 'rightsOf':
-      return [
-        'AudioObject',
-        'ImageObject',
-        'MusicAlbum',
-        'MusicComposition',
-        'MusicRecording'
-      ];
+      return ['CreativeWork'];
     case 'source':
       return ['Copyright'];
     case 'asserter':
       return [
-        'MusicGroup',
         'Organization',
         'Person'
       ];
     case 'assertionSubject':
-      return [
-        'MusicAlbum',
-        'MusicComposition',
-        'MusicRecording',
-        'Copyright',
-        'Right',
-        'RightsTransferAction'
-      ];
+      return ['Thing'];
     default:
-      throw new Error('unexpected key: ' + key);
+      throw new Error('unexpected property: ' + property);
   }
 }
 
@@ -150,7 +167,7 @@ function getLinks(obj: Object): Object[] {
 
 function validate(obj: Object, format: string): Promise<Object> {
     return new Promise((resolve, reject) => {
-        const schema = getSchema(obj['@type']);
+        const schema = getTypeSchema(obj['@type']);
         if (!validateSchema(obj, schema)) {
             return reject(obj['@type'] + ' has invalid schema: ' + JSON.stringify(obj, null, 2));
         }
@@ -162,11 +179,11 @@ function validate(obj: Object, format: string): Promise<Object> {
                 return getDAGNode(link.cid, format);
             }).then((dagNode) => {
                 parts = link.name.split('-');
-                const types = getTypes(parts[0]);
+                const types = getPropertyTypes(parts[0]);
                 if (!types.length) {
                   return { '/': link.cid.toBaseEncodedString() };
                 }
-                if (!types.includes(dagNode['@type'])) {
+                if (!types.some((type) => isSubType(dagNode['@type'], type))) {
                     return reject(
                       new Error(`invalid @type for ${parts[0]}: ${dagNode['@type']}`)
                     );
@@ -187,5 +204,5 @@ function validate(obj: Object, format: string): Promise<Object> {
     });
 }
 
-exports.getSchema = getSchema;
+exports.getTypeSchema = getTypeSchema;
 exports.validate = validate;

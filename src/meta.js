@@ -104,6 +104,12 @@ const MusicAlbum = {
     name: {
       type: 'string'
     },
+    producer: {
+      type: 'array',
+      items: Link,
+      minItems: 1,
+      uniqueItems: true
+    },
     recordLabel: {
       type: 'array',
       items: Link,
@@ -122,6 +128,7 @@ const MusicAlbum = {
     '@type',
     'byArtist',
     'name',
+    'producer',
     'track'
   ]
 }
@@ -192,6 +199,12 @@ const MusicRecording = {
       minItems: 1,
       uniqueItems: true
     },
+    byArtist: {
+      type: 'array',
+      items:  Link,
+      minItems: 1,
+      uniqueItems: true
+    },
     image: Link,
     isrcCode: {
       type: 'string',
@@ -199,12 +212,6 @@ const MusicRecording = {
     },
     name: {
       type: 'string'
-    },
-    performer: {
-      type: 'array',
-      items:  Link,
-      minItems: 1,
-      uniqueItems: true
     },
     producer: {
       type: 'array',
@@ -224,7 +231,8 @@ const MusicRecording = {
     '@context',
     '@type',
     'audio',
-    'performer',
+    'byArtist',
+    'producer',
     'recordingOf'
   ]
 }

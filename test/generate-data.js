@@ -126,7 +126,7 @@ promiseSeq(
         '@context': 'http://schema.org/',
         '@type': 'MusicRecording',
         audio: [{ '/': hashes.audio }],
-        performer: [{ '/': hashes.performer }],
+        byArtist: [{ '/': hashes.performer }],
         producer: [{ '/': hashes.producer }],
         recordingOf: { '/': hashes.composition },
         recordLabel: [{ '/': hashes.recordLabel }]
@@ -143,12 +143,10 @@ promiseSeq(
         '@type': 'MusicAlbum',
         albumProductionType: 'DemoAlbum',
         albumReleaseType: 'SingleRelease',
-        byArtist: [
-          { '/': hashes.performer },
-          { '/': hashes.producer }
-        ],
+        byArtist: [{ '/': hashes.performer }],
         image: { '/': hashes.image },
         name: 'ding-ding-dooby-doo',
+        producer: [{ '/': hashes.producer }],
         recordLabel: [{ '/': hashes.recordLabel }],
         track: [{ '/': hashes.recording }]
     }

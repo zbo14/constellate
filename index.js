@@ -10,7 +10,7 @@ const {
 } = require('./lib/form.js');
 
 const {
-  getSchema,
+  getTypeSchema,
   validate
 } = require('./lib/linked-data.js');
 
@@ -131,10 +131,13 @@ function nameToHash() {
   document.querySelectorAll('input[type="text"]').forEach((textInput) => {
     textInput.onkeyup = () => {
       if (textInput.value[0] === '#') {
-        setTimeout(() => {
-          const name = textInput.value.slice(1);
-          if (hashes[name]) textInput.value = hashes[name];
-        }, 1000);
+        let name = textInput.value.slice(1);
+        if (hashes[name]) {
+          setTimeout(() => {
+            name = textInput.value.slice(1);
+            if (hashes[name]) textInput.value = hashes[name]
+          }, 1000);
+        }
       }
     }
   });
@@ -180,7 +183,7 @@ function listModifiers() {
 
 schemaSelect.addEventListener('change', () => {
     form.innerHTML = null;
-    const schema = getSchema(schemaSelect.value);
+    const schema = getTypeSchema(schemaSelect.value);
     schemaToForm(schema).forEach((div) => form.appendChild(div));
     form.appendChild(submit);
     listModifiers();

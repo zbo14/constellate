@@ -27,7 +27,7 @@ const Link = {
   properties: {
     '/': {
       type: 'string',
-      pattern: '^[1-9A-HJ-NP-Za-km-z]{46,49}$'
+      pattern: '^[1-9A-HJ-NP-Za-km-z]+$'
     }
   }
 }
