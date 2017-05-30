@@ -21,7 +21,7 @@ function setHash(name) {
 
 objs.composer = {
     '@context': 'http://schema.org/',
-    '@type': 'MusicGroup',
+    '@type': 'Person',
     email: 'composer@example.com',
     name: 'composer',
     url: 'http://composer.com'
@@ -29,7 +29,7 @@ objs.composer = {
 
 objs.lyricist = {
     '@context': 'http://schema.org/',
-    '@type': 'MusicGroup',
+    '@type': 'Person',
     email: 'lyricist@example.com',
     name: 'lyricist',
     url: 'http://lyricist.com'
@@ -46,7 +46,7 @@ objs.performer = {
 
 objs.producer = {
     '@context': 'http://schema.org/',
-    '@type': 'MusicGroup',
+    '@type': 'Person',
     name: 'producer',
     sameAs: ['http://soundcloud-page.com'],
     url: 'http://producer.com'
@@ -160,10 +160,7 @@ promiseSeq(
 }).then(() => {
 
   objs.compositionCopyright = {
-    '@context': [
-      'http://schema.org/',
-      'http://coalaip.org/'
-    ],
+    '@context': 'http://coalaip.org/',
     '@type': 'Copyright',
     rightsOf: { '/': hashes.composition },
     validFrom: '2018-01-01T00:00:00Z',
@@ -183,10 +180,7 @@ promiseSeq(
   }
 
   objs.recordingCopyright = {
-    '@context': [
-      'http://schema.org/',
-      'http://coalaip.org/'
-    ],
+    '@context': 'http://coalaip.org/',
     '@type': 'Copyright',
     rightsOf: { '/': hashes.recording },
     validFrom: '2017-10-01T00:00:00Z',
@@ -232,7 +226,7 @@ promiseSeq(
     '@type': 'ReviewAction',
     asserter: { '/': hashes.composer },
     assertionSubject: { '/': hashes.compositionCopyright },
-    error: 'composer'
+    assertionTruth: true
   }
 
   objs.compositionRight = {
@@ -252,10 +246,7 @@ promiseSeq(
   }
 
   objs.compositionRightAssignment = {
-    '@context': [
-      'http://schema.org/',
-      'http://coalaip.org/'
-    ],
+    '@context': 'http://coalaip.org/',
     '@type': 'RightsTransferAction',
     transferContract: { '/': hashes.compositionRightContract }
   }
@@ -266,9 +257,10 @@ promiseSeq(
       'http://coalaip.org/'
     ],
     '@type': 'ReviewAction',
-    asserter: { '/': hashes.performer },
+    asserter: { '/': hashes.recordLabel },
     assertionSubject: { '/': hashes.recordingCopyright },
-    error: 'performer'
+    assertionTruth: false,
+    error: 'copyrightHolder'
   }
 
   objs.recordingRight = {
@@ -288,10 +280,7 @@ promiseSeq(
   }
 
   objs.recordingRightAssignment = {
-    '@context': [
-      'http://schema.org/',
-      'http://coalaip.org/'
-    ],
+    '@context': 'http://coalaip.org/',
     '@type': 'RightsTransferAction',
     transferContract: { '/': hashes.recordingRightContract }
   }

@@ -1,1 +1,1 @@
-{"@context":"http://schema.org/","@type":"MusicGroup","name":"producer","sameAs":["http://soundcloud-page.com"],"url":"http://producer.com"}
+{"@context":"http://schema.org/","@type":"Person","name":"producer","sameAs":["http://soundcloud-page.com"],"url":"http://producer.com"}

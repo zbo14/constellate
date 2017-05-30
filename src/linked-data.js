@@ -20,7 +20,8 @@ const {
 
 const {
   MusicGroup,
-  Organization
+  Organization,
+  Person
 } = require('../lib/party.js');
 
 const {
@@ -41,6 +42,8 @@ function getSchema(type: string): Object {
       return MusicGroup;
     case 'Organization':
       return Organization;
+    case 'Person':
+      return Person;
     case 'AudioObject':
       return AudioObject;
     case 'ImageObject':
@@ -74,7 +77,10 @@ function getTypes(key: string): string[] {
     case 'lyricist':
     case 'performer':
     case 'producer':
-      return ['MusicGroup'];
+      return [
+        'MusicGroup',
+        'Person'
+      ];
     case 'publisher':
     case 'recordLabel':
       return ['Organization'];
@@ -102,9 +108,16 @@ function getTypes(key: string): string[] {
     case 'source':
       return ['Copyright'];
     case 'asserter':
-      return ['MusicGroup', 'Organization'];
+      return [
+        'MusicGroup',
+        'Organization',
+        'Person'
+      ];
     case 'assertionSubject':
       return [
+        'MusicAlbum',
+        'MusicComposition',
+        'MusicRecording',
         'Copyright',
         'Right',
         'RightsTransferAction'

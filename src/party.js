@@ -13,75 +13,55 @@ const{
 * @module constellate/src/party
 */
 
-const MusicGroup = {
-  $schema: Draft,
-  title: 'MusicGroup',
-  type: 'object',
-  properties: {
-    '@context': {
-      enum: ['http://schema.org/'],
-      readonly: true
+function partyFactory(type: string, isOrganization: boolean): Object {
+  const party = {
+    $schema: Draft,
+    title: type,
+    type: 'object',
+    properties: {
+      '@context': {
+        enum: ['http://schema.org/'],
+        readonly: true
+      },
+      '@type': {
+        enum: [type],
+        readonly: true
+      },
+      email: Email,
+      name: {
+        type: 'string'
+      },
+      sameAs: {
+        type: 'array',
+        items: Url,
+        minItems: 1,
+        uniqueItems: true
+      },
+      url: Url
     },
-    '@type': {
-      enum: ['MusicGroup'],
-      readonly: true
-    },
-    email: Email,
-    name: {
-      type: 'string'
-    },
-    sameAs: {
-      type: 'array',
-      items: Url,
-      minItems: 1,
-      uniqueItems: true
-    },
-    url: Url
-  },
-  required: [
-    '@context',
-    '@type',
-    'name'
-  ]
+    required: [
+      '@context',
+      '@type',
+      'name'
+    ]
+  }
+  if (isOrganization) {
+    Object.assign(party.properties, {
+      member: {
+        type: 'array',
+        items: Link,
+        minItems: 1,
+        uniqueItems: true
+      }
+    });
+  }
+  return party
 }
 
-const Organization = {
-  $schema: Draft,
-  title: 'Organization',
-  type: 'object',
-  properties: {
-    '@context': {
-      enum: ['http://schema.org/'],
-      readonly: true
-    },
-    '@type': {
-      enum: ['Organization'],
-      readonly: true
-    },
-    email: Email,
-    member: {
-      type: 'array',
-      items: Link,
-      minItems: 1,
-      uniqueItems: true
-    },
-    name: {
-      type: 'string'
-    },
-    sameAs: {
-      type: 'array',
-      items: Url,
-      minItems: 1,
-      uniqueItems: true
-    },
-    url: Url
-  },
-  required: [
-    '@context',
-    '@type',
-    'name'
-  ]
-}
+const MusicGroup = partyFactory('MusicGroup', true);
+const Organization = partyFactory('Organization', true);
+const Person = partyFactory('Person', false);
 
 exports.MusicGroup = MusicGroup;
 exports.Organization = Organization;
+exports.Person = Person;

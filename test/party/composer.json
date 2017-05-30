@@ -1,1 +1,1 @@
-{"@context":"http://schema.org/","@type":"MusicGroup","email":"composer@example.com","name":"composer","url":"http://composer.com"}
+{"@context":"http://schema.org/","@type":"Person","email":"composer@example.com","name":"composer","url":"http://composer.com"}

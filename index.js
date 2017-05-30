@@ -71,23 +71,21 @@ importHashesBtn.addEventListener('click', () => {
 });
 
 saveDataHashBtn.addEventListener('click', () => {
-  const hash = dataHash.value;
-  if (hash) {
+  if (dataHash.value) {
     const name = prompt('Enter a name for the hash', '');
     if (name && name.length) {
-      hashes[name] = hash;
-      console.log('Saved data hash: ', JSON.stringify({name, hash}, null, 2));
+      hashes[name] = dataHash.value;
+      console.log(`Saved data hash as "${name}"`);
     }
   }
 });
 
 saveFileHashBtn.addEventListener('click', () => {
-  const hash = fileHash.value;
-  if (hash) {
+  if (fileHash.value) {
     const name = prompt('Enter a name for the hash', '');
     if (name && name.length) {
-      hashes[name] = hash;
-      console.log('Saved file hash: ', JSON.stringify({name, hash}, null, 2));
+      hashes[name] = fileHash.value;
+      console.log(`Saved file hash as "${name}"`);
     }
   }
 });
@@ -157,8 +155,8 @@ function listModifiers() {
           event.preventDefault();
           if (!ol.children.length) return;
           if (ol.hasAttribute('required') &&
-              ol.hasAttribute('minimum') &&
-              parseInt(ol.attributes.minimum.value) === ol.children.length) {
+              ol.hasAttribute('minitems') &&
+              parseInt(ol.attributes.minitems.value) === ol.children.length) {
               const label = ol.previousElementSibling;
               alert(label.textContent + ' is required');
               return;
@@ -192,6 +190,7 @@ schemaSelect.addEventListener('change', () => {
 function includeElement(elem, label) {
     switch (elem.nodeName) {
         case 'INPUT':
+            if (elem.type === 'checkbox') return true;
             if (!elem.value) return false;
             return true;
         case 'FIELDSET':

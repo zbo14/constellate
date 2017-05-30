@@ -10,30 +10,26 @@ const Copyright = {
   title: 'Copyright',
   properties: {
     '@context': {
-      type: 'array',
-      items: [
-        {
-          enum: ['http://schema.org/']
-        },
-        {
-          enum: ['http://coalaip.org/']
-        }
-      ],
+      enum: ['http://coalaip.org/'],
       readonly: true
     },
     '@type': {
-      enum: [ 'Copyright' ],
+      enum: ['Copyright'],
       readonly: true
     },
     rightsOf: Link,
     validFrom: DateTime,
     validThrough: DateTime
-  }
-  //..
+  },
+  required: [
+    '@context',
+    '@type',
+    'rightsOf'
+  ]
 }
 
 // CreativeWork is used for licenses and transfer contracts
-// Should there be subclass definitions for these instead?
+// Should there be subclass definitions for these?..
 
 const CreativeWork = {
   $schema: Draft,
@@ -51,8 +47,12 @@ const CreativeWork = {
     text: {
       type: 'string'
     }
-  }
-  //..
+  },
+  required: [
+    '@context',
+    '@type',
+    'text'
+  ]
 }
 
 const ReviewAction = {
@@ -86,8 +86,33 @@ const ReviewAction = {
     },
     validFrom: DateTime,
     validThrough: DateTime
-  }
-  //..
+  },
+  oneOf: [
+    {
+      properties: {
+        assertionTruth: {
+          enum: [true]
+        }
+      },
+      not: {
+        required: ['error']
+      }
+    },
+    {
+      properties: {
+        assertionTruth: {
+          enum: [false]
+        }
+      },
+      required : ['error']
+    }
+  ],
+  required: [
+    '@context',
+    '@type',
+    'asserter',
+    'assertionSubject'
+  ]
 }
 
 const Right = {
@@ -143,8 +168,13 @@ const Right = {
     },
     validFrom: DateTime,
     validThrough: DateTime
-  }
-  //..
+  },
+  required: [
+    '@context',
+    '@type',
+    'license',
+    'source'
+  ]
 }
 
 const RightsTransferAction = {
@@ -153,15 +183,7 @@ const RightsTransferAction = {
   title: 'RightsTransferAction',
   properties: {
     '@context': {
-      type: 'array',
-      items: [
-        {
-          enum: ['http://schema.org/']
-        },
-        {
-          enum: ['http://coalaip.org/']
-        }
-      ],
+      enum: ['http://coalaip.org/'],
       readonly: true
     },
     '@type': {
@@ -169,8 +191,12 @@ const RightsTransferAction = {
       readonly: true
     },
     transferContract: Link
-  }
-  //..
+  },
+  required: [
+    '@context',
+    '@type',
+    'transferContract'
+  ]
 }
 
 exports.Copyright = Copyright;

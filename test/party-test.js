@@ -1,8 +1,13 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
 import { readTestFile } from './fs.js';
-import { MusicGroup, Organization } from '../lib/party.js';
 import { validateSchema } from '../lib/schema.js';
+
+import {
+  MusicGroup,
+  Organization,
+  Person
+} from '../lib/party.js';
 
 const composer = JSON.parse(readTestFile('/party/composer.json'));
 const lyricist = JSON.parse(readTestFile('/party/lyricist.json'));
@@ -12,16 +17,16 @@ const publisher = JSON.parse(readTestFile('/party/publisher.json'));
 const recordLabel = JSON.parse(readTestFile('/party/recordLabel.json'));
 
 describe('Party', () => {
-  it('validates MusicGroup schema', () => {
+  it('validates Person schema', () => {
     assert.isOk(
-      validateSchema(composer, MusicGroup),
-      'should validate MusicGroup schema'
+      validateSchema(composer, Person),
+      'should validate Person schema'
     );
   });
-  it('validates MusicGroup schema', () => {
+  it('validates Person schema', () => {
     assert.isOk(
-      validateSchema(lyricist, MusicGroup),
-      'should validate MusicGroup schema'
+      validateSchema(lyricist, Person),
+      'should validate Person schema'
     );
   });
   it('validates MusicGroup schema', () => {
@@ -30,10 +35,10 @@ describe('Party', () => {
       'should validate MusicGroup schema'
     );
   });
-  it('validates MusicGroup schema', () => {
+  it('validates Person schema', () => {
     assert.isOk(
-      validateSchema(producer, MusicGroup),
-      'should validate MusicGroup schema'
+      validateSchema(producer, Person),
+      'should validate Person schema'
     );
   });
   it('validates Organization schema', () => {
