@@ -1,14 +1,20 @@
-const { readTestFile } = require('./fs.js');
 const { validate } = require('../lib/linked-data.js');
 const { promiseSeq } = require('../lib/util.js');
 
 const {
+  createReadStream,
+  readTestFile
+} = require('./fs.js');
+
+const {
+  addFile,
   getDAGNode,
   putDAGNode,
   startPeer
 } = require('../lib/ipfs.js');
 
 const cids = {};
+const multihashes = {};
 const objs = {};
 
 objs.composer = JSON.parse(readTestFile('/party/composer.json'));
@@ -38,6 +44,15 @@ objs.recordingRight = JSON.parse(readTestFile('/coala/recording-right.json'));
 objs.recordingRightAssignment = JSON.parse(readTestFile('/coala/recording-right-assignment.json'));
 objs.recordingRightContract = JSON.parse(readTestFile('/coala/recording-right-contract.json'));
 
+function putFile(path) {
+  const readStream = createReadStream(path);
+  return addFile(readStream, '').then((result) => {
+    const name = path.split('/').pop()
+    console.log(name + ' multihash: ' + result.hash);
+    multihashes[path] = result.hash;
+  });
+}
+
 function getCBORAndValidate(name) {
   return getDAGNode(cids[name], 'dag-cbor').then((dagNode) => {
     return validate(dagNode, 'dag-cbor');
@@ -64,6 +79,8 @@ startPeer().then((info) => {
     () => putCBOR('producer'),
     () => putCBOR('publisher'),
     () => putCBOR('recordLabel'),
+    () => putFile('/test.mp3'),
+    () => putFile('/test.png'),
     () => putCBOR('album'),
     () => putCBOR('audio'),
     () => putCBOR('composition'),
@@ -90,8 +107,12 @@ startPeer().then((info) => {
     () => getCBORAndValidate('compositionCopyright'),
     () => getCBORAndValidate('compositionCopyrightAssertion'),
     () => getCBORAndValidate('compositionRight'),
-    () => getCBORAndValidate('compositionRightAssignment')
-    //..
+    () => getCBORAndValidate('compositionRightAssignment'),
+    () => getCBORAndValidate('recording'),
+    () => getCBORAndValidate('recordingCopyright'),
+    () => getCBORAndValidate('recordingCopyrightAssertion'),
+    () => getCBORAndValidate('recordingRight'),
+    () => getCBORAndValidate('recordingRightAssignment')
   );
 
 }).then(() => console.log('done'));

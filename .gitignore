@@ -1,8 +1,6 @@
 bundle.*
 .DS_Store
 *.log
+*.mp3
 node_modules
-
-*ed25519.js
-*rsa.js
-*secp256k1.js
+*.png

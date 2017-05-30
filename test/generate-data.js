@@ -1,8 +1,13 @@
-const { writeTestFile } = require('./fs.js');
 const { promiseSeq } = require('../lib/util.js');
 
 const {
-  calcHash,
+  createReadStream,
+  readTestFile,
+  writeTestFile
+} = require('./fs.js');
+
+const {
+  addFile,
   putDAGNode,
   startPeer
 } = require('../lib/ipfs.js');
@@ -10,13 +15,17 @@ const {
 const hashes = {};
 const objs = {};
 
-function setHash(name) {
-    // return calcHash(objs[name], 'dag-cbor').then((hash) => {
-    //    return hashes[name] = hash;
-    // });
-    return putDAGNode(objs[name], 'dag-cbor').then((cid) => {
-      return hashes[name] = cid.toBaseEncodedString();
-    })
+function setDataHash(name) {
+  return putDAGNode(objs[name], 'dag-cbor').then((cid) => {
+    hashes[name] = cid.toBaseEncodedString();
+  });
+}
+
+function setFileHash(path) {
+  const readStream = createReadStream(path);
+  return addFile(readStream, '').then((result) => {
+    hashes[path] = result.hash;
+  });
 }
 
 objs.composer = {
@@ -77,19 +86,21 @@ writeTestFile('/party/recordLabel.json', JSON.stringify(objs.recordLabel));
 
 promiseSeq(
     startPeer,
-    () => setHash('composer'),
-    () => setHash('lyricist'),
-    () => setHash('performer'),
-    () => setHash('producer'),
-    () => setHash('publisher'),
-    () => setHash('recordLabel')
+    () => setDataHash('composer'),
+    () => setDataHash('lyricist'),
+    () => setDataHash('performer'),
+    () => setDataHash('producer'),
+    () => setDataHash('publisher'),
+    () => setDataHash('recordLabel'),
+    () => setFileHash('/test.mp3'),
+    () => setFileHash('/test.png')
 
 ).then(() => {
 
     objs.audio = {
         '@context': 'http://schema.org/',
         '@type': 'AudioObject',
-        contentUrl:  { '/': 'QmYKAhVW2d4e28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE' },
+        contentUrl:  { '/': hashes['/test.mp3'] },
         encodingFormat: 'mp3'
     }
 
@@ -106,7 +117,7 @@ promiseSeq(
     objs.image = {
         '@context': 'http://schema.org/',
         '@type': 'ImageObject',
-        contentUrl: { '/': 'QmYKAhvW2d4f28a7HezzFtsCZ9qsqwv6mrqELrAkrAAwfE' },
+        contentUrl: { '/': hashes['/test.png'] },
         encodingFormat: 'png'
     }
 
@@ -115,9 +126,9 @@ promiseSeq(
     writeTestFile('/meta/image.json', JSON.stringify(objs.image));
 
     return promiseSeq(
-        () => setHash('audio'),
-        () => setHash('composition'),
-        () => setHash('image')
+        () => setDataHash('audio'),
+        () => setDataHash('composition'),
+        () => setDataHash('image')
     );
 
 }).then(() => {
@@ -134,7 +145,7 @@ promiseSeq(
 
     writeTestFile('/meta/recording.json', JSON.stringify(objs.recording));
 
-    return setHash('recording');
+    return setDataHash('recording');
 
 }).then(() => {
 
@@ -153,7 +164,7 @@ promiseSeq(
 
     writeTestFile('/meta/album.json', JSON.stringify(objs.album));
 
-    return setHash('album');
+    return setDataHash('album');
 
 }).then(() => {
 
@@ -206,12 +217,12 @@ promiseSeq(
   writeTestFile('/coala/recording-right-contract.json', JSON.stringify(objs.recordingRightContract));
 
   return promiseSeq(
-    () => setHash('compositionCopyright'),
-    () => setHash('compositionLicense'),
-    () => setHash('compositionRightContract'),
-    () => setHash('recordingCopyright'),
-    () => setHash('recordingLicense'),
-    () => setHash('recordingRightContract')
+    () => setDataHash('compositionCopyright'),
+    () => setDataHash('compositionLicense'),
+    () => setDataHash('compositionRightContract'),
+    () => setDataHash('recordingCopyright'),
+    () => setDataHash('recordingLicense'),
+    () => setDataHash('recordingRightContract')
   );
 
 }).then(() => {
@@ -255,10 +266,10 @@ promiseSeq(
       'http://coalaip.org/'
     ],
     '@type': 'ReviewAction',
-    asserter: { '/': hashes.recordLabel },
+    asserter: { '/': hashes.performer },
     assertionSubject: { '/': hashes.recordingCopyright },
     assertionTruth: false,
-    error: 'copyrightHolder'
+    error: 'validThrough'
   }
 
   objs.recordingRight = {
@@ -291,12 +302,12 @@ promiseSeq(
   writeTestFile('/coala/recording-right-assignment.json', JSON.stringify(objs.recordingRightAssignment));
 
   return promiseSeq(
-    () => setHash('compositionCopyrightAssertion'),
-    () => setHash('compositionRight'),
-    () => setHash('compositionRightAssignment'),
-    () => setHash('recordingCopyrightAssertion'),
-    () => setHash('recordingRight'),
-    () => setHash('recordingRightAssignment')
+    () => setDataHash('compositionCopyrightAssertion'),
+    () => setDataHash('compositionRight'),
+    () => setDataHash('compositionRightAssignment'),
+    () => setDataHash('recordingCopyrightAssertion'),
+    () => setDataHash('recordingRight'),
+    () => setDataHash('recordingRightAssignment')
   );
 
 }).then(() => console.log('done'));
