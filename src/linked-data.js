@@ -15,7 +15,8 @@ const {
   ImageObject,
   MusicAlbum,
   MusicComposition,
-  MusicRecording
+  MusicRecording,
+  MusicRelease
 } = require('../lib/meta.js');
 
 const {
@@ -54,6 +55,8 @@ function getTypeSchema(type: string): Object {
       return MusicComposition;
     case 'MusicRecording':
       return MusicRecording;
+    case 'MusicRelease':
+      return MusicRelease;
     case 'Copyright':
       return Copyright;
     case 'CreativeWork':
@@ -82,13 +85,15 @@ function isSubType(subType: string, type: string): boolean {
     case 'MusicGroup':
       return isSubType('Organization', type);
     case 'MediaObject':
-    case 'MusicAlbum':
     case 'MusicComposition':
+    case 'MusicPlaylist':
     case 'MusicRecording':
       return isSubType('CreativeWork', type);
+    case 'MusicAlbum':
+    case 'MusicRelease':
+      return isSubType('MusicPlaylist', type);
     case 'AudioObject':
     case 'ImageObject':
-      return isSubType('MediaObject', type);
       return isSubType('MediaObject', type);
     case 'Copyright':
     case 'Right':
@@ -124,6 +129,8 @@ function getPropertyTypes(property: string): string[] {
       return ['ImageObject'];
     case 'recordingOf':
       return ['MusicComposition'];
+    case 'releaseOf':
+      return ['MusicAlbum'];
     case 'track':
       return ['MusicRecording'];
     case 'license':
@@ -184,6 +191,7 @@ function validate(obj: Object, format: string): Promise<Object> {
                   return { '/': link.cid.toBaseEncodedString() };
                 }
                 if (!types.some((type) => isSubType(dagNode['@type'], type))) {
+                    console.log(types, dagNode);
                     return reject(
                       new Error(`invalid @type for ${parts[0]}: ${dagNode['@type']}`)
                     );

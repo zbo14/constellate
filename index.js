@@ -60,7 +60,7 @@ exportHashesBtn.addEventListener('click', () => {
 });
 
 importHashesBtn.addEventListener('click', () => {
-  if (importHashes.files) {
+  if (importHashes.files.length) {
     const reader = new FileReader();
     reader.onload = () => {
       hashes = JSON.parse(reader.result);
@@ -101,7 +101,7 @@ startPeerBtn.addEventListener('click', () => {
       });
     });
     addFileBtn.addEventListener('click', () => {
-      if (fileInput.files) {
+      if (fileInput.files.length) {
         ipfs.addFileInput(fileInput).then((result) => {
           console.log('Added file!');
           fileHash.value = result.hash;
@@ -193,8 +193,8 @@ schemaSelect.addEventListener('change', () => {
 function includeElement(elem, label) {
     switch (elem.nodeName) {
         case 'INPUT':
-            if (elem.type === 'checkbox') return true;
-            if (!elem.value) return false;
+            if (elem.type !== 'checkbox' &&
+                !elem.value) return false;
             return true;
         case 'FIELDSET':
             if (!elem.children.length) return false;
@@ -215,9 +215,10 @@ function includeElement(elem, label) {
                 return includeElement(li.firstChild);
             }).every((bool) => bool);
         case 'SELECT':
+            if (!elem.value) return false;
             return true;
         default:
-            return false;
+            throw new Error('unexpected nodeName: ' + elem.nodeName);
     }
 }
 

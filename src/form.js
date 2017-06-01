@@ -91,7 +91,6 @@ function elementToValue(elem: HTMLElement): any {
           if (!isBoolean(input.checked)) {
             throw new Error('input[type="checkbox"]:checked is not boolean');
           }
-          console.log(input.checked);
           return input.checked;
         case 'number':
           if (!isNumber(input.valueAsNumber)) {

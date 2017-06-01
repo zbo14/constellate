@@ -1,7 +1,8 @@
 const {
   Draft,
   DateTime,
-  Link
+  Link,
+  Territory
 } = require('../lib/schema.js');
 
 const Copyright = {
@@ -10,7 +11,15 @@ const Copyright = {
   title: 'Copyright',
   properties: {
     '@context': {
-      enum: ['http://coalaip.org/'],
+      type: 'array',
+      items: [
+        {
+          enum: ['http://schema.org/']
+        },
+        {
+          enum: ['http://coalaip.org/']
+        }
+      ],
       readonly: true
     },
     '@type': {
@@ -18,6 +27,7 @@ const Copyright = {
       readonly: true
     },
     rightsOf: Link,
+    territory: Territory,
     validFrom: DateTime,
     validThrough: DateTime
   },
@@ -158,6 +168,7 @@ const Right = {
       uniqueItems: true
     },
     source: Link,
+    territory: Territory,
     usageType: {
       type: 'array',
       items: {

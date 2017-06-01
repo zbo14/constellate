@@ -158,7 +158,6 @@ promiseSeq(
         image: { '/': hashes.image },
         name: 'ding-ding-dooby-doo',
         producer: [{ '/': hashes.producer }],
-        recordLabel: [{ '/': hashes.recordLabel }],
         track: [{ '/': hashes.recording }]
     }
 
@@ -169,9 +168,16 @@ promiseSeq(
 }).then(() => {
 
   objs.compositionCopyright = {
-    '@context': 'http://coalaip.org/',
+    '@context': [
+      'http://schema.org/',
+      'http://coalaip.org/'
+    ],
     '@type': 'Copyright',
     rightsOf: { '/': hashes.composition },
+    territory: {
+      '@type': 'Place',
+      name: 'US'
+    },
     validFrom: '2018-01-01T00:00:00Z',
     validThrough: '2088-01-01T00:00:00Z'
   }
@@ -189,9 +195,16 @@ promiseSeq(
   }
 
   objs.recordingCopyright = {
-    '@context': 'http://coalaip.org/',
+    '@context': [
+      'http://schema.org/',
+      'http://coalaip.org/'
+    ],
     '@type': 'Copyright',
     rightsOf: { '/': hashes.recording },
+    territory: {
+      '@type': 'Place',
+      name: 'US'
+    },
     validFrom: '2017-10-01T00:00:00Z',
     validTo: '2076-10-01T00:00:00Z'
   }
@@ -248,6 +261,10 @@ promiseSeq(
     license: { '/': hashes.compositionLicense },
     percentageShares: 70,
     rightContext: ['commercial'],
+    territory: {
+      '@type': 'Place',
+      name: 'US'
+    },
     usageType: ['publish'],
     source: { '/': hashes.compositionCopyright },
     validFrom: '2018-01-01T00:00:00Z',
@@ -282,6 +299,10 @@ promiseSeq(
     license: { '/': hashes.recordingLicense },
     percentageShares: 60,
     rightContext: ['commercial'],
+    territory: {
+      '@type': 'Place',
+      name: 'US'
+    },
     usageType: ['play', 'sell'],
     source: { '/': hashes.recordingCopyright },
     validFrom: '2017-10-01T00:00:00Z',
