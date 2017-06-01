@@ -8,7 +8,8 @@ import {
   ImageObject,
   MusicAlbum,
   MusicComposition,
-  MusicRecording
+  MusicRecording,
+  MusicRelease
 } from '../lib/meta.js';
 
 const album = JSON.parse(readTestFile('/meta/album.json'));
@@ -16,6 +17,7 @@ const audio = JSON.parse(readTestFile('/meta/audio.json'));
 const composition = JSON.parse(readTestFile('/meta/composition.json'));
 const image = JSON.parse(readTestFile('/meta/image.json'));
 const recording = JSON.parse(readTestFile('/meta/recording.json'));
+const release = JSON.parse(readTestFile('/meta/release.json'));
 
 describe('Meta', () => {
   it('validates AudioObject schema', () => {
@@ -46,6 +48,12 @@ describe('Meta', () => {
     assert.isOk(
       validateSchema(recording, MusicRecording),
       'should validate MusicRecording schema'
+    );
+  });
+  it('validates MusicRelease schema', () => {
+    assert.isOk(
+      validateSchema(release, MusicRelease),
+      'should validate MusicRelease schema'
     );
   });
 });

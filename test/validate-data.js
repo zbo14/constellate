@@ -10,7 +10,8 @@ const {
   addFile,
   getDAGNode,
   putDAGNode,
-  startPeer
+  startPeer,
+  stopPeer
 } = require('../lib/ipfs.js');
 
 const cids = {};
@@ -29,6 +30,7 @@ objs.audio = JSON.parse(readTestFile('/meta/audio.json'));
 objs.composition = JSON.parse(readTestFile('/meta/composition.json'));
 objs.image = JSON.parse(readTestFile('/meta/image.json'));
 objs.recording = JSON.parse(readTestFile('/meta/recording.json'));
+objs.release = JSON.parse(readTestFile('/meta/release.json'));
 
 objs.compositionCopyright = JSON.parse(readTestFile('/coala/composition-copyright.json'));
 objs.compositionCopyrightAssertion = JSON.parse(readTestFile('/coala/composition-copyright-assertion.json'));
@@ -86,6 +88,7 @@ startPeer().then((info) => {
     () => putCBOR('composition'),
     () => putCBOR('image'),
     () => putCBOR('recording'),
+    () => putCBOR('release'),
     () => putCBOR('compositionCopyright'),
     () => putCBOR('compositionCopyrightAssertion'),
     () => putCBOR('compositionLicense'),
@@ -112,7 +115,8 @@ startPeer().then((info) => {
     () => getCBORAndValidate('recordingCopyright'),
     () => getCBORAndValidate('recordingCopyrightAssertion'),
     () => getCBORAndValidate('recordingRight'),
-    () => getCBORAndValidate('recordingRightAssignment')
+    () => getCBORAndValidate('recordingRightAssignment'),
+    () => getCBORAndValidate('release')
   );
 
 }).then(() => console.log('done'));

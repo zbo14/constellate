@@ -167,6 +167,20 @@ promiseSeq(
 
 }).then(() => {
 
+  objs.release = {
+    '@context': 'http://schema.org/',
+    '@type': 'MusicRelease',
+    musicReleaseFormat: 'DigitalFormat',
+    recordLabel: [{ '/': hashes.recordLabel }],
+    releaseOf: { '/': hashes.album }
+  }
+
+  writeTestFile('/meta/release.json', JSON.stringify(objs.release));
+
+  return setDataHash('release');
+
+}).then(() => {
+
   objs.compositionCopyright = {
     '@context': [
       'http://schema.org/',
