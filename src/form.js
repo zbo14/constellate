@@ -1,6 +1,9 @@
 'use strict';
 
-const { Draft } = require('../lib/schema.js');
+const {
+  Draft,
+  validateSchema
+} = require('../lib/schema.js');
 
 const {
   getDAGNode,
@@ -123,16 +126,6 @@ function elementToValue(elem: HTMLElement): any {
 }
 
 function schemaToElement(schema: Object): HTMLElement {
-  if (schema.hasOwnProperty('enum') && isArray(schema.enum)) {
-    const select = document.createElement('select');
-    schema.enum.forEach((val) => {
-      const option = document.createElement('option');
-      option.textContent = val;
-      option.value = val;
-      select.appendChild(option);
-    });
-    return select;
-  }
   switch(schema.type) {
     case 'array':
       let li;
@@ -155,9 +148,18 @@ function schemaToElement(schema: Object): HTMLElement {
       return fieldset;
     case 'string':
       return newInput('text');
-    default:
-      throw new Error('unexpected type: ' + schema.type);
   }
+  if (schema.hasOwnProperty('enum') && isArray(schema.enum)) {
+    const select = document.createElement('select');
+    schema.enum.forEach((val) => {
+      const option = document.createElement('option');
+      option.textContent = val;
+      option.value = val;
+      select.appendChild(option);
+    });
+    return select;
+  }
+  throw new Error('unexpected schema: ' + JSON.stringify(schema));
 }
 
 function valueToElement(val: any, key?: string): Promise<HTMLElement> {
@@ -243,11 +245,18 @@ function getAttributes(elem: HTMLElement, schema: Object): Object {
   });
 }
 
-function setAttribute(elem: HTMLElement, key: string, val: string): HTMLElement {
+function setAttribute(elem: HTMLElement, key: string, val: any): HTMLElement {
   const input: HTMLInputElement = (elem: any);
   switch(key) {
     case 'default':
-      input.defaultValue = val;
+      if (input.type === 'checkbox') input.checked = val;
+      else input.defaultValue = val;
+      break;
+    case 'enum':
+      if (isArray(val) && elem.hasAttribute('type')) {
+        if (input.type === 'checkbox') input.checked = val[0];
+        else input.value = val[0];
+      }
       break;
     case 'maximum':
       input.max = val;
@@ -380,30 +389,63 @@ function getInputs(elem: HTMLElement): HTMLInputElement[] {
   }, []);
 }
 
-function addDependencies(elem: HTMLElement, elems: HTMLElement[], negate: boolean) {
-  getInputs(elem).forEach((input1) => {
-    input1.addEventListener('input', () => {
-      elems.map(getInputs).forEach((inputs) => {
-        inputs.forEach((input2) => {
-          if (negate) {
-            Array.from(document.querySelectorAll('div')).forEach((div) => {
-              if (isDescendant(div, input2) &&
-                  div.parentElement &&
-                  div.parentElement.nodeName === 'FORM') {
-                div.hidden = !!input1.value;
-                const remover: HTMLElement = (div.previousElementSibling: any);
-                if (remover && remover.nodeName === 'BUTTON') {
-                  const adder : HTMLElement = (remover.previousElementSibling: any);
-                  if (!adder) throw new Error('expected adder and remover btns');
-                  adder.hidden = remover.hidden = !!input1.value;
-                }
-              }
-            });
-            input2.disabled = !!input1.value;
+function hasInputValue(input: HTMLInputElement): boolean {
+  return (input.type === 'checkbox' ? input.checked : !!input.value);
+}
+
+function addPropertyDependencies(elem: HTMLElement, elems: HTMLElement[], negate: boolean) {
+  let input : HTMLInputElement;
+  const handler = (event) => {
+    if (!(input = (event.target : any)) ||
+        input.nodeName !== 'INPUT') return;
+    const hasValue = hasInputValue(input);
+    elems.forEach((el) => {
+      Array.from(document.querySelectorAll('div')).forEach((div) => {
+        if (isDescendant(div, el) &&
+            div.parentElement &&
+            div.parentElement.nodeName === 'FORM') {
+          div.hidden = (negate ? hasValue: false);
+          const remover: HTMLElement = (div.previousElementSibling: any);
+          if (remover && remover.nodeName === 'BUTTON') {
+            const adder : HTMLElement = (remover.previousElementSibling: any);
+            if (!adder) throw new Error('expected adder and remover btns');
+            adder.hidden = remover.hidden = (negate ? hasValue: false);
           }
-          input2.required = (negate ? !input1.value : !!input1.value);
-        });
+        }
       });
+      getInputs(el).forEach((input) => {
+        input.disabled = (negate ? hasValue: false);
+        input.required = (negate ? !hasValue : hasValue);
+      });
+    });
+  }
+  elem.addEventListener('change', handler);
+  elem.addEventListener('input', handler);
+}
+
+function addSchemaDependencies(elem: HTMLElement, objs: Object[], negate: boolean) {
+  let input : HTMLInputElement;
+  objs.map((obj) => {
+    const el: HTMLElement = (obj.elem : any);
+    const schema: Object = (obj.schema : any);
+    const handler = (event) => {
+      if (!(input = (event.target : any)) ||
+          input.nodeName !== 'INPUT' ||
+          !hasInputValue(input)) return;
+      const value = elementToValue(el);
+      if (negate === validateSchema(schema, value)) {
+        arrayFromObject(schema).reduce((result, [k, v]) => {
+          return setAttribute(result, k, v);
+        }, el);
+      }
+    }
+    elem.addEventListener('change', handler);
+    elem.addEventListener('input', handler);
+    el.addEventListener('change', () => {
+      elem.dispatchEvent(new Event('change'));
+    });
+    el.addEventListener('input', () => {
+      elem.dispatchEvent(new Event('input'));
     });
   });
 }
@@ -415,7 +457,7 @@ function schemaToForm(schema: Object): HTMLElement[] {
   const props = schema.properties;
   const reqs = schema.required;
   let elem;
-  const elems = traverse(props, (schema, key) => {
+  let elems = traverse(props, (schema, key) => {
     elem = arrayFromObject(schema).reduce((result, [k, v]) => {
       return setAttribute(result, k, v);
     }, schemaToElement(schema));
@@ -425,21 +467,43 @@ function schemaToForm(schema: Object): HTMLElement[] {
   let deps;
   return Object.keys(elems).reduce((result, key) => {
     if (!(elem = elems[key])) return result;
-    if (isObject(schema.dependencies) &&
-        (deps = schema.dependencies[key])) {
-      addDependencies(elem, deps.map((dep) => elems[dep]), false);
-    }
-    if (isObject(schema.not) &&
-        isObject(schema.not.dependencies) &&
-        (deps = schema.not.dependencies[key])) {
-      addDependencies(elem, deps.map((dep) => elems[dep]), true);
-    }
     const div = document.createElement('div');
     const label = document.createElement('label');
     label.textContent = key;
     if (elem.hasAttribute('hidden')) label.hidden = true;
     div.appendChild(label);
     div.appendChild(elem);
+    if (isObject(schema.dependencies) &&
+        (deps = schema.dependencies[key])) {
+      if (isArray(deps)) {
+        addPropertyDependencies(elem, deps.map((dep) => elems[dep]), false);
+      } else if (isObject(deps)) {
+        if (!isObject(deps.properties)) {
+          throw new Error('expected non-empty object for deps.properties');
+        }
+        addSchemaDependencies(elem, arrayFromObject(deps.properties).map(([key, schema]) => {
+          return { elem: elems[key], schema };
+        }), false);
+      } else {
+        throw new Error('expected non-empty array/object for deps; got ' + JSON.stringify(deps));
+      }
+    }
+    if (isObject(schema.not) &&
+        isObject(schema.not.dependencies) &&
+        (deps = schema.not.dependencies[key])) {
+      if (isArray(deps)) {
+        addPropertyDependencies(elem, deps.map((dep) => elems[dep]), true);
+      } else if (isObject(deps)) {
+        if (!isObject(deps.properties)) {
+          throw new Error('expected non-empty object for deps.properties');
+        }
+        addSchemaDependencies(elem, arrayFromObject(deps.properties).map(([key, schema]) => {
+          return { elem: elems[key], schema };
+        }), true);
+      } else {
+        throw new Error('expected non-empty array/object for deps; got ' + JSON.stringify(deps));
+      }
+    }
     return result.concat(div);
   }, []);
 }

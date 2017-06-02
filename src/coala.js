@@ -97,15 +97,16 @@ const ReviewAction = {
     validFrom: DateTime,
     validThrough: DateTime
   },
-  switch: [
-      {
-        if: { properties: { assertionTruth: false }},
-        then: { required: ['error'] }
-      },
-      {
-        then: { not: { required: ['error'] }}
+  dependencies: {
+    error: {
+      properties: {
+        assertionTruth: {
+          type: 'boolean',
+          enum: [false]
+        }
       }
-  ],
+    }
+  },
   required: [
     '@context',
     '@type',

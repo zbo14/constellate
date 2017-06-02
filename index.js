@@ -129,7 +129,7 @@ startPeerBtn.addEventListener('click', () => {
 
 function nameToHash() {
   document.querySelectorAll('input[type="text"]').forEach((textInput) => {
-    textInput.onkeyup = () => {
+    textInput.addEventListener('keyup', () => {
       if (textInput.value[0] === '#') {
         let name = textInput.value.slice(1);
         if (hashes[name]) {
@@ -139,7 +139,7 @@ function nameToHash() {
           }, 1000);
         }
       }
-    }
+    });
   });
 }
 

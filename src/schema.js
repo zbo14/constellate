@@ -67,8 +67,8 @@ const Url = {
   pattern: '^https?:\/\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%_\\+.~#?&\/\/=]*)$'
 }
 
-function validateSchema(obj: Object, schema: Object): boolean {
-  return ajv.compile(schema)(obj);
+function validateSchema(schema: Object, value: any): boolean {
+  return ajv.compile(schema)(value);
 }
 
 exports.Draft = Draft;
