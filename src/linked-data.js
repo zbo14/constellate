@@ -15,6 +15,7 @@ const {
   ImageObject,
   MusicAlbum,
   MusicComposition,
+  MusicPlaylist,
   MusicRecording,
   MusicRelease
 } = require('../lib/meta.js');
@@ -53,6 +54,8 @@ function getTypeSchema(type: string): Object {
       return MusicAlbum;
     case 'MusicComposition':
       return MusicComposition;
+    case 'MusicPlaylist':
+      return MusicPlaylist;
     case 'MusicRecording':
       return MusicRecording;
     case 'MusicRelease':

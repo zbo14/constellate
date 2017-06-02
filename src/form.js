@@ -12,6 +12,7 @@ const {
   arrayFromObject,
   isArray,
   isBoolean,
+  isDescendant,
   isNumber,
   isObject,
   isString,
@@ -368,27 +369,77 @@ function objectToForm(obj: Object): Promise<HTMLElement[]> {
   });
 }
 
+function getInputs(elem: HTMLElement): HTMLInputElement[] {
+  if (elem.nodeName === 'INPUT') {
+    const input: HTMLInputElement = (elem: any);
+    return [input];
+  }
+  if (!elem.children) return [];
+  return Array.from(elem.children).reduce((result, child) => {
+    return result.concat(getInputs(child));
+  }, []);
+}
+
+function addDependencies(elem: HTMLElement, elems: HTMLElement[], negate: boolean) {
+  getInputs(elem).forEach((input1) => {
+    input1.addEventListener('input', () => {
+      elems.map(getInputs).forEach((inputs) => {
+        inputs.forEach((input2) => {
+          if (negate) {
+            Array.from(document.querySelectorAll('div')).forEach((div) => {
+              if (isDescendant(div, input2) &&
+                  div.parentElement &&
+                  div.parentElement.nodeName === 'FORM') {
+                div.hidden = !!input1.value;
+                const remover: HTMLElement = (div.previousElementSibling: any);
+                if (remover && remover.nodeName === 'BUTTON') {
+                  const adder : HTMLElement = (remover.previousElementSibling: any);
+                  if (!adder) throw new Error('expected adder and remover btns');
+                  adder.hidden = remover.hidden = !!input1.value;
+                }
+              }
+            });
+            input2.disabled = !!input1.value;
+          }
+          input2.required = (negate ? !input1.value : !!input1.value);
+        });
+      });
+    });
+  });
+}
+
 function schemaToForm(schema: Object): HTMLElement[] {
   if (!isObject(schema.properties)) {
     throw new Error('schema properties should be non-empty object');
   }
   const props = schema.properties;
   const reqs = schema.required;
+  let elem;
   const elems = traverse(props, (schema, key) => {
-    const elem = arrayFromObject(schema).reduce((result, [k, v]) => {
+    elem = arrayFromObject(schema).reduce((result, [k, v]) => {
       return setAttribute(result, k, v);
     }, schemaToElement(schema));
     if (!isArray(reqs) || !reqs.includes(key)) return elem;
     return setAttribute(elem, 'required', 'true');
   });
+  let deps;
   return Object.keys(elems).reduce((result, key) => {
-    if (!elems[key]) return result;
+    if (!(elem = elems[key])) return result;
+    if (isObject(schema.dependencies) &&
+        (deps = schema.dependencies[key])) {
+      addDependencies(elem, deps.map((dep) => elems[dep]), false);
+    }
+    if (isObject(schema.not) &&
+        isObject(schema.not.dependencies) &&
+        (deps = schema.not.dependencies[key])) {
+      addDependencies(elem, deps.map((dep) => elems[dep]), true);
+    }
     const div = document.createElement('div');
     const label = document.createElement('label');
     label.textContent = key;
-    if (elems[key].hasAttribute('hidden')) label.hidden = true;
+    if (elem.hasAttribute('hidden')) label.hidden = true;
     div.appendChild(label);
-    div.appendChild(elems[key]);
+    div.appendChild(elem);
     return result.concat(div);
   }, []);
 }

@@ -97,25 +97,14 @@ const ReviewAction = {
     validFrom: DateTime,
     validThrough: DateTime
   },
-  oneOf: [
-    {
-      properties: {
-        assertionTruth: {
-          enum: [true]
-        }
+  switch: [
+      {
+        if: { properties: { assertionTruth: false }},
+        then: { required: ['error'] }
       },
-      not: {
-        required: ['error']
+      {
+        then: { not: { required: ['error'] }}
       }
-    },
-    {
-      properties: {
-        assertionTruth: {
-          enum: [false]
-        }
-      },
-      required : ['error']
-    }
   ],
   required: [
     '@context',
