@@ -5,6 +5,7 @@ require('setimmediate');
 
 const {
   formToObject,
+  getInputs,
   objectToForm,
   schemaToForm
 } = require('./lib/form.js');
@@ -20,11 +21,9 @@ const exportHashes = document.getElementById('export-hashes');
 const fileHash = document.getElementById('file-hash');
 const fileInput = document.getElementById('file-input');
 const files = document.getElementById('files');
-const form = document.querySelector('form');
+const formContainer = document.getElementById('form-container');
 const importHashes = document.getElementById('import-hashes');
 const ols = document.getElementsByTagName('ol');
-const submit = document.createElement('input');
-submit.type = 'submit';
 const textarea = document.querySelector('textarea');
 
 const keySelect = document.getElementById('key-select');
@@ -112,9 +111,11 @@ startPeerBtn.addEventListener('click', () => {
       ipfs.getDAGNode(dataHash.value, 'dag-cbor').then((dagNode) => {
         console.log(dagNode);
         return objectToForm(dagNode);
-      }).then((divs) => {
+      }).then((form) => {
         data.innerHTML = null;
-        divs.forEach((div) => data.appendChild(div));
+        Array.from(form.children).forEach((div) => {
+          if (div.nodeName === 'DIV') data.appendChild(div);
+        });
       });
     });
     getFileBtn.addEventListener('click', () => {
@@ -127,67 +128,96 @@ startPeerBtn.addEventListener('click', () => {
   });
 });
 
-function nameToHash() {
-  document.querySelectorAll('input[type="text"]').forEach((textInput) => {
-    textInput.addEventListener('keyup', () => {
-      if (textInput.value[0] === '#') {
-        let name = textInput.value.slice(1);
-        if (hashes[name]) {
-          setTimeout(() => {
-            name = textInput.value.slice(1);
-            if (hashes[name]) textInput.value = hashes[name]
-          }, 1000);
-        }
-      }
-    });
-  });
-}
-
-function listModifiers() {
-  const lis = Array.from(document.getElementsByTagName('li')).reduce((result, li) => {
-    if (li.parentElement.hidden) return result;
-    return result.concat(li.cloneNode(true));
-  }, []);
+function addButtons(form) {
   Array.from(ols).forEach((ol, idx) => {
     if (!ol.hidden && isDescendant(form, ol)) {
       const remover = document.createElement('button');
       remover.className = 'remover';
       remover.id = 'remover-' + idx;
       remover.textContent = '-';
-      remover.addEventListener('click', (event) => {
-          event.preventDefault();
-          if (!ol.children.length) return;
-          if (ol.hasAttribute('required') &&
-              ol.hasAttribute('minitems') &&
-              parseInt(ol.attributes.minitems.value) === ol.children.length) {
-              const label = ol.previousElementSibling;
-              alert(label.textContent + ' is required');
-              return;
-          }
-          ol.removeChild(ol.lastChild);
-      });
       form.insertBefore(remover, ol.parentElement);
       const adder = document.createElement('button');
       adder.className = 'adder';
       adder.id = 'adder-' + idx;
       adder.textContent = '+';
-      adder.addEventListener('click', (event) => {
-          event.preventDefault();
-          ol.appendChild(lis[idx].cloneNode(true));
-          nameToHash();
-      });
       form.insertBefore(adder, remover);
     }
   });
 }
 
 schemaSelect.addEventListener('change', () => {
-    form.innerHTML = null;
+    formContainer.innerHTML = null;
     const schema = getTypeSchema(schemaSelect.value);
-    schemaToForm(schema).forEach((div) => form.appendChild(div));
-    form.appendChild(submit);
-    listModifiers();
-    nameToHash();
+    const form = schemaToForm(schema);
+    formContainer.appendChild(form);
+    addButtons(form);
+});
+
+formContainer.addEventListener('keyup', (evt) => {
+  const input = evt.target;
+  if (input.nodeName !== 'INPUT' || input.type !== 'text') return;
+  if (input.value[0] === '#') {
+    let name = input.value.slice(1);
+    if (hashes[name]) {
+      setTimeout(() => {
+        name = input.value.slice(1);
+        if (hashes[name]) input.value = hashes[name]
+      }, 1000);
+    }
+  }
+});
+
+formContainer.addEventListener('click', (evt) => {
+    const btn = evt.target;
+    if (btn.nodeName !== 'BUTTON') return;
+    evt.preventDefault();
+    let div = btn.nextElementSibling;
+    if (div.nodeName !== 'DIV') {
+      div = div.nextElementSibling;
+      if (div.nodeName !== 'DIV') {
+        throw new Error('expected div; got ' + div.nodeName);
+      }
+    }
+    const ol = div.lastChild;
+    if (ol.nodeName !== 'OL') {
+      throw new Error('expected ol; got ' + ol.nodeName);
+    }
+    if (btn.className === 'remover') {
+      if (!ol.children.length) {
+        throw new Error('ol has no children');
+      }
+      if (ol.hasAttribute('required') &&
+          ol.hasAttribute('minitems') &&
+          parseInt(ol.attributes.minitems.value) === ol.children.length) {
+          const label = div.firstChild;
+          if (label.nodeName !== 'LABEL') {
+            throw new Error('expected label; got ' + label.nodeName);
+          }
+          alert(label.textContent + ' is required');
+      } else if (ol.children.length === 1) {
+        const li = ol.firstChild;
+        getInputs(li).forEach((input) => input.disabled = true);
+        li.hidden = true;
+      } else {
+        ol.removeChild(ol.lastChild);
+      }
+    } else if (btn.className === 'adder') {
+      const li = ol.firstChild;
+      if (ol.children.length === 1 && li.hidden) {
+        getInputs(li).forEach((input) => input.disabled = false);
+        li.hidden = false;
+      } else {
+        const clone = li.cloneNode(true);
+        getInputs(clone).forEach((input) => {
+          if (input.type === 'checkbox') input.checked = false;
+          else if (input.type === 'text') input.value = null;
+          else throw new Error('unexpected input type: ' + input.type);
+        });
+        ol.appendChild(clone);
+      }
+    } else {
+      throw new Error('expected adder or remover btn; got ' + btn.className);
+    }
 });
 
 function includeElement(elem, label) {
@@ -222,8 +252,9 @@ function includeElement(elem, label) {
     }
 }
 
-form.addEventListener('submit', (event) => {
-    event.preventDefault();
+formContainer.addEventListener('submit', (evt) => {
+    evt.preventDefault();
+    const form = formContainer.firstChild;
     const divs = Array.from(form.children).filter((div) => {
         return div.nodeName === 'DIV' &&
                div.children.length === 2 &&

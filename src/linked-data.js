@@ -117,6 +117,7 @@ function getPropertyTypes(property: string): string[] {
       return ['MusicGroup'];
     case 'composer':
     case 'lyricist':
+    case 'member':
     case 'producer':
     case 'publisher':
     case 'recordLabel':
@@ -194,7 +195,6 @@ function validate(obj: Object, format: string): Promise<Object> {
                   return { '/': link.cid.toBaseEncodedString() };
                 }
                 if (!types.some((type) => isSubType(dagNode['@type'], type))) {
-                    console.log(types, dagNode);
                     return reject(
                       new Error(`invalid @type for ${parts[0]}: ${dagNode['@type']}`)
                     );

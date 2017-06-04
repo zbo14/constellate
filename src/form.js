@@ -92,20 +92,11 @@ function elementToValue(elem: HTMLElement): any {
       const input: HTMLInputElement = (elem: any);
       switch(input.type) {
         case 'checkbox':
-          if (!isBoolean(input.checked)) {
-            throw new Error('input[type="checkbox"]:checked is not boolean');
-          }
-          return input.checked;
+          return (isBoolean(input.checked) ? input.checked: null);
         case 'number':
-          if (!isNumber(input.valueAsNumber)) {
-            throw new Error('input[type="number"] has non-number value');
-          }
-          return input.valueAsNumber;
+          return (isNumber(input.valueAsNumber) ? input.valueAsNumber : null);
         case 'text':
-          if (!isString(input.value)) {
-            throw new Error('input[type="text"] has non-string value');
-          }
-          return input.value;
+          return (isString(input.value) ? input.value : null);
         default:
           throw new Error('unexpected input type: ' + input.type);
       }
@@ -143,8 +134,10 @@ function schemaToElement(schema: Object): HTMLElement {
       return newInput('number');
     case 'object':
       const fieldset = document.createElement('fieldset');
-      const divs = schemaToForm(schema);
-      divs.forEach((div) => fieldset.appendChild(div));
+      const form = schemaToForm(schema);
+      Array.from(form.children).forEach((div) => {
+        if (div.nodeName === 'DIV') fieldset.appendChild(div)
+      });
       return fieldset;
     case 'string':
       return newInput('text');
@@ -193,13 +186,17 @@ function valueToElement(val: any, key?: string): Promise<HTMLElement> {
         }
         return getDAGNode(val['/'], 'dag-cbor').then((dagNode) => {
           return objectToForm(dagNode);
-        }).then((divs) => {
-          divs.forEach((div) => fieldset.appendChild(div));
+        }).then((form) => {
+          Array.from(form.children).forEach((div) => {
+            if (div.nodeName === 'DIV') fieldset.appendChild(div);
+          });
           resolve(fieldset);
         });
       }
-      return objectToForm(val).then((divs) => {
-        divs.forEach((div) => fieldset.appendChild(div));
+      return objectToForm(val).then((form) => {
+        Array.from(form.children).forEach((div) => {
+          if (div.nodeName === 'DIV') fieldset.appendChild(div);
+        });
         resolve(fieldset);
       });
     }
@@ -290,17 +287,6 @@ function setAttribute(elem: HTMLElement, key: string, val: any): HTMLElement {
   return elem;
 }
 
-// function definition(obj: Object, defs: Object): Object {
-//  if (!isString(obj['$ref'])) {
-//    throw new Error('$ref should be non-empty string');
-//  }
-//  const match = obj['$ref'].match(/^\#\/definitions\/([A-Za-z0-9]+?)$/);
-//  if (!isArray(match)) {
-//    throw new Error('no schema definition matches');
-//  }
-//  return Object.assign({}, defs[match[1]]);
-// }
-
 function formToObject(divs: HTMLElement[]): Object {
   return divs.reduce((result, div) => {
     if (div.nodeName !== 'DIV') {
@@ -341,13 +327,12 @@ function formToSchema(divs: HTMLElement[]): Object  {
     }
     const elem = children[1];
     const schema = elementToSchema(elem);
-    const reqs = result.required;
-    if (elem.hasAttribute('required')) reqs.push(label.textContent);
+    if (elem.hasAttribute('required')) result.required.push(label.textContent);
     return Object.assign({}, result, {
       properties: Object.assign({}, result.properties,
         { [label.textContent]: getAttributes(elem, schema) }
       ),
-      required: reqs
+      required: result.required
     });
   }, {
     $schema: Draft,
@@ -357,11 +342,11 @@ function formToSchema(divs: HTMLElement[]): Object  {
   });
 }
 
-function objectToForm(obj: Object): Promise<HTMLElement[]> {
+function objectToForm(obj: Object): Promise<HTMLFormElement> {
   const elems = traverse(obj, (val, key) => {
       return valueToElement(val, key);
   });
-  const divs = [];
+  const form = document.createElement('form');
   return Object.keys(elems).reduce((result, key) => {
     return result.then(() => {
       return elems[key];
@@ -371,10 +356,11 @@ function objectToForm(obj: Object): Promise<HTMLElement[]> {
       label.textContent = key;
       div.appendChild(label);
       div.appendChild(elem);
-      divs.push(div);
+      form.appendChild(div);
     });
   }, Promise.resolve()).then(() => {
-    return divs;
+    form.appendChild(newInput('submit'));
+    return form;
   });
 }
 
@@ -395,8 +381,8 @@ function hasInputValue(input: HTMLInputElement): boolean {
 
 function addPropertyDependencies(elem: HTMLElement, elems: HTMLElement[], negate: boolean) {
   let input : HTMLInputElement;
-  const handler = (event) => {
-    if (!(input = (event.target : any)) ||
+  const handler = (evt) => {
+    if (!(input = (evt.target : any)) ||
         input.nodeName !== 'INPUT') return;
     const hasValue = hasInputValue(input);
     elems.forEach((el) => {
@@ -428,8 +414,8 @@ function addSchemaDependencies(elem: HTMLElement, objs: Object[], negate: boolea
   objs.map((obj) => {
     const el: HTMLElement = (obj.elem : any);
     const schema: Object = (obj.schema : any);
-    const handler = (event) => {
-      if (!(input = (event.target : any)) ||
+    const handler = (evt) => {
+      if (!(input = (evt.target : any)) ||
           input.nodeName !== 'INPUT' ||
           !hasInputValue(input)) return;
       const value = elementToValue(el);
@@ -450,22 +436,42 @@ function addSchemaDependencies(elem: HTMLElement, objs: Object[], negate: boolea
   });
 }
 
-function schemaToForm(schema: Object): HTMLElement[] {
+function addNotSchema(form: HTMLFormElement, not: Object, objs: Object[]) {
+  const handler = (evt) => {
+    if (evt.target.nodeName !== 'INPUT') return;
+    let obj = objs.reduce((result, obj) => {
+      const value = elementToValue(obj.elem);
+      return Object.assign({}, result, { [obj.key]: value });
+    }, {});
+    if (validateSchema(not, obj)) {
+      objs.forEach((obj) => {
+        arrayFromObject(obj.schema).reduce((result, [k, v]) => {
+          return setAttribute(result, k, v);
+        }, obj.elem);
+      });
+    }
+  }
+  form.addEventListener('change', handler);
+  form.addEventListener('input', handler);
+}
+
+function schemaToForm(schema: Object): HTMLFormElement {
   if (!isObject(schema.properties)) {
     throw new Error('schema properties should be non-empty object');
   }
-  const props = schema.properties;
-  const reqs = schema.required;
+  let properties = schema.properties;
+  let required = schema.required;
   let elem;
-  let elems = traverse(props, (schema, key) => {
+  const elems = traverse(properties, (schema, key) => {
     elem = arrayFromObject(schema).reduce((result, [k, v]) => {
       return setAttribute(result, k, v);
     }, schemaToElement(schema));
-    if (!isArray(reqs) || !reqs.includes(key)) return elem;
+    if (!isArray(required) || !required.includes(key)) return elem;
     return setAttribute(elem, 'required', 'true');
   });
+  const form = document.createElement('form');
   let deps;
-  return Object.keys(elems).reduce((result, key) => {
+  Object.keys(elems).reduce((result, key) => {
     if (!(elem = elems[key])) return result;
     const div = document.createElement('div');
     const label = document.createElement('label');
@@ -473,6 +479,7 @@ function schemaToForm(schema: Object): HTMLElement[] {
     if (elem.hasAttribute('hidden')) label.hidden = true;
     div.appendChild(label);
     div.appendChild(elem);
+    form.appendChild(div);
     if (isObject(schema.dependencies) &&
         (deps = schema.dependencies[key])) {
       if (isArray(deps)) {
@@ -488,27 +495,42 @@ function schemaToForm(schema: Object): HTMLElement[] {
         throw new Error('expected non-empty array/object for deps; got ' + JSON.stringify(deps));
       }
     }
-    if (isObject(schema.not) &&
-        isObject(schema.not.dependencies) &&
-        (deps = schema.not.dependencies[key])) {
-      if (isArray(deps)) {
-        addPropertyDependencies(elem, deps.map((dep) => elems[dep]), true);
-      } else if (isObject(deps)) {
-        if (!isObject(deps.properties)) {
-          throw new Error('expected non-empty object for deps.properties');
+    if (isObject(schema.not)) {
+      const keys = [];
+      if (isObject(schema.not.properties)) {
+        keys.push(...Object.keys(schema.not.properties));
+      }
+      if (isArray(schema.not.required)) {
+        keys.push(...schema.required);
+      }
+      if (keys.length) {
+        addNotSchema(form, schema.not, keys.map((key) => {
+          return { elem: elems[key], key, schema: properties[key] };
+        }));
+      }
+      if (isObject(schema.not.dependencies) &&
+          (deps = schema.not.dependencies[key])) {
+        if (isArray(deps)) {
+          addPropertyDependencies(elem, deps.map((dep) => elems[dep]), true);
+        } else if (isObject(deps)) {
+          if (!isObject(deps.properties)) {
+            throw new Error('expected non-empty object for deps.properties');
+          }
+          addSchemaDependencies(elem, arrayFromObject(deps.properties).map(([key, schema]) => {
+            return { elem: elems[key], schema };
+          }), true);
+        } else {
+          throw new Error('expected non-empty array/object for deps; got ' + JSON.stringify(deps));
         }
-        addSchemaDependencies(elem, arrayFromObject(deps.properties).map(([key, schema]) => {
-          return { elem: elems[key], schema };
-        }), true);
-      } else {
-        throw new Error('expected non-empty array/object for deps; got ' + JSON.stringify(deps));
       }
     }
-    return result.concat(div);
   }, []);
+  form.appendChild(newInput('submit'));
+  return form;
 }
 
 exports.formToObject = formToObject;
 exports.formToSchema = formToSchema;
+exports.getInputs = getInputs;
 exports.objectToForm = objectToForm;
 exports.schemaToForm = schemaToForm;

@@ -89,7 +89,8 @@ const ReviewAction = {
     asserter: Link,
     assertionSubject: Link,
     assertionTruth: {
-      type: 'boolean'
+      type: 'boolean',
+      default: true
     },
     error: {
       type: 'string'
@@ -104,6 +105,17 @@ const ReviewAction = {
           type: 'boolean',
           enum: [false]
         }
+      }
+    }
+  },
+  not: {
+    properties: {
+      assertionTruth: {
+        type: 'boolean',
+        enum: [false]
+      },
+      error: {
+        enum: [null]
       }
     }
   },
