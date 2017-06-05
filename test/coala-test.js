@@ -29,73 +29,73 @@ const recordingRightContract = JSON.parse(readTestFile('/coala/recording-right-c
 describe('Coala', () => {
   it('validates CreativeWork schema', () => {
     assert.isOk(
-      validateSchema(compositionLicense, CreativeWork),
+      validateSchema(CreativeWork, compositionLicense),
       'should validate CreativeWork schema'
     );
   });
   it('validates CreativeWork schema', () => {
     assert.isOk(
-      validateSchema(recordingLicense, CreativeWork),
+      validateSchema(CreativeWork, recordingLicense),
       'should validate CreativeWork schema'
     );
   });
   it('validates CreativeWork schema', () => {
     assert.isOk(
-      validateSchema(compositionRightContract, CreativeWork),
+      validateSchema(CreativeWork, compositionRightContract),
       'should validate CreativeWork schema'
     );
   });
   it('validates CreativeWork schema', () => {
     assert.isOk(
-      validateSchema(recordingRightContract, CreativeWork),
+      validateSchema(CreativeWork, recordingRightContract),
       'should validate CreativeWork schema'
     );
   });
   it('validates Copyright schema', () => {
     assert.isOk(
-      validateSchema(compositionCopyright, Copyright),
+      validateSchema(Copyright, compositionCopyright),
       'should validate Copyright schema'
     );
   });
   it('validates Copyright schema', () => {
     assert.isOk(
-      validateSchema(recordingCopyright, Copyright),
+      validateSchema(Copyright, recordingCopyright),
       'should validate Copyright schema'
     );
   });
   it('validates ReviewAction schema', () => {
     assert.isOk(
-      validateSchema(compositionCopyrightAssertion, ReviewAction),
+      validateSchema(ReviewAction, compositionCopyrightAssertion),
       'should validate ReviewAction schema'
     );
   });
   it('validates ReviewAction schema', () => {
     assert.isOk(
-      validateSchema(recordingCopyrightAssertion, ReviewAction),
+      validateSchema(ReviewAction, recordingCopyrightAssertion),
       'should validate ReviewAction schema'
     );
   });
   it('validates Right schema', () => {
     assert.isOk(
-      validateSchema(compositionRight, Right),
+      validateSchema(Right, compositionRight),
       'should validate Right schema'
     );
   });
   it('validates Right schema', () => {
     assert.isOk(
-      validateSchema(recordingRight, Right),
+      validateSchema(Right, recordingRight),
       'should validate Right schema'
     );
   });
   it('validates RightsTransferAction schema', () => {
     assert.isOk(
-      validateSchema(compositionRightAssignment, RightsTransferAction),
+      validateSchema(RightsTransferAction, compositionRightAssignment),
       'should validate RightsTransferAction'
     );
   });
   it('validates RightsTransferAction schema', () => {
     assert.isOk(
-      validateSchema(recordingRightAssignment, RightsTransferAction),
+      validateSchema(RightsTransferAction, recordingRightAssignment),
       'should validate RightsTransferAction'
     );
   });

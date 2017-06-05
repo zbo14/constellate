@@ -19,7 +19,8 @@ const {
   isNumber,
   isObject,
   isString,
-  traverse
+  traverse,
+  withoutIndex
 } = require('../lib/util.js');
 
 // @flow
@@ -28,10 +29,10 @@ const {
 * @module constellate/src/form
 */
 
-function newInput(type: string, value?: any): HTMLInputElement {
+function newInput(type: string, val?: any): HTMLInputElement {
   const input = document.createElement('input');
   input.type = type;
-  if (value) input.value = value;
+  if (val) input.value = val;
   return input;
 }
 
@@ -117,42 +118,48 @@ function elementToValue(elem: HTMLElement): any {
 }
 
 function schemaToElement(schema: Object): HTMLElement {
+  let elem : HTMLElement = document.createElement('null');
   switch(schema.type) {
     case 'array':
-      let li;
-      const ol = document.createElement('ol');
+      elem = document.createElement('ol');
+      let li : HTMLLIElement;
       [].concat(schema.items).forEach((item) => {
         li = document.createElement('li');
         li.appendChild(schemaToElement(item));
-        ol.appendChild(li);
+        elem.appendChild(li);
       });
-      return ol;
+      break;
     case 'boolean':
-      return newInput('checkbox');
+      elem = newInput('checkbox');
+      break;
     case 'integer':
     case 'number':
-      return newInput('number');
+      elem = newInput('number');
+      break;
     case 'object':
-      const fieldset = document.createElement('fieldset');
+      elem = document.createElement('fieldset');
       const form = schemaToForm(schema);
       Array.from(form.children).forEach((div) => {
-        if (div.nodeName === 'DIV') fieldset.appendChild(div)
+        if (div.nodeName === 'DIV') elem.appendChild(div)
       });
-      return fieldset;
+      return elem;
     case 'string':
-      return newInput('text');
+      elem = newInput('text');
+      break;
+    default:
+      if (!schema.hasOwnProperty('enum') || !isArray(schema.enum)) {
+        throw new Error('unexpected schema: ' + JSON.stringify(schema));
+      }
+      elem = document.createElement('select');
+      schema.enum.forEach((val) => {
+        const option = document.createElement('option');
+        option.textContent = val;
+        option.value = val;
+        elem.appendChild(option);
+      });
   }
-  if (schema.hasOwnProperty('enum') && isArray(schema.enum)) {
-    const select = document.createElement('select');
-    schema.enum.forEach((val) => {
-      const option = document.createElement('option');
-      option.textContent = val;
-      option.value = val;
-      select.appendChild(option);
-    });
-    return select;
-  }
-  throw new Error('unexpected schema: ' + JSON.stringify(schema));
+  arrayFromObject(schema).forEach(([k, v]) => setAttribute(elem, k, v));
+  return elem;
 }
 
 function valueToElement(val: any, key?: string): Promise<HTMLElement> {
@@ -242,49 +249,45 @@ function getAttributes(elem: HTMLElement, schema: Object): Object {
   });
 }
 
-function setAttribute(elem: HTMLElement, key: string, val: any): HTMLElement {
+function setAttribute(elem: HTMLElement, key: string, val: any) {
   const input: HTMLInputElement = (elem: any);
   switch(key) {
-    case 'default':
-      if (input.type === 'checkbox') input.checked = val;
-      else input.defaultValue = val;
-      break;
     case 'enum':
-      if (isArray(val) && elem.hasAttribute('type')) {
+      if (val && val.length && elem.hasAttribute('type')) {
         if (input.type === 'checkbox') input.checked = val[0];
         else input.value = val[0];
       }
-      break;
+      return;
     case 'maximum':
       input.max = val;
-      break;
+      return;
     case 'maxItems':
       elem.setAttribute('maxitems', val);
       break;
     case 'minimum':
       input.min = val;
-      break;
+      return;
     case 'minItems':
       elem.setAttribute('minitems', val);
-      break;
+      return;
     case 'pattern':
       input.pattern = val;
-      break;
+      return;
     case 'readonly':
-      input.disabled = true;
-      input.hidden = true;
-      break;
+      input.disabled = val;
+      input.hidden = val;
+      return;
     case 'required':
-      input.required = true;
+      input.required = val;
       if (!input.hasAttribute('required')) {
-        elem.setAttribute('required', 'true');
+        elem.setAttribute('required', JSON.stringify(val));
       }
-      break;
+      return;
     case 'uniqueItems':
-      elem.setAttribute('uniqueitems', 'true');
-      break;
+      elem.setAttribute('uniqueitems', JSON.stringify(val));
+      return;
+    //..
   }
-  return elem;
 }
 
 function formToObject(divs: HTMLElement[]): Object {
@@ -379,152 +382,208 @@ function hasInputValue(input: HTMLInputElement): boolean {
   return (input.type === 'checkbox' ? input.checked : !!input.value);
 }
 
-function addPropertyDependencies(elem: HTMLElement, elems: HTMLElement[], negate: boolean) {
-  let input : HTMLInputElement;
-  const handler = (evt) => {
-    if (!(input = (evt.target : any)) ||
-        input.nodeName !== 'INPUT') return;
-    const hasValue = hasInputValue(input);
-    elems.forEach((el) => {
-      Array.from(document.querySelectorAll('div')).forEach((div) => {
-        if (isDescendant(div, el) &&
-            div.parentElement &&
-            div.parentElement.nodeName === 'FORM') {
-          div.hidden = (negate ? hasValue: false);
-          const remover: HTMLElement = (div.previousElementSibling: any);
-          if (remover && remover.nodeName === 'BUTTON') {
-            const adder : HTMLElement = (remover.previousElementSibling: any);
-            if (!adder) throw new Error('expected adder and remover btns');
-            adder.hidden = remover.hidden = (negate ? hasValue: false);
-          }
-        }
-      });
-      getInputs(el).forEach((input) => {
-        input.disabled = (negate ? hasValue: false);
-        input.required = (negate ? !hasValue : hasValue);
-      });
+function propertyDependencyHandler(div2: HTMLElement, negate: boolean): Function {
+  return (evt) => {
+    const input : HTMLInputElement = (evt.target : any);
+    if (!input || input.nodeName !== 'INPUT') return;
+    const elem2 : HTMLElement = (div2.lastChild : any);
+    if (!elem2) throw new Error('expected element');
+    const hasVal = hasInputValue(input);
+    const hidden = (negate ? hasVal: false);
+    const disabled = (negate ? hasVal: false);
+    const required = (negate ? !hasVal : hasVal);
+    div2.hidden = hidden;
+    const remover : HTMLElement = (div2.previousElementSibling : any);
+    if (remover && remover.nodeName === 'BUTTON') {
+      const adder : HTMLElement = (remover.previousElementSibling : any);
+      if (!adder) throw new Error('expected adder and remover btns');
+      adder.hidden = remover.hidden = hidden;
+    }
+    getInputs(elem2).forEach((input) => {
+      input.disabled = disabled;
+      input.required = required;
     });
   }
-  elem.addEventListener('change', handler);
-  elem.addEventListener('input', handler);
 }
 
-function addSchemaDependencies(elem: HTMLElement, objs: Object[], negate: boolean) {
-  let input : HTMLInputElement;
-  objs.map((obj) => {
-    const el: HTMLElement = (obj.elem : any);
-    const schema: Object = (obj.schema : any);
-    const handler = (evt) => {
-      if (!(input = (evt.target : any)) ||
-          input.nodeName !== 'INPUT' ||
-          !hasInputValue(input)) return;
-      const value = elementToValue(el);
-      if (negate === validateSchema(schema, value)) {
-        arrayFromObject(schema).reduce((result, [k, v]) => {
-          return setAttribute(result, k, v);
-        }, el);
-      }
+function schemaDependencyHandler1(div2 : HTMLElement, negate: boolean, schema: Object): Function {
+  return (evt) => {
+    const input : HTMLInputElement = (evt.target : any);
+    if (!input || input.nodeName !== 'INPUT' || !hasInputValue(input)) return;
+    const elem2 : HTMLElement = (div2.lastChild : any);
+    if (!elem2) throw new Error('expected element');
+    const errors = validateSchema(schema, elementToValue(elem2));
+    if (!errors === negate) {
+      div2.replaceChild(schemaToElement(schema), elem2);
     }
-    elem.addEventListener('change', handler);
-    elem.addEventListener('input', handler);
-    el.addEventListener('change', () => {
-      elem.dispatchEvent(new Event('change'));
-    });
-    el.addEventListener('input', () => {
-      elem.dispatchEvent(new Event('input'));
-    });
+  }
+}
+
+function schemaDependencyHandler2(div1: HTMLElement, div2: HTMLElement, negate: boolean, schema : Object): Function {
+  return (evt) => {
+    const input : HTMLInputElement = (evt.target : any);
+    if (!input || input.nodeName !== 'INPUT') return;
+    const elem1 : HTMLElement = (div1.lastChild : any);
+    if (!elem1) throw new Error('expected element');
+    if (!getInputs(elem1).some(hasInputValue)) return;
+    const elem2 : HTMLElement = (div2.lastChild : any);
+    if (!elem2) throw new Error('expected element');
+    const errors = validateSchema(schema, elementToValue(elem2));
+    if (!errors === negate) {
+      div2.replaceChild(schemaToElement(schema), elem2);
+    }
+  }
+}
+
+function schemaHandler(divs: HTMLElement[], isValid: Function, subschemas: Object[]): Function {
+  return (evt) => {
+    if (evt.target.nodeName !== 'INPUT') return;
+    let elem : HTMLElement,
+        label : HTMLLabelElement;
+    const val = divs.reduce((result, div) => {
+      if (!(elem = (div.lastChild : any))) {
+        throw new Error('expected element');
+      }
+      if (!(label = (div.firstChild : any)) || label.nodeName !== 'LABEL') {
+        throw new Error('expected label');
+      }
+      return Object.assign({}, result, {
+        [label.textContent]: elementToValue(elem)
+      });
+    }, {});
+    if (!isValid(val)) {
+      divs.forEach((div, i) => {
+        if (!(elem = (div.lastChild : any))) {
+          throw new Error('expected element');
+        }
+        div.replaceChild(schemaToElement(subschemas[i]), elem);
+      });
+    }
+  }
+}
+
+function setDependencies(deps: Object, form: HTMLFormElement, negate: boolean) {
+  const divs : HTMLElement[] = Array.from(form.children).filter((child) => {
+    if (child && child.nodeName === 'DIV') return (child : any);
+  });
+  const keys = Object.keys(deps);
+  divs.forEach((div1, i) => {
+    const label1 : HTMLLabelElement = (div1.firstChild : any);
+    if (!label1 || label1.nodeName !== 'LABEL') throw new Error('expected label');
+    if (!keys.includes(label1.textContent)) return;
+    const dep = deps[label1.textContent];
+    if (isArray(dep)) {
+      withoutIndex(divs, i).forEach((div2) => {
+        const label2 : HTMLLabelElement = (div2.firstChild : any);
+        if (!label2 || label2.nodeName !== 'LABEL') throw new Error('expected label');
+        if (!dep.includes(label2.textContent)) return;
+        const handler = propertyDependencyHandler(div2, negate);
+        div1.addEventListener('input', handler);
+        // div1.addEventListener('change', handler);
+      });
+    } else if (isObject(dep)) {
+      if (!isObject(dep.properties)) {
+        throw new Error('expected non-empty object for dep properties');
+      }
+      withoutIndex(divs, i).forEach((div2) => {
+        const label2 : HTMLLabelElement = (div2.firstChild : any);
+        if (!label2 || label2.nodeName !== 'LABEL') throw new Error('expected label');
+        const schema : Object = (dep.properties[label2.textContent] : any);
+        if (!isObject(schema)) return;
+        const handler1 = schemaDependencyHandler1(div2, negate, schema)
+        const handler2 = schemaDependencyHandler2(div1, div2, negate, schema);
+        div1.addEventListener('input', handler1);
+        div2.addEventListener('input', handler2);
+        // div1.addEventListener('change', handler1);
+        // div2.addEventListener('change', handler2);
+      });
+    } else {
+      throw new Error('expected array/object for dep; got ' + typeof dep);
+    }
   });
 }
 
-function addNotSchema(form: HTMLFormElement, not: Object, objs: Object[]) {
-  const handler = (evt) => {
-    if (evt.target.nodeName !== 'INPUT') return;
-    let obj = objs.reduce((result, obj) => {
-      const value = elementToValue(obj.elem);
-      return Object.assign({}, result, { [obj.key]: value });
-    }, {});
-    if (validateSchema(not, obj)) {
-      objs.forEach((obj) => {
-        arrayFromObject(obj.schema).reduce((result, [k, v]) => {
-          return setAttribute(result, k, v);
-        }, obj.elem);
-      });
+function setSchema(form: HTMLFormElement, negate: boolean, schema: Object, subschemas: Object[], keyword?: string) {
+  const divs : HTMLElement[] = Array.from(form.children).filter((child) => {
+    if (child && child.nodeName === 'DIV') return (child : any);
+  });
+  let isValid: Function;
+  if (!keyword) {
+    isValid = (val: Object): boolean => {
+      const errors = validateSchema(schema, val);
+      return !!errors === negate;
+    }
+  } else {
+    const schemas: Object[] = (schema[keyword] : any);
+    if (!isArray(schemas)) return;
+    switch(keyword) {
+      case 'allOf':
+        isValid = (val: Object): boolean => {
+          return schemas.every((schema) => {
+            const errors = validateSchema(schema, val);
+            return !!errors === negate;
+          });
+        }
+        break;
+      case 'anyOf':
+        isValid = (val: Object): boolean => {
+          return schemas.some((schema) => {
+            const errors = validateSchema(schema, val);
+            return !!errors === negate;
+          });
+        }
+        break;
+      case 'oneOf':
+        isValid = (val: Object): boolean => {
+          return schemas.filter((schema) => {
+            const errors = validateSchema(schema, val);
+            return !errors;
+          }).length === 1;
+        }
+        break;
+      //..
+      default:
+        throw new Error('unexpected keyword: ' + JSON.stringify(keyword));
     }
   }
-  form.addEventListener('change', handler);
+  const handler = schemaHandler(divs, isValid, subschemas);
   form.addEventListener('input', handler);
+  // form.addEventListener('change', handler);
 }
 
 function schemaToForm(schema: Object): HTMLFormElement {
   if (!isObject(schema.properties)) {
     throw new Error('schema properties should be non-empty object');
   }
-  let properties = schema.properties;
-  let required = schema.required;
-  let elem;
-  const elems = traverse(properties, (schema, key) => {
-    elem = arrayFromObject(schema).reduce((result, [k, v]) => {
-      return setAttribute(result, k, v);
-    }, schemaToElement(schema));
-    if (!isArray(required) || !required.includes(key)) return elem;
-    return setAttribute(elem, 'required', 'true');
-  });
   const form = document.createElement('form');
-  let deps;
-  Object.keys(elems).reduce((result, key) => {
-    if (!(elem = elems[key])) return result;
-    const div = document.createElement('div');
-    const label = document.createElement('label');
+  const props = schema.properties;
+  const reqs = schema.required;
+  const subschemas = [];
+  let div : HTMLDivElement, elem : HTMLElement, label : HTMLLabelElement;
+  arrayFromObject(props).forEach(([key, subschema]) => {
+    elem = schemaToElement(subschema);
+    if (isArray(reqs) && reqs.includes(key)) setAttribute(elem, 'required');
+    div = (document.createElement('div') : any);
+    label = (document.createElement('label') : any);
     label.textContent = key;
-    if (elem.hasAttribute('hidden')) label.hidden = true;
+    label.hidden = elem.hidden;
     div.appendChild(label);
     div.appendChild(elem);
     form.appendChild(div);
-    if (isObject(schema.dependencies) &&
-        (deps = schema.dependencies[key])) {
-      if (isArray(deps)) {
-        addPropertyDependencies(elem, deps.map((dep) => elems[dep]), false);
-      } else if (isObject(deps)) {
-        if (!isObject(deps.properties)) {
-          throw new Error('expected non-empty object for deps.properties');
-        }
-        addSchemaDependencies(elem, arrayFromObject(deps.properties).map(([key, schema]) => {
-          return { elem: elems[key], schema };
-        }), false);
-      } else {
-        throw new Error('expected non-empty array/object for deps; got ' + JSON.stringify(deps));
-      }
+    subschemas.push(subschema);
+  });
+  if (isObject(schema.dependencies)) {
+    setDependencies(schema.dependencies, form, false);
+  }
+  if (isObject(schema.not)) {
+    setSchema(form, true, schema.not, subschemas);
+    if (isObject(schema.not.dependencies)) {
+      setDependencies(schema.not.dependencies, form, true);
     }
-    if (isObject(schema.not)) {
-      const keys = [];
-      if (isObject(schema.not.properties)) {
-        keys.push(...Object.keys(schema.not.properties));
-      }
-      if (isArray(schema.not.required)) {
-        keys.push(...schema.required);
-      }
-      if (keys.length) {
-        addNotSchema(form, schema.not, keys.map((key) => {
-          return { elem: elems[key], key, schema: properties[key] };
-        }));
-      }
-      if (isObject(schema.not.dependencies) &&
-          (deps = schema.not.dependencies[key])) {
-        if (isArray(deps)) {
-          addPropertyDependencies(elem, deps.map((dep) => elems[dep]), true);
-        } else if (isObject(deps)) {
-          if (!isObject(deps.properties)) {
-            throw new Error('expected non-empty object for deps.properties');
-          }
-          addSchemaDependencies(elem, arrayFromObject(deps.properties).map(([key, schema]) => {
-            return { elem: elems[key], schema };
-          }), true);
-        } else {
-          throw new Error('expected non-empty array/object for deps; got ' + JSON.stringify(deps));
-        }
-      }
-    }
-  }, []);
+  }
+  setSchema(form, false, schema, subschemas, 'allOf');
+  setSchema(form, false, schema, subschemas, 'anyOf');
+  setSchema(form, false, schema, subschemas, 'oneOf');
   form.appendChild(newInput('submit'));
   return form;
 }

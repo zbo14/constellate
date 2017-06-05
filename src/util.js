@@ -135,6 +135,10 @@ function traverse(x: any, fn: Function): any {
   return x;
 }
 
+function withoutIndex(arr: Array, idx: number): Array {
+  return arr.slice(0, idx).concat(arr.slice(idx+1));
+}
+
 function withoutKeys(obj: Object, ...keys: string[]): Object {
   return Object.keys(obj).reduce((result, key) => {
     if (keys.includes(key)) { return result; }
@@ -164,4 +168,5 @@ exports.orderStringify = orderStringify;
 exports.promiseSeq = promiseSeq;
 exports.readFileInput = readFileInput;
 exports.traverse = traverse;
+exports.withoutIndex = withoutIndex;
 exports.withoutKeys = withoutKeys;

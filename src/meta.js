@@ -201,6 +201,9 @@ const MusicPlaylist = {
       readonly: true
     },
     image: Link,
+    name: {
+      type: 'string'
+    },
     track: {
       type: 'array',
       items: Link,
@@ -309,12 +312,14 @@ const MusicRelease = {
       uniqueItems: true
     }
   },
-  not: {
-    dependencies: {
-      releaseOf: ['track'],
-      track: ['releaseOf']
+  oneOf: [
+    {
+      required: ['releaseOf']
+    },
+    {
+      required: ['track']
     }
-  },
+  ],
   required: [
     '@context',
     '@type'

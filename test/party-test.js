@@ -19,37 +19,37 @@ const recordLabel = JSON.parse(readTestFile('/party/recordLabel.json'));
 describe('Party', () => {
   it('validates Person schema', () => {
     assert.isOk(
-      validateSchema(composer, Person),
+      validateSchema(Person, composer),
       'should validate Person schema'
     );
   });
   it('validates Person schema', () => {
     assert.isOk(
-      validateSchema(lyricist, Person),
+      validateSchema(Person, lyricist),
       'should validate Person schema'
     );
   });
   it('validates MusicGroup schema', () => {
     assert.isOk(
-      validateSchema(performer, MusicGroup),
+      validateSchema(MusicGroup, performer),
       'should validate MusicGroup schema'
     );
   });
   it('validates Person schema', () => {
     assert.isOk(
-      validateSchema(producer, Person),
+      validateSchema(Person, producer),
       'should validate Person schema'
     );
   });
   it('validates Organization schema', () => {
     assert.isOk(
-      validateSchema(publisher, Organization),
+      validateSchema(Organization, publisher),
       'should validate Organization schema'
     );
   });
   it('validates Organization schema', () => {
     assert.isOk(
-      validateSchema(recordLabel, Organization),
+      validateSchema(Organization, recordLabel),
       'should validate Organization schema'
     );
   });

@@ -29,6 +29,7 @@ objs.album = JSON.parse(readTestFile('/meta/album.json'));
 objs.audio = JSON.parse(readTestFile('/meta/audio.json'));
 objs.composition = JSON.parse(readTestFile('/meta/composition.json'));
 objs.image = JSON.parse(readTestFile('/meta/image.json'));
+objs.playlist = JSON.parse(readTestFile('/meta/playlist.json'));
 objs.recording = JSON.parse(readTestFile('/meta/recording.json'));
 objs.release = JSON.parse(readTestFile('/meta/release.json'));
 
@@ -87,6 +88,7 @@ startPeer().then((info) => {
     () => putCBOR('audio'),
     () => putCBOR('composition'),
     () => putCBOR('image'),
+    () => putCBOR('playlist'),
     () => putCBOR('recording'),
     () => putCBOR('release'),
     () => putCBOR('compositionCopyright'),

@@ -27,6 +27,7 @@ const Link = {
   properties: {
     '/': {
       type: 'string',
+      enum: [''],
       pattern: '^[1-9A-HJ-NP-Za-km-z]+$'
     }
   },
@@ -67,8 +68,10 @@ const Url = {
   pattern: '^https?:\/\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%_\\+.~#?&\/\/=]*)$'
 }
 
-function validateSchema(schema: Object, value: any): boolean {
-  return ajv.compile(schema)(value);
+function validateSchema(schema: Object, value: any): ?Object {
+  const validate = ajv.compile(schema);
+  validate(value);
+  return validate.errors;
 }
 
 exports.Draft = Draft;

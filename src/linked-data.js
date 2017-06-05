@@ -179,8 +179,10 @@ function getLinks(obj: Object): Object[] {
 function validate(obj: Object, format: string): Promise<Object> {
     return new Promise((resolve, reject) => {
         const schema = getTypeSchema(obj['@type']);
-        if (!validateSchema(schema, obj)) {
-            return reject(obj['@type'] + ' has invalid schema: ' + JSON.stringify(obj, null, 2));
+        const errors = validateSchema(schema, obj);
+        if (errors) {
+          return reject(new Error(JSON.stringify(errors)));
+          // return reject(obj['@type'] + ' has invalid schema: ' + JSON.stringify(obj, null, 2));
         }
         const links = getLinks(obj);
         if (!links || !links.length) resolve(obj);

@@ -9,11 +9,12 @@
     "build": "babel src/ -d lib/",
     "bundle": "browserify index.js --require browserify-zlib-next:zlib > bundle.js",
     "_comment": "test command from https://github.com/ipfs/js-ipfs/blob/master/examples/bundle-browserify/package.json",
-    "flow": "flow",
+    "flow": "flow --show-all-errors",
     "flow:file": "read -p 'Enter path to file: ' path_to_file && export PATH_TO_FILE=$path_to_file && flow check-contents < ${PATH_TO_FILE}",
     "gulp": "gulp",
     "remove-types:file": "read -p 'Enter filename: ' filename && export FILENAME=$filename && flow-remove-types src/${FILENAME} | js-beautify -o lib/${FILENAME}",
-    "test": "mocha --compilers js:babel-core/register --require babel-polyfill --recursive './test/*-test.js'"
+    "test": "mocha --compilers js:babel-core/register --require babel-polyfill --recursive './test/*-test.js'",
+    "_comment": "test command from https://github.com/Envoke-org/envokeJS/blob/master/package.json",
   },
   "babel": {
     "presets": [

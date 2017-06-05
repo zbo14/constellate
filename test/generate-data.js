@@ -156,12 +156,21 @@ promiseSeq(
         albumReleaseType: 'SingleRelease',
         byArtist: [{ '/': hashes.performer }],
         image: { '/': hashes.image },
-        name: 'ding-ding-dooby-doo',
+        name: 'ding ding dooby doo',
         producer: [{ '/': hashes.producer }],
         track: [{ '/': hashes.recording }]
     }
 
+    objs.playlist = {
+      '@context': 'http://schema.org/',
+      '@type': 'MusicPlaylist',
+      image: { '/': hashes.image },
+      name: 'just 1 song',
+      track: [{ '/': hashes.recording }]
+    }
+
     writeTestFile('/meta/album.json', JSON.stringify(objs.album));
+    writeTestFile('/meta/playlist.json', JSON.stringify(objs.playlist));
 
     return setDataHash('album');
 
