@@ -48,7 +48,7 @@ const {
   isObject,
   orderStringify,
   readFileInput,
-  traverse,
+  transform,
   withoutKeys
 } = require('../lib/util.js');
 
@@ -120,7 +120,7 @@ function getDAGNode(cid: Object|string, format: string): Promise<Object> {
       if (err) return reject(err);
       let obj;
       if (format === 'dag-cbor') {
-        obj = traverse(dagNode.value, (val, key) => {
+        obj = transform(dagNode.value, (val, key) => {
           if (key === '/') {
             return new CID(val).toBaseEncodedString();
           }
@@ -151,8 +151,8 @@ function getFile(multihash: string): Promise<HTMLAnchorElement> {
           if (!type) type = fileType(chunk);
         });
         file.content.once('end', () => {
-          const link = newBlobURL(data, type.ext, multihash);
-          resolve(link);
+          const blob = new Blob(data, { type: type.mime });
+          resolve(blob);
         });
         file.content.resume();
       });
@@ -165,16 +165,26 @@ function isMultihash(multihash: string): boolean {
   return isIPFS.multihash(multihash);
 }
 
-function newBlobURL(data: any[], ext: string, multihash: string): HTMLAnchorElement {
+function isIPFSPath(path: string): boolean {
+  return isIPFS.ipfsPath(path);
+}
+
+function isIPFSUrl(url: string): boolean {
+  return isIPFS.ipfsUrl(url);
+}
+
+/*
+function newBlobURL(data: any[]): string {
   const blob = new Blob(data, {type: 'application/octet-binary'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.setAttribute('href', url);
   a.setAttribute('download', multihash + '.' + ext);
   const date = (new Date()).toLocaleString();
-  a.innerText = date + '-' + multihash + '- Size: ' + blob.size;
+  a.innerText = date + '-' + multihash + '- size: ' + blob.size;
   return a;
 }
+*/
 
 function serializeCBOR(obj: Object): Promise<Object> {
   return new Promise((resolve, reject) => {
@@ -272,6 +282,8 @@ exports.deserializeCBOR = deserializeCBOR;
 exports.getDAGNode = getDAGNode;
 exports.getFile = getFile;
 exports.isMultihash = isMultihash;
+exports.isIPFSPath = isIPFSPath;
+exports.isIPFSUrl = isIPFSUrl;
 exports.newPBLinks = newPBLinks;
 exports.newPBNode = newPBNode;
 exports.putDAGNode = putDAGNode;

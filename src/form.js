@@ -6,12 +6,6 @@ const {
 } = require('../lib/schema.js');
 
 const {
-  getDAGNode,
-  getFile,
-  isMultihash
-} = require('../lib/ipfs.js');
-
-const {
   arrayFromObject,
   isArray,
   isBoolean,
@@ -19,7 +13,7 @@ const {
   isNumber,
   isObject,
   isString,
-  traverse,
+  transform,
   withoutIndex
 } = require('../lib/util.js');
 
@@ -55,12 +49,12 @@ function elementToSchema(elem: HTMLElement): Object {
       }
     case 'OL':
       if (!elem.children.length) {
-        throw new Error('<ol> has no children');
+        throw new Error('ol has no children');
       }
       const li = Array.from(elem.children).find((child) => child.nodeName === 'LI');
-      if (!li) throw new Error('<ol> has no <li>');
+      if (!li) throw new Error('ol has no li');
       if (!li.children.length) {
-        throw new Error('<li> has no children');
+        throw new Error('li has no children');
       }
       const firstChild: HTMLElement = (li.firstChild: any);
       const attrs: Object = (elem.attributes: any);
@@ -103,7 +97,7 @@ function elementToValue(elem: HTMLElement): any {
       }
     case 'OL':
       if (!elem.children.length) {
-        throw new Error('<ol> has no children');
+        throw new Error('ol has no children');
       }
       return Array.from(elem.children).reduce((result, child) => {
           if (child.nodeName !== 'LI') { return result; }
@@ -142,7 +136,7 @@ function schemaToElement(schema: Object): HTMLElement {
       Array.from(form.children).forEach((div) => {
         if (div.nodeName === 'DIV') elem.appendChild(div)
       });
-      return elem;
+      break;
     case 'string':
       elem = newInput('text');
       break;
@@ -162,56 +156,51 @@ function schemaToElement(schema: Object): HTMLElement {
   return elem;
 }
 
-function valueToElement(val: any, key?: string): Promise<HTMLElement> {
-  return new Promise((resolve, reject) => {
-    if (isArray(val)) {
-      const ol = document.createElement('ol');
-      let li;
-      return val.reduce((result, v) => {
-        return result.then(() => {
-          return valueToElement(v);
-        }).then((elem) => {
-          li = document.createElement('li');
-          li.appendChild(elem);
-          ol.appendChild(li);
-        });
-      }, Promise.resolve()).then(() => {
-        resolve(ol);
-      });
-    }
-    if (isBoolean(val)) {
-      resolve(newInput('checkbox', val));
-    }
-    if (isNumber(val)) {
-      resolve(newInput('number', val));
-    }
-    if (isObject(val)) {
-      const fieldset = document.createElement('fieldset');
-      if (val['/']) {
-        if (isMultihash(val['/'])) {
-          return getFile(val['/']).then(resolve);
-        }
-        return getDAGNode(val['/'], 'dag-cbor').then((dagNode) => {
-          return objectToForm(dagNode);
-        }).then((form) => {
-          Array.from(form.children).forEach((div) => {
-            if (div.nodeName === 'DIV') fieldset.appendChild(div);
-          });
-          resolve(fieldset);
-        });
-      }
-      return objectToForm(val).then((form) => {
-        Array.from(form.children).forEach((div) => {
-          if (div.nodeName === 'DIV') fieldset.appendChild(div);
-        });
-        resolve(fieldset);
-      });
-    }
-    if (isString(val)) {
-      resolve(newInput('text', val));
-    }
-    reject(new Error('unexpected type: ' + typeof val));
-  });
+function valueToElement(val: any): HTMLElement {
+  if (isArray(val)) {
+    const ol = document.createElement('ol');
+    let elem, li;
+    val.forEach((v) => {
+      elem = valueToElement(v);
+      li = document.createElement('li');
+      li.appendChild(elem);
+      ol.appendChild(li);
+    });
+    return ol;
+  }
+  if (isBoolean(val)) {
+    return newInput('checkbox', val);
+  }
+  if (isNumber(val)) {
+    return newInput('number', val);
+  }
+  if (isObject(val)) {
+    const fieldset = document.createElement('fieldset');
+    const form = objectToForm(val);
+    Array.from(form.children).forEach((div) => {
+      if (div.nodeName === 'DIV') fieldset.appendChild(div);
+    });
+    return fieldset;
+  }
+  if (isString(val)) {
+    return newInput('text', val);
+  }
+  if (val instanceof Blob) {
+    return blobToAnchor(val);
+  }
+  throw new Error('unexpected value: ' + JSON.stringify(val));
+}
+
+function blobToAnchor(blob: Blob): HTMLAnchorElement {
+  const a = document.createElement('a');
+  const mime = blob.type.split('/');
+  const ext = mime.pop();
+  const url = URL.createObjectURL(blob);
+  a.setAttribute('href', url);
+  a.setAttribute('download', mime[0] + '.' + ext);
+  const date = (new Date()).toLocaleString();
+  a.innerText = date + '-' + mime[0] + '- size: ' + blob.size;
+  return a;
 }
 
 function getAttributes(elem: HTMLElement, schema: Object): Object {
@@ -252,8 +241,11 @@ function getAttributes(elem: HTMLElement, schema: Object): Object {
 function setAttribute(elem: HTMLElement, key: string, val: any) {
   const input: HTMLInputElement = (elem: any);
   switch(key) {
+    case 'default':
+      if (input.type === 'checkbox') input.checked = val;
+      else input.value = val;
     case 'enum':
-      if (val && val.length && elem.hasAttribute('type')) {
+      if (val && val.length) {
         if (input.type === 'checkbox') input.checked = val[0];
         else input.value = val[0];
       }
@@ -274,8 +266,10 @@ function setAttribute(elem: HTMLElement, key: string, val: any) {
       input.pattern = val;
       return;
     case 'readonly':
-      input.disabled = val;
-      input.hidden = val;
+      elem.hidden = val;
+      getInputs(elem).forEach((input) => {
+        input.disabled = val;
+      });
       return;
     case 'required':
       input.required = val;
@@ -293,14 +287,14 @@ function setAttribute(elem: HTMLElement, key: string, val: any) {
 function formToObject(divs: HTMLElement[]): Object {
   return divs.reduce((result, div) => {
     if (div.nodeName !== 'DIV') {
-      throw new Error('expected <div>; got ' + div.nodeName);
+      throw new Error('expected div; got ' + div.nodeName);
     }
     if (!div.children.length) {
-      throw new Error('<div> has no children');
+      throw new Error('div has no children');
     }
     const children = Array.from(div.children);
     if (children.length !== 2) {
-      throw new Error('<div> should have 2 children; has ' + children.length);
+      throw new Error('div should have 2 children; has ' + children.length);
     }
     const label = children[0];
     if (label.nodeName !== 'LABEL') {
@@ -315,14 +309,14 @@ function formToObject(divs: HTMLElement[]): Object {
 function formToSchema(divs: HTMLElement[]): Object  {
   return divs.reduce((result, div) => {
     if (div.nodeName !== 'DIV') {
-      throw new Error('expected <div>; got ' + div.nodeName);
+      throw new Error('expected div; got ' + div.nodeName);
     }
     if (!div.children.length) {
-      throw new Error('<div> has no children');
+      throw new Error('div has no children');
     }
     const children = Array.from(div.children);
     if (children.length !== 2) {
-      throw new Error('<div> should have 2 children; has ' + children.length);
+      throw new Error('div should have 2 children; has ' + children.length);
     }
     const label = children[0];
     if (label.nodeName !== 'LABEL') {
@@ -345,26 +339,21 @@ function formToSchema(divs: HTMLElement[]): Object  {
   });
 }
 
-function objectToForm(obj: Object): Promise<HTMLFormElement> {
-  const elems = traverse(obj, (val, key) => {
-      return valueToElement(val, key);
+function objectToForm(obj: Object): HTMLFormElement {
+  const elems = transform(obj, (val) => {
+    return valueToElement(val);
   });
   const form = document.createElement('form');
-  return Object.keys(elems).reduce((result, key) => {
-    return result.then(() => {
-      return elems[key];
-    }).then((elem) => {
-      const div = document.createElement('div');
-      const label = document.createElement('label');
-      label.textContent = key;
-      div.appendChild(label);
-      div.appendChild(elem);
-      form.appendChild(div);
-    });
-  }, Promise.resolve()).then(() => {
-    form.appendChild(newInput('submit'));
-    return form;
+  Object.keys(elems).forEach((key) => {
+    const div = document.createElement('div');
+    const label = document.createElement('label');
+    label.textContent = key;
+    div.appendChild(label);
+    div.appendChild(elems[key]);
+    form.appendChild(div);
   });
+  form.appendChild(newInput('submit'));
+  return form;
 }
 
 function getInputs(elem: HTMLElement): HTMLInputElement[] {
@@ -372,20 +361,26 @@ function getInputs(elem: HTMLElement): HTMLInputElement[] {
     const input: HTMLInputElement = (elem: any);
     return [input];
   }
-  if (!elem.children) return [];
-  return Array.from(elem.children).reduce((result, child) => {
-    return result.concat(getInputs(child));
-  }, []);
+  return (elem.querySelectorAll('input') : any);
+  // if (!elem.children) return [];
+  // return Array.from(elem.children).reduce((result, child) => {
+  //  return result.concat(getInputs(child));
+  // }, []);
 }
 
 function hasInputValue(input: HTMLInputElement): boolean {
   return (input.type === 'checkbox' ? input.checked : !!input.value);
 }
 
+function isInputEvent(evt: Event, input: HTMLInputElement): boolean {
+  return (input.type === 'checkbox' ? evt.type === 'click' : evt.type === 'input');
+}
+
 function propertyDependencyHandler(div2: HTMLElement, negate: boolean): Function {
   return (evt) => {
     const input : HTMLInputElement = (evt.target : any);
     if (!input || input.nodeName !== 'INPUT') return;
+    if (!isInputEvent(evt, input)) return;
     const elem2 : HTMLElement = (div2.lastChild : any);
     if (!elem2) throw new Error('expected element');
     const hasVal = hasInputValue(input);
@@ -410,6 +405,7 @@ function schemaDependencyHandler1(div2 : HTMLElement, negate: boolean, schema: O
   return (evt) => {
     const input : HTMLInputElement = (evt.target : any);
     if (!input || input.nodeName !== 'INPUT' || !hasInputValue(input)) return;
+    if (!isInputEvent(evt, input)) return;
     const elem2 : HTMLElement = (div2.lastChild : any);
     if (!elem2) throw new Error('expected element');
     const errors = validateSchema(schema, elementToValue(elem2));
@@ -423,6 +419,7 @@ function schemaDependencyHandler2(div1: HTMLElement, div2: HTMLElement, negate: 
   return (evt) => {
     const input : HTMLInputElement = (evt.target : any);
     if (!input || input.nodeName !== 'INPUT') return;
+    if (!isInputEvent(evt, input)) return;
     const elem1 : HTMLElement = (div1.lastChild : any);
     if (!elem1) throw new Error('expected element');
     if (!getInputs(elem1).some(hasInputValue)) return;
@@ -437,7 +434,9 @@ function schemaDependencyHandler2(div1: HTMLElement, div2: HTMLElement, negate: 
 
 function schemaHandler(divs: HTMLElement[], isValid: Function, subschemas: Object[]): Function {
   return (evt) => {
-    if (evt.target.nodeName !== 'INPUT') return;
+    const input: HTMLInputElement = (evt.target : any);
+    if (!input || input.nodeName !== 'INPUT') return;
+    if (!isInputEvent(evt, input)) return;
     let elem : HTMLElement,
         label : HTMLLabelElement;
     const val = divs.reduce((result, div) => {
@@ -478,8 +477,8 @@ function setDependencies(deps: Object, form: HTMLFormElement, negate: boolean) {
         if (!label2 || label2.nodeName !== 'LABEL') throw new Error('expected label');
         if (!dep.includes(label2.textContent)) return;
         const handler = propertyDependencyHandler(div2, negate);
+        div1.addEventListener('click', handler);
         div1.addEventListener('input', handler);
-        // div1.addEventListener('change', handler);
       });
     } else if (isObject(dep)) {
       if (!isObject(dep.properties)) {
@@ -492,10 +491,10 @@ function setDependencies(deps: Object, form: HTMLFormElement, negate: boolean) {
         if (!isObject(schema)) return;
         const handler1 = schemaDependencyHandler1(div2, negate, schema)
         const handler2 = schemaDependencyHandler2(div1, div2, negate, schema);
+        div1.addEventListener('click', handler1);
+        div2.addEventListener('click', handler2);
         div1.addEventListener('input', handler1);
         div2.addEventListener('input', handler2);
-        // div1.addEventListener('change', handler1);
-        // div2.addEventListener('change', handler2);
       });
     } else {
       throw new Error('expected array/object for dep; got ' + typeof dep);
@@ -537,7 +536,7 @@ function setSchema(form: HTMLFormElement, negate: boolean, schema: Object, subsc
         isValid = (val: Object): boolean => {
           return schemas.filter((schema) => {
             const errors = validateSchema(schema, val);
-            return !errors;
+            return !!errors === negate;
           }).length === 1;
         }
         break;
@@ -547,8 +546,8 @@ function setSchema(form: HTMLFormElement, negate: boolean, schema: Object, subsc
     }
   }
   const handler = schemaHandler(divs, isValid, subschemas);
+  form.addEventListener('click', handler);
   form.addEventListener('input', handler);
-  // form.addEventListener('change', handler);
 }
 
 function schemaToForm(schema: Object): HTMLFormElement {
@@ -562,7 +561,7 @@ function schemaToForm(schema: Object): HTMLFormElement {
   let div : HTMLDivElement, elem : HTMLElement, label : HTMLLabelElement;
   arrayFromObject(props).forEach(([key, subschema]) => {
     elem = schemaToElement(subschema);
-    if (isArray(reqs) && reqs.includes(key)) setAttribute(elem, 'required');
+    if (isArray(reqs) && reqs.includes(key)) setAttribute(elem, 'required', true);
     div = (document.createElement('div') : any);
     label = (document.createElement('label') : any);
     label.textContent = key;
@@ -588,6 +587,7 @@ function schemaToForm(schema: Object): HTMLFormElement {
   return form;
 }
 
+exports.blobToAnchor = blobToAnchor;
 exports.formToObject = formToObject;
 exports.formToSchema = formToSchema;
 exports.getInputs = getInputs;

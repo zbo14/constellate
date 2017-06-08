@@ -17,7 +17,7 @@ function arrayFromObject(obj: Object): any[][] {
   return Object.keys(obj).map((key) => [key, obj[key]]);
 }
 
-function clone(obj: Object): Object {
+function cloneObject(obj: Object): Object {
   return JSON.parse(JSON.stringify(obj));
 }
 
@@ -125,14 +125,29 @@ function readFileInput(input: HTMLInputElement): Promise<ArrayBuffer> {
   });
 }
 
-function traverse(x: any, fn: Function): any {
+function transform(x: any, fn: Function): any {
   if (isArray(x)) {
-    return x.map((y) => traverse(fn(y), fn));
+    return x.map((y) => transform(fn(y), fn));
   }
   if (isObject(x)) {
-    return Object.assign({}, ...Object.keys(x).map((k) => objectFromArray([[k, traverse(fn(x[k], k), fn)]])));
+    return Object.assign({}, ...arrayFromObject(x).map(([k, v]) => {
+      return objectFromArray([[k, transform(fn(v), fn)]]);
+    }));
   }
   return x;
+}
+
+function traverse(path: ?string, val: any, fn: Function, result: ?any) {
+  if (isArray(val)) {
+    val.map((v) => traverse(path, v, fn, result));
+  } else if (isObject(val)) {
+    arrayFromObject(val).map(([k, v]) => {
+      const fullPath = (!path ? k : path + '/' + k);
+      traverse(fullPath, v, fn, result)
+    });
+  } else {
+    fn(path, val, result);
+  }
 }
 
 function withoutIndex(arr: Array, idx: number): Array {
@@ -147,7 +162,7 @@ function withoutKeys(obj: Object, ...keys: string[]): Object {
 }
 
 exports.arrayFromObject = arrayFromObject;
-exports.clone = clone;
+exports.cloneObject = cloneObject;
 exports.decodeBase58 = decodeBase58;
 exports.decodeBase64 = decodeBase64;
 exports.digestRIPEMD160 = digestRIPEMD160;
@@ -167,6 +182,7 @@ exports.objectFromArray = objectFromArray;
 exports.orderStringify = orderStringify;
 exports.promiseSeq = promiseSeq;
 exports.readFileInput = readFileInput;
+exports.transform = transform;
 exports.traverse = traverse;
 exports.withoutIndex = withoutIndex;
 exports.withoutKeys = withoutKeys;

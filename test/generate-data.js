@@ -2,12 +2,13 @@ const { promiseSeq } = require('../lib/util.js');
 
 const {
   createReadStream,
-  readTestFile,
-  writeTestFile
-} = require('./fs.js');
+  readFileSync,
+  writeFileSync
+} = require('fs');
 
 const {
   addFile,
+  calcHash,
   putDAGNode,
   startPeer
 } = require('../lib/ipfs.js');
@@ -22,70 +23,81 @@ function setDataHash(name) {
 }
 
 function setFileHash(path) {
-  const readStream = createReadStream(path);
+  const readStream = createReadStream(__dirname + path);
   return addFile(readStream, '').then((result) => {
     hashes[path] = result.hash;
   });
 }
 
-objs.composer = {
-    '@context': 'http://schema.org/',
-    '@type': 'Person',
-    email: 'composer@example.com',
-    name: 'composer',
-    url: 'http://composer.com'
-}
+objs.context = JSON.parse(readFileSync('../src/context.json'));
 
-objs.lyricist = {
-    '@context': 'http://schema.org/',
-    '@type': 'Person',
-    email: 'lyricist@example.com',
-    name: 'lyricist',
-    url: 'http://lyricist.com'
-}
-
-objs.performer = {
-    '@context': 'http://schema.org/',
-    '@type': 'MusicGroup',
-    email: 'performer@example.com',
-    name: 'performer',
-    sameAs: ['http://bandcamp-page.com'],
-    url: 'http://performer.com'
-}
-
-objs.producer = {
-    '@context': 'http://schema.org/',
-    '@type': 'Person',
-    name: 'producer',
-    sameAs: ['http://soundcloud-page.com'],
-    url: 'http://producer.com'
-}
-
-objs.publisher = {
-    '@context': 'http://schema.org/',
-    '@type': 'Organization',
-    email: 'publisher@example.com',
-    name: 'publisher',
-    url: 'http://publisher.com'
-}
-
-objs.recordLabel = {
-    '@context': 'http://schema.org/',
-    '@type': 'Organization',
-    email: 'recordLabel@example.com',
-    name: 'recordLabel',
-    url: 'http://recordLabel.com'
-}
-
-writeTestFile('/party/composer.json', JSON.stringify(objs.composer));
-writeTestFile('/party/lyricist.json', JSON.stringify(objs.lyricist));
-writeTestFile('/party/performer.json', JSON.stringify(objs.performer));
-writeTestFile('/party/producer.json', JSON.stringify(objs.producer));
-writeTestFile('/party/publisher.json', JSON.stringify(objs.publisher));
-writeTestFile('/party/recordLabel.json', JSON.stringify(objs.recordLabel));
+calcHash(objs.context, 'dag-cbor').then((hash) => {
+  console.log(hash);
+});
 
 promiseSeq(
-    startPeer,
+  startPeer,
+  () => setDataHash('context')
+
+).then(() => {
+
+  objs.composer = {
+      '@context': { '/': hashes.context },
+      '@type': 'Person',
+      email: 'composer@example.com',
+      name: 'composer',
+      url: 'http://composer.com'
+  }
+
+  objs.lyricist = {
+      '@context': { '/': hashes.context },
+      '@type': 'Person',
+      email: 'lyricist@example.com',
+      name: 'lyricist',
+      url: 'http://lyricist.com'
+  }
+
+  objs.performer = {
+      '@context': { '/': hashes.context },
+      '@type': 'MusicGroup',
+      email: 'performer@example.com',
+      name: 'performer',
+      sameAs: ['http://bandcamp-page.com'],
+      url: 'http://performer.com'
+  }
+
+  objs.producer = {
+      '@context': { '/': hashes.context },
+      '@type': 'Person',
+      name: 'producer',
+      sameAs: ['http://soundcloud-page.com'],
+      url: 'http://producer.com'
+  }
+
+  objs.publisher = {
+      '@context': { '/': hashes.context },
+      '@type': 'Organization',
+      email: 'publisher@example.com',
+      name: 'publisher',
+      url: 'http://publisher.com'
+  }
+
+  objs.recordLabel = {
+      '@context': { '/': hashes.context },
+      '@type': 'Organization',
+      email: 'recordLabel@example.com',
+      name: 'recordLabel',
+      url: 'http://recordLabel.com'
+  }
+
+  writeFileSync(__dirname + '/party/composer.json', JSON.stringify(objs.composer));
+  writeFileSync(__dirname + '/party/lyricist.json', JSON.stringify(objs.lyricist));
+  writeFileSync(__dirname + '/party/performer.json', JSON.stringify(objs.performer));
+  writeFileSync(__dirname + '/party/producer.json', JSON.stringify(objs.producer));
+  writeFileSync(__dirname + '/party/publisher.json', JSON.stringify(objs.publisher));
+  writeFileSync(__dirname + '/party/recordLabel.json', JSON.stringify(objs.recordLabel));
+
+  return promiseSeq(
     () => setDataHash('composer'),
     () => setDataHash('lyricist'),
     () => setDataHash('performer'),
@@ -94,18 +106,19 @@ promiseSeq(
     () => setDataHash('recordLabel'),
     () => setFileHash('/test.mp3'),
     () => setFileHash('/test.png')
+  );
 
-).then(() => {
+}).then(() => {
 
     objs.audio = {
-        '@context': 'http://schema.org/',
+        '@context': { '/': hashes.context },
         '@type': 'AudioObject',
         contentUrl:  { '/': hashes['/test.mp3'] },
         encodingFormat: 'mp3'
     }
 
     objs.composition = {
-        '@context': 'http://schema.org/',
+        '@context': { '/': hashes.context },
         '@type': 'MusicComposition',
         composer: [{ '/': hashes.composer }],
         iswcCode: 'T-034.524.680-1',
@@ -115,15 +128,15 @@ promiseSeq(
     }
 
     objs.image = {
-        '@context': 'http://schema.org/',
+        '@context': { '/': hashes.context },
         '@type': 'ImageObject',
         contentUrl: { '/': hashes['/test.png'] },
         encodingFormat: 'png'
     }
 
-    writeTestFile('/meta/composition.json', JSON.stringify(objs.composition));
-    writeTestFile('/meta/audio.json', JSON.stringify(objs.audio));
-    writeTestFile('/meta/image.json', JSON.stringify(objs.image));
+    writeFileSync(__dirname + '/meta/composition.json', JSON.stringify(objs.composition));
+    writeFileSync(__dirname + '/meta/audio.json', JSON.stringify(objs.audio));
+    writeFileSync(__dirname + '/meta/image.json', JSON.stringify(objs.image));
 
     return promiseSeq(
         () => setDataHash('audio'),
@@ -134,7 +147,7 @@ promiseSeq(
 }).then(() => {
 
     objs.recording = {
-        '@context': 'http://schema.org/',
+        '@context': { '/': hashes.context },
         '@type': 'MusicRecording',
         audio: [{ '/': hashes.audio }],
         byArtist: [{ '/': hashes.performer }],
@@ -143,14 +156,14 @@ promiseSeq(
         recordLabel: [{ '/': hashes.recordLabel }]
     }
 
-    writeTestFile('/meta/recording.json', JSON.stringify(objs.recording));
+    writeFileSync(__dirname + '/meta/recording.json', JSON.stringify(objs.recording));
 
     return setDataHash('recording');
 
 }).then(() => {
 
     objs.album = {
-        '@context': 'http://schema.org/',
+        '@context': { '/': hashes.context },
         '@type': 'MusicAlbum',
         albumProductionType: 'DemoAlbum',
         albumReleaseType: 'SingleRelease',
@@ -162,29 +175,29 @@ promiseSeq(
     }
 
     objs.playlist = {
-      '@context': 'http://schema.org/',
+      '@context': { '/': hashes.context },
       '@type': 'MusicPlaylist',
       image: { '/': hashes.image },
       name: 'just 1 song',
       track: [{ '/': hashes.recording }]
     }
 
-    writeTestFile('/meta/album.json', JSON.stringify(objs.album));
-    writeTestFile('/meta/playlist.json', JSON.stringify(objs.playlist));
+    writeFileSync(__dirname + '/meta/album.json', JSON.stringify(objs.album));
+    writeFileSync(__dirname + '/meta/playlist.json', JSON.stringify(objs.playlist));
 
     return setDataHash('album');
 
 }).then(() => {
 
   objs.release = {
-    '@context': 'http://schema.org/',
+    '@context': { '/': hashes.context },
     '@type': 'MusicRelease',
     musicReleaseFormat: 'DigitalFormat',
     recordLabel: [{ '/': hashes.recordLabel }],
     releaseOf: { '/': hashes.album }
   }
 
-  writeTestFile('/meta/release.json', JSON.stringify(objs.release));
+  writeFileSync(__dirname + '/meta/release.json', JSON.stringify(objs.release));
 
   return setDataHash('release');
 
@@ -206,13 +219,13 @@ promiseSeq(
   }
 
   objs.compositionLicense = {
-    '@context': 'http://schema.org/',
+    '@context': { '/': hashes.context },
     '@type': 'CreativeWork',
     text: 'some text for composition license...'
   }
 
   objs.compositionRightContract = {
-    '@context': 'http://schema.org/',
+    '@context': { '/': hashes.context },
     '@type': 'CreativeWork',
     text: 'some text saying composition right is assigned to publisher...'
   }
@@ -233,24 +246,24 @@ promiseSeq(
   }
 
   objs.recordingLicense = {
-    '@context': 'http://schema.org/',
+    '@context': { '/': hashes.context },
     '@type': 'CreativeWork',
     text: 'some text for recording license...'
   }
 
   objs.recordingRightContract =  {
-    '@context': 'http://schema.org/',
+    '@context': { '/': hashes.context },
     '@type': 'CreativeWork',
     text: 'some text saying recording right is assigned to record label...'
   }
 
-  writeTestFile('/coala/composition-copyright.json', JSON.stringify(objs.compositionCopyright));
-  writeTestFile('/coala/composition-license.json', JSON.stringify(objs.compositionLicense));
-  writeTestFile('/coala/composition-right-contract.json', JSON.stringify(objs.compositionRightContract));
+  writeFileSync(__dirname + '/coala/composition-copyright.json', JSON.stringify(objs.compositionCopyright));
+  writeFileSync(__dirname + '/coala/composition-license.json', JSON.stringify(objs.compositionLicense));
+  writeFileSync(__dirname + '/coala/composition-right-contract.json', JSON.stringify(objs.compositionRightContract));
 
-  writeTestFile('/coala/recording-copyright.json', JSON.stringify(objs.recordingCopyright));
-  writeTestFile('/coala/recording-license.json', JSON.stringify(objs.recordingLicense));
-  writeTestFile('/coala/recording-right-contract.json', JSON.stringify(objs.recordingRightContract));
+  writeFileSync(__dirname + '/coala/recording-copyright.json', JSON.stringify(objs.recordingCopyright));
+  writeFileSync(__dirname + '/coala/recording-license.json', JSON.stringify(objs.recordingLicense));
+  writeFileSync(__dirname + '/coala/recording-right-contract.json', JSON.stringify(objs.recordingRightContract));
 
   return promiseSeq(
     () => setDataHash('compositionCopyright'),
@@ -338,12 +351,14 @@ promiseSeq(
     transferContract: { '/': hashes.recordingRightContract }
   }
 
-  writeTestFile('/coala/composition-copyright-assertion.json', JSON.stringify(objs.compositionCopyrightAssertion));
-  writeTestFile('/coala/composition-right.json', JSON.stringify(objs.compositionRight));
-  writeTestFile('/coala/composition-right-assignment.json', JSON.stringify(objs.compositionRightAssignment));
-  writeTestFile('/coala/recording-copyright-assertion.json', JSON.stringify(objs.recordingCopyrightAssertion));
-  writeTestFile('/coala/recording-right.json', JSON.stringify(objs.recordingRight));
-  writeTestFile('/coala/recording-right-assignment.json', JSON.stringify(objs.recordingRightAssignment));
+  writeFileSync(__dirname + '/coala/composition-copyright-assertion.json', JSON.stringify(objs.compositionCopyrightAssertion));
+  writeFileSync(__dirname + '/coala/composition-right.json', JSON.stringify(objs.compositionRight));
+  writeFileSync(__dirname + '/coala/composition-right-assignment.json', JSON.stringify(objs.compositionRightAssignment));
+  writeFileSync(__dirname + '/coala/recording-copyright-assertion.json', JSON.stringify(objs.recordingCopyrightAssertion));
+  writeFileSync(__dirname + '/coala/recording-right.json', JSON.stringify(objs.recordingRight));
+  writeFileSync(__dirname + '/coala/recording-right-assignment.json', JSON.stringify(objs.recordingRightAssignment));
+
+  console.log(hashes.context);
 
   return promiseSeq(
     () => setDataHash('compositionCopyrightAssertion'),

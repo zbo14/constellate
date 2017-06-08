@@ -1,9 +1,11 @@
 const CID = require('cids');
+const { Context } = require('./lib/context.js');
 const ipfs = require('./lib/ipfs.js');
 const { isDescendant } = require('./lib/util.js');
 require('setimmediate');
 
 const {
+  blobToAnchor,
   formToObject,
   getInputs,
   objectToForm,
@@ -11,7 +13,9 @@ const {
 } = require('./lib/form.js');
 
 const {
+  convertObject,
   getTypeSchema,
+  hashToId,
   validate
 } = require('./lib/linked-data.js');
 
@@ -26,6 +30,7 @@ const importHashes = document.getElementById('import-hashes');
 const ols = document.getElementsByTagName('ol');
 const textarea = document.querySelector('textarea');
 
+const formatSelect = document.getElementById('format-select');
 const keySelect = document.getElementById('key-select');
 const schemaSelect = document.getElementById('schema-select');
 
@@ -92,8 +97,15 @@ saveFileHashBtn.addEventListener('click', () => {
 startPeerBtn.addEventListener('click', () => {
   ipfs.startPeer().then((info) => {
     console.log('Peer info:', info);
+    ipfs.putDAGNode(Context, 'dag-cbor').then((cid) => {
+      hashes.context = cid.toBaseEncodedString();
+      console.log('Context hash:', hashes.context);
+    });
     addDataBtn.addEventListener('click', () => {
-      const obj = JSON.parse(textarea.textContent);
+      let obj = JSON.parse(textarea.textContent);
+      if (formatSelect.value === 'json-ld') {
+        obj = convertObject(obj, 'json-ld', 'ipld');
+      }
       ipfs.putDAGNode(obj, 'dag-cbor').then((cid) => {
         console.log('Added data!');
         dataHash.value = cid.toBaseEncodedString();
@@ -109,9 +121,12 @@ startPeerBtn.addEventListener('click', () => {
     });
     getDataBtn.addEventListener('click', () => {
       ipfs.getDAGNode(dataHash.value, 'dag-cbor').then((dagNode) => {
-        console.log(dagNode);
-        return objectToForm(dagNode);
-      }).then((form) => {
+        return validate(dagNode, 'ipld');
+      }).then((validated) => {
+        if (formatSelect.value === 'json-ld') {
+          validated = convertObject(validated, 'ipld', 'json-ld');
+        }
+        const form = objectToForm(validated);
         data.innerHTML = null;
         Array.from(form.children).forEach((div) => {
           if (div.nodeName === 'DIV') data.appendChild(div);
@@ -120,7 +135,8 @@ startPeerBtn.addEventListener('click', () => {
     });
     getFileBtn.addEventListener('click', () => {
       if (fileHash.value) {
-        ipfs.getFile(fileHash.value).then((a) => {
+        ipfs.getFile(fileHash.value).then((blob) => {
+          const a = blobToAnchor(blob);
           files.appendChild(a);
         });
       }
@@ -145,15 +161,37 @@ function addButtons(form) {
   });
 }
 
-schemaSelect.addEventListener('change', () => {
-    formContainer.innerHTML = null;
-    const schema = getTypeSchema(schemaSelect.value);
-    const form = schemaToForm(schema);
-    formContainer.appendChild(form);
-    addButtons(form);
-});
+const formHandler = () => {
+  if (!schemaSelect.value || !formatSelect.value) return;
+  formContainer.innerHTML = null;
+  const schema = getTypeSchema(schemaSelect.value, formatSelect.value);
+  const form = schemaToForm(schema);
+  if (!hashes.context) return alert('Cannot find context; please start peer');
+  let child, elem, input, label;
+  for (let i = 0; i < form.children.length; i++) {
+    child = form.children[i];
+    if (child.nodeName === 'DIV' &&
+        (elem = child.lastChild) &&
+        (label = child.firstChild) &&
+        label.textContent === '@context') {
+      input = getInputs(elem)[0];
+      if (formatSelect.value === 'ipld') {
+        input.value = hashes.context;
+      }
+      if (formatSelect.value === 'json-ld') {
+        input.value = hashToId(hashes.context);
+      }
+      break;
+    }
+  }
+  formContainer.appendChild(form);
+  addButtons(form);
+}
 
-formContainer.addEventListener('keyup', (evt) => {
+formatSelect.addEventListener('change', formHandler);
+schemaSelect.addEventListener('change', formHandler);
+
+document.body.addEventListener('keyup', (evt) => {
   const input = evt.target;
   if (input.nodeName !== 'INPUT' || input.type !== 'text') return;
   if (input.value[0] === '#') {
@@ -161,7 +199,20 @@ formContainer.addEventListener('keyup', (evt) => {
     if (hashes[name]) {
       setTimeout(() => {
         name = input.value.slice(1);
-        if (hashes[name]) input.value = hashes[name]
+        if (hashes[name]) {
+          if (formatSelect.value === 'ipld') {
+            input.value = hashes[name];
+          }
+          if (formatSelect.value === 'json-ld') {
+            const cid = new CID(hashes[name]);
+            if (cid.version === 0) {
+              input.value = 'ipfs:/ipfs/' + hashes[name];
+            }
+            if (cid.version === 1) {
+              input.value = 'ipfs:/ipld/' + hashes[name];
+            }
+          }
+        }
       }, 1000);
     }
   }
@@ -223,8 +274,7 @@ formContainer.addEventListener('click', (evt) => {
 function includeElement(elem, label) {
     switch (elem.nodeName) {
         case 'INPUT':
-            if (elem.type !== 'checkbox' &&
-                !elem.value) return false;
+            if (elem.type !== 'checkbox' && !elem.value) return false;
             return true;
         case 'FIELDSET':
             if (!elem.children.length) return false;
@@ -261,7 +311,7 @@ formContainer.addEventListener('submit', (evt) => {
                includeElement(div.lastChild, div.firstChild);
     });
     const obj = formToObject(divs);
-    validate(obj, 'dag-cbor').then((validated) => {
+    validate(obj, formatSelect.value).then(() => {
       textarea.textContent = JSON.stringify(obj, null, 2);
     });
 });

@@ -15,8 +15,13 @@
     <button id='clear-files-btn'>clear files</button><br><br>
     <div id='files'></div><br><br>
     <hr>
+    <select id='format-select'>
+      <option selected disabled value=''>--</option>
+      <option value='ipld'>ipld</option>
+      <option value='json-ld'>jsond-ld</option>
+    </select>
     <select id='schema-select'>
-      <option selected disabled>--</option>
+      <option selected disabled value=''>--</option>
       <optgroup label='party'>
         <option value='Person'>individual</option>
         <option value='MusicGroup'>music group</option>
