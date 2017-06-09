@@ -1,6 +1,6 @@
 import { assert } from 'chai';
 import { describe, it } from 'mocha';
-import { readTestFile } from './fs.js';
+import { readFileSync } from 'fs';
 import { validateSchema } from '../lib/schema.js';
 
 import {
@@ -11,91 +11,96 @@ import {
   RightsTransferAction
 } from '../lib/coala.js';
 
+const CreativeWorkIPLD = CreativeWork('ipld');
+const CopyrightIPLD = Copyright('ipld');
+const ReviewActionIPLD = ReviewAction('ipld');
+const RightIPLD = Right('ipld');
+const RightsTransferActionIPLD = RightsTransferAction('ipld');
 
-const compositionCopyright = JSON.parse(readTestFile('/coala/composition-copyright.json'));
-const compositionCopyrightAssertion = JSON.parse(readTestFile('/coala/composition-copyright-assertion.json'));
-const compositionLicense = JSON.parse(readTestFile('/coala/composition-license.json'));
-const compositionRight = JSON.parse(readTestFile('/coala/composition-right.json'));
-const compositionRightAssignment = JSON.parse(readTestFile('/coala/composition-right-assignment.json'));
-const compositionRightContract = JSON.parse(readTestFile('/coala/composition-right-contract.json'));
+const compositionCopyright = JSON.parse(readFileSync(__dirname + '/coala/composition-copyright.json'));
+const compositionCopyrightAssertion = JSON.parse(readFileSync(__dirname + '/coala/composition-copyright-assertion.json'));
+const compositionLicense = JSON.parse(readFileSync(__dirname + '/coala/composition-license.json'));
+const compositionRight = JSON.parse(readFileSync(__dirname + '/coala/composition-right.json'));
+const compositionRightAssignment = JSON.parse(readFileSync(__dirname + '/coala/composition-right-assignment.json'));
+const compositionRightContract = JSON.parse(readFileSync(__dirname + '/coala/composition-right-contract.json'));
 
-const recordingCopyright = JSON.parse(readTestFile('/coala/recording-copyright.json'));
-const recordingCopyrightAssertion = JSON.parse(readTestFile('/coala/recording-copyright-assertion.json'));
-const recordingLicense = JSON.parse(readTestFile('/coala/recording-license.json'));
-const recordingRight = JSON.parse(readTestFile('/coala/recording-right.json'));
-const recordingRightAssignment = JSON.parse(readTestFile('/coala/recording-right-assignment.json'));
-const recordingRightContract = JSON.parse(readTestFile('/coala/recording-right-contract.json'));
+const recordingCopyright = JSON.parse(readFileSync(__dirname + '/coala/recording-copyright.json'));
+const recordingCopyrightAssertion = JSON.parse(readFileSync(__dirname + '/coala/recording-copyright-assertion.json'));
+const recordingLicense = JSON.parse(readFileSync(__dirname + '/coala/recording-license.json'));
+const recordingRight = JSON.parse(readFileSync(__dirname + '/coala/recording-right.json'));
+const recordingRightAssignment = JSON.parse(readFileSync(__dirname + '/coala/recording-right-assignment.json'));
+const recordingRightContract = JSON.parse(readFileSync(__dirname + '/coala/recording-right-contract.json'));
 
 describe('Coala', () => {
   it('validates CreativeWork schema', () => {
-    assert.isOk(
-      validateSchema(CreativeWork, compositionLicense),
+    assert.isNull(
+      validateSchema(CreativeWorkIPLD, compositionLicense),
       'should validate CreativeWork schema'
     );
   });
   it('validates CreativeWork schema', () => {
-    assert.isOk(
-      validateSchema(CreativeWork, recordingLicense),
+    assert.isNull(
+      validateSchema(CreativeWorkIPLD, recordingLicense),
       'should validate CreativeWork schema'
     );
   });
   it('validates CreativeWork schema', () => {
-    assert.isOk(
-      validateSchema(CreativeWork, compositionRightContract),
+    assert.isNull(
+      validateSchema(CreativeWorkIPLD, compositionRightContract),
       'should validate CreativeWork schema'
     );
   });
   it('validates CreativeWork schema', () => {
-    assert.isOk(
-      validateSchema(CreativeWork, recordingRightContract),
+    assert.isNull(
+      validateSchema(CreativeWorkIPLD, recordingRightContract),
       'should validate CreativeWork schema'
     );
   });
   it('validates Copyright schema', () => {
-    assert.isOk(
-      validateSchema(Copyright, compositionCopyright),
+    assert.isNull(
+      validateSchema(CopyrightIPLD, compositionCopyright),
       'should validate Copyright schema'
     );
   });
   it('validates Copyright schema', () => {
-    assert.isOk(
-      validateSchema(Copyright, recordingCopyright),
+    assert.isNull(
+      validateSchema(CopyrightIPLD, recordingCopyright),
       'should validate Copyright schema'
     );
   });
   it('validates ReviewAction schema', () => {
-    assert.isOk(
-      validateSchema(ReviewAction, compositionCopyrightAssertion),
+    assert.isNull(
+      validateSchema(ReviewActionIPLD, compositionCopyrightAssertion),
       'should validate ReviewAction schema'
     );
   });
   it('validates ReviewAction schema', () => {
-    assert.isOk(
-      validateSchema(ReviewAction, recordingCopyrightAssertion),
+    assert.isNull(
+      validateSchema(ReviewActionIPLD, recordingCopyrightAssertion),
       'should validate ReviewAction schema'
     );
   });
   it('validates Right schema', () => {
-    assert.isOk(
-      validateSchema(Right, compositionRight),
+    assert.isNull(
+      validateSchema(RightIPLD, compositionRight),
       'should validate Right schema'
     );
   });
   it('validates Right schema', () => {
-    assert.isOk(
-      validateSchema(Right, recordingRight),
+    assert.isNull(
+      validateSchema(RightIPLD, recordingRight),
       'should validate Right schema'
     );
   });
   it('validates RightsTransferAction schema', () => {
-    assert.isOk(
-      validateSchema(RightsTransferAction, compositionRightAssignment),
+    assert.isNull(
+      validateSchema(RightsTransferActionIPLD, compositionRightAssignment),
       'should validate RightsTransferAction'
     );
   });
   it('validates RightsTransferAction schema', () => {
-    assert.isOk(
-      validateSchema(RightsTransferAction, recordingRightAssignment),
+    assert.isNull(
+      validateSchema(RightsTransferActionIPLD, recordingRightAssignment),
       'should validate RightsTransferAction'
     );
   });

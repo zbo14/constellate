@@ -51,14 +51,14 @@ const CreativeWork = (format: string): Object => {
         enum: ['CreativeWork'],
         readonly: true
       },
-      tereft: {
+      text: {
         type: 'string'
       }
     },
     required: [
       '@context',
       '@type',
-      'tereft'
+      'text'
     ]
   }
 }
@@ -79,7 +79,7 @@ const ReviewAction = (format: string): Object => {
       assertionSubject: ref,
       assertionTruth: {
         type: 'boolean',
-        enum: [true]
+        default: true
       },
       error: {
         type: 'string'
@@ -129,7 +129,7 @@ const Right = (format: string): Object => {
         enum: ['Right'],
         readonly: true
       },
-      erefclusive: {
+      exclusive: {
         type: 'boolean'
       },
       license: ref,
@@ -140,9 +140,9 @@ const Right = (format: string): Object => {
       percentageShares: {
         type: 'number',
         minimum: 1,
-        marefimum: 100
+        maximum: 100
       },
-      rightContereft: {
+      rightContext: {
         type: 'array',
         items: {
           type: 'string'
@@ -173,7 +173,7 @@ const Right = (format: string): Object => {
 }
 
 const RightsTransferAction = (format: string): Object => {
-  const ref = linkOrURI(format);
+  const ref = getRefSchema(format);
   return {
     $schema: Draft,
     type: 'object',

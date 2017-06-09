@@ -4,6 +4,7 @@ const { isDescendant } = require('./lib/util.js');
 require('setimmediate');
 
 const {
+  newAnchor,
   formToObject,
   getInputs,
   objectToForm,
@@ -12,10 +13,9 @@ const {
 
 const {
   addFileInput,
-  blobToAnchor,
-  getDAGNode,
+  getCBOR,
   getFile,
-  putDAGNode,
+  putCBOR,
   startPeer
 } = require('./lib/ipfs.js');
 
@@ -104,16 +104,15 @@ saveFileHashBtn.addEventListener('click', () => {
 startPeerBtn.addEventListener('click', () => {
   startPeer().then((info) => {
     console.log('Peer info:', info);
-    putDAGNode(Context, 'dag-cbor').then((cid) => {
+    putCBOR(Context).then((cid) => {
       hashes.context = cid.toBaseEncodedString();
-      console.log('Context hash:', hashes.context);
     });
     addDataBtn.addEventListener('click', () => {
       let obj = JSON.parse(textarea.textContent);
       if (formatSelect.value === 'json-ld') {
         obj = convertObject(obj, 'json-ld', 'ipld');
       }
-      putDAGNode(obj, 'dag-cbor').then((cid) => {
+      putCBOR(obj).then((cid) => {
         console.log('Added data!');
         dataHash.value = cid.toBaseEncodedString();
       });
@@ -127,7 +126,7 @@ startPeerBtn.addEventListener('click', () => {
       }
     });
     getDataBtn.addEventListener('click', () => {
-      getDAGNode(dataHash.value, 'dag-cbor').then((dagNode) => {
+      getCBOR(dataHash.value).then((dagNode) => {
         return validate(dagNode, 'ipld');
       }).then((validated) => {
         if (formatSelect.value === 'json-ld') {
@@ -142,8 +141,8 @@ startPeerBtn.addEventListener('click', () => {
     });
     getFileBtn.addEventListener('click', () => {
       if (fileHash.value) {
-        getFile(fileHash.value).then((blob) => {
-          const a = blobToAnchor(blob);
+        getFile(fileHash.value).then((obj) => {
+          const a = newAnchor(obj.data, obj.type);
           files.appendChild(a);
         });
       }

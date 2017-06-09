@@ -87,10 +87,10 @@ const MusicAlbum = (format : string): Object => {
           '',
           'CompilationAlbum',
           'DemoAlbum',
-          'DJMirefAlbum',
+          'DJMixAlbum',
           'LiveAlbum',
-          'MireftapeAlbum',
-          'RemirefAlbum',
+          'MixtapeAlbum',
+          'RemixAlbum',
           'SoundtrackAlbum',
           'SpokenWordAlbum',
           'StudioAlbum'

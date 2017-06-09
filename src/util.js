@@ -137,7 +137,11 @@ function transform(x: any, fn: Function): any {
   return x;
 }
 
-const _traverse = (path: string, val: any, fn: Function, result: ?any) => {
+function traverse(val: any, fn: Function, result: ?any) {
+  _traverse('', val, fn, result);
+}
+
+function _traverse(path: string, val: any, fn: Function, result: ?any) {
   if (isArray(val)) {
     val.map((v) => _traverse(path, v, fn, result));
   } else if (isObject(val)) {
@@ -148,10 +152,6 @@ const _traverse = (path: string, val: any, fn: Function, result: ?any) => {
   } else {
     fn(path, val, result);
   }
-}
-
-function traverse(val: any, fn: Function, result: ?any) {
-  _traverse('', val, fn, result);
 }
 
 function withoutIndex(arr: Array, idx: number): Array {

@@ -2,7 +2,7 @@ const CID = require('cids');
 const { validateSchema } = require('../lib/schema.js');
 
 const {
-  getDAGNode,
+  getCBOR,
   getFile
 } = require('../lib/ipfs.js');
 
@@ -174,7 +174,7 @@ function resolveCID(cid: Object): Promise<any> {
       });
     }
     if (cid.codec === 'dag-cbor' && cid.version === 1) {
-      return getDAGNode(cid, cid.codec).then((dagNode) => {
+      return getCBOR(cid).then((dagNode) => {
         resolve(dagNode);
       });
     }
@@ -252,7 +252,8 @@ function validate(obj: Object, format: string): Promise<Object> {
       if (!cid) return;
       result.push(
         resolveCID(cid).then((resolved) => {
-          if (resolved instanceof Blob) {
+          // if (resolved instanceof Blob) {}
+          if (resolved.type && (resolved.type.match(/audio|image/))) {
             return resolved;
           } else if (!isObject(resolved)) {
             return reject(new Error('expected non-empty object; got ' + JSON.stringify(resolved)));

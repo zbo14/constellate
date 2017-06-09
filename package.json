@@ -8,13 +8,12 @@
   "scripts": {
     "build": "babel src/ -d lib/",
     "bundle": "browserify index.js --require browserify-zlib-next:zlib > bundle.js",
-    "_comment": "test command from https://github.com/ipfs/js-ipfs/blob/master/examples/bundle-browserify/package.json",
+    "_comment": "test command from https://github.com/Envoke-org/envokeJS/blob/master/package.json",
     "flow": "flow --show-all-errors",
     "flow:file": "read -p 'Enter filename: ' filename && export FILENAME=$filename && flow check-contents < src/${FILENAME}",
     "gulp": "gulp",
     "remove-types:file": "read -p 'Enter filename: ' filename && export FILENAME=$filename && flow-remove-types src/${FILENAME} | js-beautify -o lib/${FILENAME}",
-    "test": "mocha --compilers js:babel-core/register --require babel-polyfill --recursive './test/*-test.js'",
-    "_comment": "test command from https://github.com/Envoke-org/envokeJS/blob/master/package.json"
+    "test": "mocha --compilers js:babel-core/register --require babel-polyfill --recursive './test/*-test.js'"
   },
   "babel": {
     "presets": [
@@ -50,7 +49,6 @@
     "ipfs-unixfs": "^0.1.11",
     "ipld-dag-cbor": "^0.11.1",
     "ipld-dag-pb": "^0.11.0",
-    "is-ipfs": "^0.3.0",
     "js-sha256": "^0.5.0",
     "js-sha3": "^0.5.7",
     "mocha": "^3.2.0",

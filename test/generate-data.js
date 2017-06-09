@@ -1,3 +1,4 @@
+const { Context } = require('../lib/context.js');
 const { promiseSeq } = require('../lib/util.js');
 
 const {
@@ -8,8 +9,7 @@ const {
 
 const {
   addFile,
-  calcHash,
-  putDAGNode,
+  putCBOR,
   startPeer
 } = require('../lib/ipfs.js');
 
@@ -17,7 +17,7 @@ const hashes = {};
 const objs = {};
 
 function setDataHash(name) {
-  return putDAGNode(objs[name], 'dag-cbor').then((cid) => {
+  return putCBOR(objs[name]).then((cid) => {
     hashes[name] = cid.toBaseEncodedString();
   });
 }
@@ -29,11 +29,7 @@ function setFileHash(path) {
   });
 }
 
-objs.context = JSON.parse(readFileSync('../src/context.json'));
-
-calcHash(objs.context, 'dag-cbor').then((hash) => {
-  console.log(hash);
-});
+objs.context = Context;
 
 promiseSeq(
   startPeer,
@@ -204,10 +200,7 @@ promiseSeq(
 }).then(() => {
 
   objs.compositionCopyright = {
-    '@context': [
-      'http://schema.org/',
-      'http://coalaip.org/'
-    ],
+    '@context': { '/': hashes.context },
     '@type': 'Copyright',
     rightsOf: { '/': hashes.composition },
     territory: {
@@ -231,10 +224,7 @@ promiseSeq(
   }
 
   objs.recordingCopyright = {
-    '@context': [
-      'http://schema.org/',
-      'http://coalaip.org/'
-    ],
+    '@context': { '/': hashes.context },
     '@type': 'Copyright',
     rightsOf: { '/': hashes.recording },
     territory: {
@@ -277,10 +267,7 @@ promiseSeq(
 }).then(() => {
 
   objs.compositionCopyrightAssertion = {
-    '@context': [
-      'http://schema.org/',
-      'http://coalaip.org/'
-    ],
+    '@context': { '/': hashes.context },
     '@type': 'ReviewAction',
     asserter: { '/': hashes.composer },
     assertionSubject: { '/': hashes.compositionCopyright },
@@ -288,10 +275,7 @@ promiseSeq(
   }
 
   objs.compositionRight = {
-    '@context': [
-      'http://schema.org/',
-      'http://coalaip.org/'
-    ],
+    '@context': { '/': hashes.context },
     '@type': 'Right',
     exclusive: true,
     license: { '/': hashes.compositionLicense },
@@ -308,16 +292,13 @@ promiseSeq(
   }
 
   objs.compositionRightAssignment = {
-    '@context': 'http://coalaip.org/',
+    '@context': { '/': hashes.context },
     '@type': 'RightsTransferAction',
     transferContract: { '/': hashes.compositionRightContract }
   }
 
   objs.recordingCopyrightAssertion = {
-    '@context': [
-      'http://schema.org/',
-      'http://coalaip.org/'
-    ],
+    '@context': { '/': hashes.context },
     '@type': 'ReviewAction',
     asserter: { '/': hashes.performer },
     assertionSubject: { '/': hashes.recordingCopyright },
@@ -326,10 +307,7 @@ promiseSeq(
   }
 
   objs.recordingRight = {
-    '@context': [
-      'http://schema.org/',
-      'http://coalaip.org/'
-    ],
+    '@context': { '/': hashes.context },
     '@type': 'Right',
     exclusive: true,
     license: { '/': hashes.recordingLicense },
@@ -346,7 +324,7 @@ promiseSeq(
   }
 
   objs.recordingRightAssignment = {
-    '@context': 'http://coalaip.org/',
+    '@context': { '/': hashes.context },
     '@type': 'RightsTransferAction',
     transferContract: { '/': hashes.recordingRightContract }
   }
