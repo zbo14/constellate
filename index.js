@@ -1,16 +1,23 @@
 const CID = require('cids');
 const { Context } = require('./lib/context.js');
-const ipfs = require('./lib/ipfs.js');
 const { isDescendant } = require('./lib/util.js');
 require('setimmediate');
 
 const {
-  blobToAnchor,
   formToObject,
   getInputs,
   objectToForm,
   schemaToForm
 } = require('./lib/form.js');
+
+const {
+  addFileInput,
+  blobToAnchor,
+  getDAGNode,
+  getFile,
+  putDAGNode,
+  startPeer
+} = require('./lib/ipfs.js');
 
 const {
   convertObject,
@@ -95,9 +102,9 @@ saveFileHashBtn.addEventListener('click', () => {
 });
 
 startPeerBtn.addEventListener('click', () => {
-  ipfs.startPeer().then((info) => {
+  startPeer().then((info) => {
     console.log('Peer info:', info);
-    ipfs.putDAGNode(Context, 'dag-cbor').then((cid) => {
+    putDAGNode(Context, 'dag-cbor').then((cid) => {
       hashes.context = cid.toBaseEncodedString();
       console.log('Context hash:', hashes.context);
     });
@@ -106,21 +113,21 @@ startPeerBtn.addEventListener('click', () => {
       if (formatSelect.value === 'json-ld') {
         obj = convertObject(obj, 'json-ld', 'ipld');
       }
-      ipfs.putDAGNode(obj, 'dag-cbor').then((cid) => {
+      putDAGNode(obj, 'dag-cbor').then((cid) => {
         console.log('Added data!');
         dataHash.value = cid.toBaseEncodedString();
       });
     });
     addFileBtn.addEventListener('click', () => {
       if (fileInput.files.length) {
-        ipfs.addFileInput(fileInput).then((result) => {
+        addFileInput(fileInput).then((result) => {
           console.log('Added file!');
           fileHash.value = result.hash;
         });
       }
     });
     getDataBtn.addEventListener('click', () => {
-      ipfs.getDAGNode(dataHash.value, 'dag-cbor').then((dagNode) => {
+      getDAGNode(dataHash.value, 'dag-cbor').then((dagNode) => {
         return validate(dagNode, 'ipld');
       }).then((validated) => {
         if (formatSelect.value === 'json-ld') {
@@ -135,7 +142,7 @@ startPeerBtn.addEventListener('click', () => {
     });
     getFileBtn.addEventListener('click', () => {
       if (fileHash.value) {
-        ipfs.getFile(fileHash.value).then((blob) => {
+        getFile(fileHash.value).then((blob) => {
           const a = blobToAnchor(blob);
           files.appendChild(a);
         });
@@ -271,46 +278,10 @@ formContainer.addEventListener('click', (evt) => {
     }
 });
 
-function includeElement(elem, label) {
-    switch (elem.nodeName) {
-        case 'INPUT':
-            if (elem.type !== 'checkbox' && !elem.value) return false;
-            return true;
-        case 'FIELDSET':
-            if (!elem.children.length) return false;
-            return Array.from(elem.children).map((div) => {
-                if (!div.children.length) {
-                    if (!elem.hasAttribute('required')) return false;
-                    throw new Error(label.textContent + ' is required');
-                }
-                return includeElement(div.lastChild);
-            }).every((bool) => bool);
-        case 'OL':
-            if (!elem.children.length) {
-                if (!elem.hasAttribute('required')) return false;
-                throw new Error(label.textContent + ' is required');
-            }
-            return Array.from(elem.children).map((li) => {
-                if (!li.children.length) return false;
-                return includeElement(li.firstChild);
-            }).every((bool) => bool);
-        case 'SELECT':
-            if (!elem.value) return false;
-            return true;
-        default:
-            throw new Error('unexpected nodeName: ' + elem.nodeName);
-    }
-}
-
 formContainer.addEventListener('submit', (evt) => {
     evt.preventDefault();
     const form = formContainer.firstChild;
-    const divs = Array.from(form.children).filter((div) => {
-        return div.nodeName === 'DIV' &&
-               div.children.length === 2 &&
-               includeElement(div.lastChild, div.firstChild);
-    });
-    const obj = formToObject(divs);
+    const obj = formToObject(Array.from(form.children));
     validate(obj, formatSelect.value).then(() => {
       textarea.textContent = JSON.stringify(obj, null, 2);
     });

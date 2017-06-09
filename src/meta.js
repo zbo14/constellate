@@ -313,21 +313,10 @@ const MusicRelease = (format: string): Object => {
     },
     oneOf: [
       {
-        properties: {
-          releaseOf: {
-            enum: [null]
-          }
-        }
+        required: ['releaseOf']
       },
       {
-        properties: {
-          track: {
-            type: 'array',
-            items: {
-              enum: [null]
-            }
-          }
-        }
+        required: ['track']
       }
     ],
     required: [

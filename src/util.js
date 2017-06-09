@@ -137,17 +137,21 @@ function transform(x: any, fn: Function): any {
   return x;
 }
 
-function traverse(path: ?string, val: any, fn: Function, result: ?any) {
+const _traverse = (path: string, val: any, fn: Function, result: ?any) => {
   if (isArray(val)) {
-    val.map((v) => traverse(path, v, fn, result));
+    val.map((v) => _traverse(path, v, fn, result));
   } else if (isObject(val)) {
     arrayFromObject(val).map(([k, v]) => {
       const fullPath = (!path ? k : path + '/' + k);
-      traverse(fullPath, v, fn, result)
+      _traverse(fullPath, v, fn, result)
     });
   } else {
     fn(path, val, result);
   }
+}
+
+function traverse(val: any, fn: Function, result: ?any) {
+  _traverse('', val, fn, result);
 }
 
 function withoutIndex(arr: Array, idx: number): Array {

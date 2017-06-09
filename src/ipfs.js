@@ -148,10 +148,13 @@ function getFile(multihash: string): Promise<HTMLAnchorElement> {
         let type;
         file.content.on('data', (chunk) => {
           data.push(chunk)
-          if (!type) type = fileType(chunk);
+          if (!type) {
+            type = fileType(chunk);
+          };
         });
         file.content.once('end', () => {
-          const blob = new Blob(data, { type: type.mime });
+          type = type.mime.split('/')[0] + '/' + type.ext;
+          const blob = new Blob(data, { type });
           resolve(blob);
         });
         file.content.resume();
@@ -173,18 +176,15 @@ function isIPFSUrl(url: string): boolean {
   return isIPFS.ipfsUrl(url);
 }
 
-/*
-function newBlobURL(data: any[]): string {
-  const blob = new Blob(data, {type: 'application/octet-binary'});
-  const url = URL.createObjectURL(blob);
+function blobToAnchor(blob: Blob): HTMLAnchorElement {
   const a = document.createElement('a');
+  const filename = blob.type.replace('/', '.');
+  const url = URL.createObjectURL(blob);
   a.setAttribute('href', url);
-  a.setAttribute('download', multihash + '.' + ext);
-  const date = (new Date()).toLocaleString();
-  a.innerText = date + '-' + multihash + '- size: ' + blob.size;
+  a.setAttribute('download', filename);
+  a.innerText = filename;
   return a;
 }
-*/
 
 function serializeCBOR(obj: Object): Promise<Object> {
   return new Promise((resolve, reject) => {
@@ -276,6 +276,7 @@ function startPeer() {
 
 exports.addFile = addFile;
 exports.addFileInput = addFileInput;
+exports.blobToAnchor = blobToAnchor;
 exports.calcHash = calcHash;
 exports.connectToPeer = connectToPeer;
 exports.deserializeCBOR = deserializeCBOR;

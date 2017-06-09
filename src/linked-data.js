@@ -247,7 +247,7 @@ function validate(obj: Object, format: string): Promise<Object> {
       return reject(new Error(JSON.stringify(errors)));
     }
     const promises = [];
-    traverse(null, obj, (path, val, result) => {
+    traverse(obj, (path, val, result) => {
       const cid = getCID(val, path);
       if (!cid) return;
       result.push(

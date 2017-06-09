@@ -1,5 +1,7 @@
 'use strict';
 
+const { blobToAnchor } = require('../lib/ipfs.js');
+
 const {
   Draft,
   validateSchema
@@ -14,6 +16,7 @@ const {
   isObject,
   isString,
   transform,
+  traverse,
   withoutIndex
 } = require('../lib/util.js');
 
@@ -28,6 +31,40 @@ function newInput(type: string, val?: any): HTMLInputElement {
   input.type = type;
   if (val) input.value = val;
   return input;
+}
+
+function includeElement(elem : HTMLElement, label: HTMLLabelElement): boolean {
+    switch (elem.nodeName) {
+        case 'INPUT':
+            const input : HTMLInputElement = (elem : any);
+            return input.type === 'checkbox' || !!input.value;
+        case 'FIELDSET':
+            if (!elem.children || !elem.children.length) return false;
+            return Array.from(elem.children).every((div) => {
+                if (!div.children && !div.children.length) {
+                    if (!elem.hasAttribute('required')) return false;
+                    throw new Error(label.textContent + ' is required');
+                }
+                elem = (div.lastChild : any);
+                label = (div.firstChild : any);
+                return includeElement(elem, label);
+            });
+        case 'OL':
+            if (!elem.children && !elem.children.length) {
+                if (!elem.hasAttribute('required')) return false;
+                throw new Error(label.textContent + ' is required');
+            }
+            return Array.from(elem.children).some((li) => {
+                if (!li.children || !li.children.length) return false;
+                elem = (li.firstChild : any);
+                return includeElement(elem, label);
+            });
+        case 'SELECT':
+            const select : HTMLSelectElement = (elem : any);
+            return !!select.value;
+        default:
+            throw new Error('unexpected nodeName: ' + elem.nodeName);
+    }
 }
 
 function elementToSchema(elem: HTMLElement): Object {
@@ -191,18 +228,6 @@ function valueToElement(val: any): HTMLElement {
   throw new Error('unexpected value: ' + JSON.stringify(val));
 }
 
-function blobToAnchor(blob: Blob): HTMLAnchorElement {
-  const a = document.createElement('a');
-  const mime = blob.type.split('/');
-  const ext = mime.pop();
-  const url = URL.createObjectURL(blob);
-  a.setAttribute('href', url);
-  a.setAttribute('download', mime[0] + '.' + ext);
-  const date = (new Date()).toLocaleString();
-  a.innerText = date + '-' + mime[0] + '- size: ' + blob.size;
-  return a;
-}
-
 function getAttributes(elem: HTMLElement, schema: Object): Object {
   if (!elem.attributes) return schema;
   const result = Array.from(elem.attributes).reduce((result, attr) => {
@@ -284,45 +309,42 @@ function setAttribute(elem: HTMLElement, key: string, val: any) {
   }
 }
 
-function formToObject(divs: HTMLElement[]): Object {
+function formToObject(divs : HTMLElement[]): Object {
+  let elem : HTMLElement, label : HTMLLabelElement;
   return divs.reduce((result, div) => {
     if (div.nodeName !== 'DIV') {
-      throw new Error('expected div; got ' + div.nodeName);
+      return result;
     }
-    if (!div.children.length) {
-      throw new Error('div has no children');
+    if (!(elem = (div.lastChild : any))) {
+      throw new Error('expected element');
     }
-    const children = Array.from(div.children);
-    if (children.length !== 2) {
-      throw new Error('div should have 2 children; has ' + children.length);
+    if (!(label = (div.firstChild : any)) || label.nodeName !== 'LABEL') {
+      throw new Error('expected label');
     }
-    const label = children[0];
-    if (label.nodeName !== 'LABEL') {
-      throw new Error('expected label; got ' + label.nodeName);
+    if (!includeElement(elem, label)) {
+      return result;
     }
-    const val = elementToValue(children[1]);
+    const val = elementToValue(elem);
     if (val == null || (isArray(val) && val.some((x) => x == null))) return result;
     return Object.assign({}, result, { [label.textContent]: val } );
   }, {});
 }
 
 function formToSchema(divs: HTMLElement[]): Object  {
+  let elem : HTMLElement, label : HTMLLabelElement;
   return divs.reduce((result, div) => {
     if (div.nodeName !== 'DIV') {
-      throw new Error('expected div; got ' + div.nodeName);
+      return result;
     }
-    if (!div.children.length) {
-      throw new Error('div has no children');
+    if (!(elem = (div.lastChild : any))) {
+      throw new Error('expected element');
     }
-    const children = Array.from(div.children);
-    if (children.length !== 2) {
-      throw new Error('div should have 2 children; has ' + children.length);
+    if (!(label = (div.firstChild : any)) || label.nodeName !== 'LABEL') {
+      throw new Error('expected label');
     }
-    const label = children[0];
-    if (label.nodeName !== 'LABEL') {
-      throw new Error('expected label; got ' + label.nodeName);
+    if (!includeElement(elem, label)) {
+      return result;
     }
-    const elem = children[1];
     const schema = elementToSchema(elem);
     if (elem.hasAttribute('required')) result.required.push(label.textContent);
     return Object.assign({}, result, {
@@ -432,32 +454,39 @@ function schemaDependencyHandler2(div1: HTMLElement, div2: HTMLElement, negate: 
   }
 }
 
-function schemaHandler(divs: HTMLElement[], isValid: Function, subschemas: Object[]): Function {
+function schemaHandler(divs: HTMLElement[], finder: Function, subschemas: Object[], validator: Function): Function {
   return (evt) => {
     const input: HTMLInputElement = (evt.target : any);
     if (!input || input.nodeName !== 'INPUT') return;
     if (!isInputEvent(evt, input)) return;
     let elem : HTMLElement,
-        label : HTMLLabelElement;
-    const val = divs.reduce((result, div) => {
-      if (!(elem = (div.lastChild : any))) {
+        label : HTMLLabelElement,
+        promises : Promise<boolean>[] = [],
+        key = '', val = {};
+    for (let i = 0; i < divs.length; i++) {
+      if (!(elem = (divs[i].lastChild : any))) {
         throw new Error('expected element');
       }
-      if (!(label = (div.firstChild : any)) || label.nodeName !== 'LABEL') {
+      if (!(label = (divs[i].firstChild : any)) || label.nodeName !== 'LABEL') {
         throw new Error('expected label');
       }
-      return Object.assign({}, result, {
-        [label.textContent]: elementToValue(elem)
-      });
-    }, {});
-    if (!isValid(val)) {
-      divs.forEach((div, i) => {
-        if (!(elem = (div.lastChild : any))) {
-          throw new Error('expected element');
-        }
-        div.replaceChild(schemaToElement(subschemas[i]), elem);
-      });
+      promises.push(finder(label.textContent));
+      if (includeElement(elem, label)) {
+        Object.assign(val, { [label.textContent]: elementToValue(elem) });
+      }
     }
+    if (validator(val)) return;
+    Promise.all(promises).then((finds) => {
+      for (let i = 0; i < divs.length; i++) {
+        if (finds[i]) {
+          elem = (divs[i].lastChild : any);
+          label = (divs[i].firstChild : any);
+          if (includeElement(elem, label)) {
+            divs[i].replaceChild(schemaToElement(subschemas[i]), elem);
+          }
+        }
+      }
+    });
   }
 }
 
@@ -502,50 +531,100 @@ function setDependencies(deps: Object, form: HTMLFormElement, negate: boolean) {
   });
 }
 
+function findInSchema(schema: Object): Function {
+  return (key: string): Promise<boolean> => {
+    return new Promise((resolve, _) => {
+      traverse(schema, (path, val) => {
+        if (key === val) {
+          resolve(true);
+        }
+        if (path) {
+          const keys = path.split('/');
+          if (keys && keys.includes(key)) {
+            resolve(true);
+          }
+        }
+      });
+      resolve(false);
+    });
+  }
+}
+
+function findInSchemas(schemas: Object[]): Function {
+  return (key: string): Promise<boolean> => {
+    return new Promise((resolve, _) => {
+      const promises = schemas.map((schema) => {
+        return findInSchema(schema)(key);
+      });
+      Promise.all(promises).then((finds) => {
+        resolve(finds.some((found) => found));
+      });
+    });
+  }
+}
+
+function validate(schema: Object, negate: boolean): Function {
+  return (val: Object): boolean => {
+    const errors = validateSchema(schema, val);
+    return !!errors === negate;
+  }
+}
+
+function validateAllOf(schemas: Object[], negate: boolean): Function {
+  return (val: Object): boolean => {
+    return schemas.some((schema) => {
+      const errors = validateSchema(schema, val);
+      return !!errors === negate;
+    });
+  }
+}
+
+function validateAnyOf(schemas: Object[], negate: boolean): Function {
+  return (val: Object): boolean => {
+    return schemas.some((schema) => {
+      const errors = validateSchema(schema, val);
+      return !!errors === negate;
+    });
+  }
+}
+
+function validateOneOf(schemas: Object[], negate: boolean): Function {
+  return (val: Object): boolean => {
+    return schemas.filter((schema) => {
+      const errors = validateSchema(schema, val);
+      return !!errors === negate;
+    }).length === 1;
+  }
+}
+
 function setSchema(form: HTMLFormElement, negate: boolean, schema: Object, subschemas: Object[], keyword?: string) {
   const divs : HTMLElement[] = Array.from(form.children).filter((child) => {
     if (child && child.nodeName === 'DIV') return (child : any);
   });
-  let isValid: Function;
+  let finder : Function, validator : Function;
   if (!keyword) {
-    isValid = (val: Object): boolean => {
-      const errors = validateSchema(schema, val);
-      return !!errors === negate;
-    }
+    finder = findInSchema(schema);
+    validator = validate(schema, negate);
   } else {
     const schemas: Object[] = (schema[keyword] : any);
     if (!isArray(schemas)) return;
+    finder = findInSchemas(schemas);
     switch(keyword) {
       case 'allOf':
-        isValid = (val: Object): boolean => {
-          return schemas.every((schema) => {
-            const errors = validateSchema(schema, val);
-            return !!errors === negate;
-          });
-        }
+        validator = validateAllOf(schemas, negate);
         break;
       case 'anyOf':
-        isValid = (val: Object): boolean => {
-          return schemas.some((schema) => {
-            const errors = validateSchema(schema, val);
-            return !!errors === negate;
-          });
-        }
+        validator = validateAnyOf(schemas, negate);
         break;
       case 'oneOf':
-        isValid = (val: Object): boolean => {
-          return schemas.filter((schema) => {
-            const errors = validateSchema(schema, val);
-            return !!errors === negate;
-          }).length === 1;
-        }
+        validator = validateOneOf(schemas, negate);
         break;
       //..
       default:
         throw new Error('unexpected keyword: ' + JSON.stringify(keyword));
     }
   }
-  const handler = schemaHandler(divs, isValid, subschemas);
+  const handler = schemaHandler(divs, finder, subschemas, validator);
   form.addEventListener('click', handler);
   form.addEventListener('input', handler);
 }
@@ -587,7 +666,6 @@ function schemaToForm(schema: Object): HTMLFormElement {
   return form;
 }
 
-exports.blobToAnchor = blobToAnchor;
 exports.formToObject = formToObject;
 exports.formToSchema = formToSchema;
 exports.getInputs = getInputs;
