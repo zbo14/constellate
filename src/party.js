@@ -1,8 +1,8 @@
 'use strict';
 
 const{
+  Date,
   Draft,
-  Context,
   Email,
   Url,
   getRefSchema
@@ -14,19 +14,25 @@ const{
 * @module constellate/src/party
 */
 
-function partyFactory(type: string, format: string, isOrganization: boolean): Object {
+const MusicGroup = (format: string): Object => {
   const ref = getRefSchema(format);
-  const party = {
+  return {
     $schema: Draft,
-    title: type,
+    title: 'MusicGroup',
     type: 'object',
     properties: {
       '@context': Object.assign({}, ref, { readonly: true }),
       '@type': {
-        enum: [type],
+        enum: ['MusicGroup'],
         readonly: true
       },
       email: Email,
+      member: {
+        type: 'array',
+        items: ref,
+        minItems: 1,
+        uniqueItems: true
+      },
       name: {
         type: 'string'
       },
@@ -44,22 +50,83 @@ function partyFactory(type: string, format: string, isOrganization: boolean): Ob
       'name'
     ]
   }
-  if (isOrganization) {
-    Object.assign(party.properties, {
+}
+
+const Organization = (format: string): Object => {
+  const ref = getRefSchema(format);
+  return {
+    $schema: Draft,
+    title: 'Organization',
+    type: 'object',
+    properties: {
+      '@context': Object.assign({}, ref, { readonly: true }),
+      '@type': {
+        enum: ['Organization'],
+        readonly: true
+      },
+      email: Email,
       member: {
         type: 'array',
         items: ref,
         minItems: 1,
         uniqueItems: true
-      }
-    });
+      },
+      name: {
+        type: 'string'
+      },
+      sameAs: {
+        type: 'array',
+        items: Url,
+        minItems: 1,
+        uniqueItems: true
+      },
+      url: Url
+    },
+    required: [
+      '@context',
+      '@type',
+      'name'
+    ]
   }
-  return party
 }
 
-const MusicGroup = (format: string): Object => partyFactory('MusicGroup', format, true);
-const Organization = (format: string): Object => partyFactory('Organization', format, true);
-const Person = (format: string): Object => partyFactory('Person', format, false);
+const Person = (format: string): Object => {
+  const ref = getRefSchema(format);
+  return {
+    $schema: Draft,
+    title: 'Person',
+    type: 'object',
+    properties: {
+      '@context': Object.assign({}, ref, { readonly: true }),
+      '@type': {
+        enum: ['Person'],
+        readonly: true
+      },
+      birthDate: Date,
+      email: Email,
+      familyName: {
+        type: 'string'
+      },
+      givenName: {
+        type: 'string'
+      },
+      sameAs: {
+        type: 'array',
+        items: Url,
+        minItems: 1,
+        uniqueItems: true
+      },
+      url: Url
+    },
+    required: [
+      '@context',
+      '@type',
+      'birthDate',
+      'familyName',
+      'givenName'
+    ]
+  }
+}
 
 exports.MusicGroup = MusicGroup;
 exports.Organization = Organization;

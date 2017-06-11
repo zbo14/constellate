@@ -10,6 +10,12 @@ const Ajv = require('ajv');
 
 const ajv = new Ajv();
 
+const Date = {
+  type: 'string',
+  // from https://stackoverflow.com/questions/12756159/regex-and-iso8601-formatted-datetime#comment39882425_12756279
+  pattern: '^(\\d{4})-(0[1-9]|1[0-2])-(\\3([12]\\d|0[1-9]|3[01])|[1-9]‌​)$'
+}
+
 const DateTime = {
   type: 'string',
   format: 'date-time'
@@ -86,6 +92,7 @@ function validateSchema(schema: Object, value: any) {
   return validate.errors;
 }
 
+exports.Date = Date;
 exports.DateTime = DateTime;
 exports.Draft = Draft;
 exports.Email = Email;

@@ -362,6 +362,97 @@ function formToSchema(divs: HTMLElement[]): Object  {
   });
 }
 
+function addButtons(form: HTMLFormElement) {
+  const ols = form.querySelectorAll('ol');
+  Array.from(ols).forEach((ol, i) => {
+    if (!ol.hidden && isAncestor(form, ol)) {
+      const remover = document.createElement('button');
+      remover.className = 'remover';
+      remover.id = 'remover-' + i;
+      remover.textContent = '-';
+      form.insertBefore(remover, ol.parentElement);
+      const adder = document.createElement('button');
+      adder.className = 'adder';
+      adder.id = 'adder-' + i;
+      adder.textContent = '+';
+      form.insertBefore(adder, remover);
+    }
+  });
+}
+
+function addButtonListener(form: HTMLFormElement) {
+  form.addEventListener('click', (evt: Event) => {
+      const btn : HTMLButtonElement = (evt.target: any);
+      if (btn.nodeName !== 'BUTTON') return;
+      evt.preventDefault();
+      let div : HTMLDivElement;
+      if (!(div = (btn.nextElementSibling : any))) {
+        throw new Error('expected div; got ' + JSON.stringify(div));
+      }
+      if (div.nodeName !== 'DIV') {
+        div = div.nextElementSibling;
+        if (!div || div.nodeName !== 'DIV') {
+          throw new Error('expected div; got ' + (!div ? JSON.stringify(div) : div.nodeName));
+        }
+      }
+      const ol : HTMLOListElement = (div.lastChild : any);
+      if (!ol || ol.nodeName !== 'OL') {
+        throw new Error('expected ol; got ' + (!ol ? JSON.stringify(ol) : ol.nodeName));
+      }
+      if (!ol.children || !ol.children.length) {
+        throw new Error('ol has no children');
+      }
+      if (btn.className === 'remover') {
+        let minitems : string;
+        if (ol.hasAttribute('required') &&
+            ol.hasAttribute('minitems') &&
+            (minitems = (ol.getAttribute('minitems') : any)) &&
+            parseInt(minitems) === ol.children.length) {
+            const label : HTMLLabelElement = (div.firstChild : any);
+            if (!label || label.nodeName !== 'LABEL') {
+              throw new Error('expected label; got ' + (!label ? JSON.stringify(label) : label.nodeName));
+            }
+            alert(label.textContent + ' is required');
+        } else if (ol.children.length === 1) {
+          const li : HTMLLIElement = (ol.firstChild : any);
+          if (!li || li.nodeName !== 'LI') {
+            throw new Error('expected li; got ' + (!li ? JSON.stringify(li) : li.nodeName));
+          }
+          const inputs : HTMLInputElement[] = (Array.from(li.querySelectorAll('input')) : any);
+          for (let i = 0; i < inputs.length; i++) {
+            inputs[i].disabled = true;
+          }
+          li.hidden = true;
+        } else {
+          ol.removeChild((ol.lastChild : any));
+        }
+      } else if (btn.className === 'adder') {
+        const li : HTMLLIElement = (ol.firstChild : any);
+        if (!li || li.nodeName !== 'LI') {
+          throw new Error('expected li; got ' + (!li ? JSON.stringify(li) : li.nodeName));
+        }
+        if (ol.children.length === 1 && li.hidden) {
+          const inputs = Array.from(li.querySelectorAll('input'));
+          for (let i = 0; i < inputs.length; i++) {
+            (inputs[i] : any).disabled = false;
+          }
+          li.hidden = false;
+        } else {
+          const clone = li.cloneNode(true);
+          const inputs : HTMLInputElement[] = (Array.from(clone.querySelectorAll('input')) : any);
+          for (let i = 0; i < inputs.length; i++) {
+            if (inputs[i].type === 'checkbox') inputs[i].checked = false;
+            else if (inputs[i].type === 'text') inputs[i].value = '';
+            else throw new Error('unexpected input type: ' + inputs[i].type);
+          }
+          ol.appendChild(clone);
+        }
+      } else {
+        throw new Error('expected adder or remover btn; got ' + btn.className);
+      }
+  });
+}
+
 function objectToForm(obj: Object): HTMLFormElement {
   const elems = transform(obj, (val) => {
     return valueToElement(val);
@@ -376,6 +467,8 @@ function objectToForm(obj: Object): HTMLFormElement {
     form.appendChild(div);
   });
   form.appendChild(newInput('submit'));
+  addButtons(form);
+  addButtonListener(form);
   return form;
 }
 
@@ -384,11 +477,7 @@ function getInputs(elem: HTMLElement): HTMLInputElement[] {
     const input: HTMLInputElement = (elem: any);
     return [input];
   }
-  return (elem.querySelectorAll('input') : any);
-  // if (!elem.children) return [];
-  // return Array.from(elem.children).reduce((result, child) => {
-  //  return result.concat(getInputs(child));
-  // }, []);
+  return (Array.from(elem.querySelectorAll('input')) : any);
 }
 
 function hasInputValue(input: HTMLInputElement): boolean {
@@ -664,6 +753,8 @@ function schemaToForm(schema: Object): HTMLFormElement {
   setSchema(form, false, schema, subschemas, 'anyOf');
   setSchema(form, false, schema, subschemas, 'oneOf');
   form.appendChild(newInput('submit'));
+  addButtons(form);
+  addButtonListener(form);
   return form;
 }
 

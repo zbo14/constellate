@@ -53,7 +53,7 @@ exports.hdkeyFromMnemonic = hdkeyFromMnemonic;
 
 const rpcUrl = 'http://localhost:8545';
 
-let engine, web3;
+let web3;
 
 function compileSource(source: string): Promise<Object> {
   return new Promise((resolve, reject) => {
@@ -67,7 +67,6 @@ function compileSource(source: string): Promise<Object> {
 function deployContract(from: string, source: string): Promise<Object> {
   return new Promise((resolve, reject) => {
     compileSource(source).then((compiled) => {
-      console.log(compiled);
       const contract = newContract(compiled);
       const data = compiled.code;
       web3.eth.estimateGas({ data }, (err, gas) => {
@@ -86,14 +85,26 @@ function newContract(compiled: Object): Object {
 }
 
 function callContract(
-  contract: Object, from: string, gas: number, method: string,
+  contract: Object, from: string, method: string,
   params: any[], to: string, value: number): Promise<any> {
   const instance = contract.at(to);
   value *= 1.0e18;
   return new Promise((resolve, reject) => {
-    instance[method].call(...params, { from, gas, value }, (err, val) => {
+    instance[method].estimateGas((err, gas) => {
       if (err) return reject(err);
-      resolve(val);
+      instance[method].call(...params, { from, gas, value }, (err, val) => {
+        if (err) return reject(err);
+        resolve(val);
+      });
+    });
+  });
+}
+
+function getAccountAddrs(): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    web3.eth.getAccounts((err, addrs) => {
+      if (err) return reject(err);
+      resolve(addrs);
     });
   });
 }
@@ -120,40 +131,8 @@ function getTransaction(hash: string): Promise<Object> {
   });
 }
 
-function sendEther(from: string, to: string, value: number): Promise<string> {
-  value *= 1.0e18;
-  return new Promise((resolve, reject) => {
-    web3.eth.sendTransaction({ from, to, value }, (err, hash) => {
-      if (err) return reject(err);
-      resolve(hash);
-    });
-  });
-}
-
-function sendTransaction(
-  contract: Object, from: string, gas: number, method: string,
-  params: any[], to: string, value: number): Promise<string> {
-  const instance = contract.at(to);
-  value *= 1.0e18;
-  return new Promise((resolve, reject) => {
-    instance[method].sendTransaction(...params, { from, gas, value }, (err, hash) => {
-      if (err) return reject(err);
-      resolve(hash);
-    });
-  });
-}
-
-function signData(addr: string, data: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    web3.eth.sign(addr, web3.sha3(data), (err, sig) => {
-      if (err) return reject(err);
-      resolve(sig);
-    });
-  });
-}
-
-function setSignerProvider(input: string) {
-  const signer = new SignerProvider(rpcUrl, {
+function newSignerProvider(input: string): Object {
+  return new SignerProvider(rpcUrl, {
     accounts: (cb) => {
       const password = prompt('Please enter password', '');
       if (!password) {
@@ -171,19 +150,59 @@ function setSignerProvider(input: string) {
       cb(null, sign(rawTx, '0x' + wallet.getPrivateKey().toString('hex')));
     }
   });
-  web3 = new Web3(signer);
+}
+
+function sendEther(from: string, to: string, value: number): Promise<string> {
+  value *= 1.0e18;
+  return new Promise((resolve, reject) => {
+    web3.eth.sendTransaction({ from, to, value }, (err, hash) => {
+      if (err) return reject(err);
+      resolve(hash);
+    });
+  });
+}
+
+function sendTransaction(
+  contract: Object, from: string, method: string,
+  params: any[], to: string, value: number): Promise<string> {
+  const instance = contract.at(to);
+  value *= 1.0e18;
+  return new Promise((resolve, reject) => {
+    return instance[method].estimateGas((err, gas) => {
+      if (err) return reject(err);
+      instance[method].sendTransaction(...params, { from, gas, value }, (err, hash) => {
+        if (err) return reject(err);
+        resolve(hash);
+      });
+    });
+  });
+}
+
+function setWeb3Provider(provider: Object) {
+  web3 = new Web3(provider);
+}
+
+function signData(addr: string, data: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    web3.eth.sign(addr, web3.sha3(data), (err, sig) => {
+      if (err) return reject(err);
+      resolve(sig);
+    });
+  });
 }
 
 exports.callContract = callContract;
 exports.compileSource = compileSource;
 exports.deployContract = deployContract;
+exports.getAccountAddrs = getAccountAddrs;
 exports.getAccountDetails = getAccountDetails;
 exports.getTransaction = getTransaction;
 exports.newContract = newContract;
+exports.newSignerProvider = newSignerProvider;
 exports.sendEther = sendEther;
 exports.sendTransaction = sendTransaction;
+exports.setWeb3Provider = setWeb3Provider;
 exports.signData = signData;
-exports.setSignerProvider = setSignerProvider;
 
 /*
 
@@ -215,8 +234,8 @@ exports.setSignerProvider = setSignerProvider;
 
 */
 
-function setProviderEngine(wallet: Object) {
-  engine = new ProviderEngine();
+function newProviderEngine(wallet: Object): Object {
+  const engine = new ProviderEngine();
   engine.addProvider(new RpcSubprovider({ rpcUrl }));
   engine.addProvider(new HookedWalletTxSubprovider({
     getAccounts: function(cb) {
@@ -229,17 +248,7 @@ function setProviderEngine(wallet: Object) {
       cb(null, wallet.getPrivateKey());
     }
   }));
-  web3 = new Web3(engine);
+  return engine;
 }
 
-function startProvider() {
-  engine.start();
-}
-
-function stopProvider() {
-  engine.stop();
-}
-
-exports.setProviderEngine = setProviderEngine;
-exports.startProvider = startProvider;
-exports.stopProvider = stopProvider;
+exports.newProviderEngine = newProviderEngine;

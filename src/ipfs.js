@@ -56,7 +56,7 @@ function addFile(data: Buffer|ReadableStream, path: string): Promise<Object> {
     content: data,
     path: path
   }).then((result) => {
-    return result[0];
+    return result[0].hash;
   });
 }
 

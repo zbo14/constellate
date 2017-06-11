@@ -10,14 +10,16 @@ const {
   defaultWallet,
   deployContract,
   generateMnemonic,
+  getAccountAddrs,
   getAccountDetails,
   getTransaction,
   hdkeyFromMnemonic,
   newContract,
+  newSignerProvider,
   sendEther,
   sendTransaction,
   signData,
-  setSignerProvider
+  setWeb3Provider
 } = require('./lib/ethereum.js');
 
 const {
@@ -81,7 +83,6 @@ const getDataBtn = document.getElementById('get-data-btn');
 const getFileBtn = document.getElementById('get-file-btn');
 const getTxBtn = document.getElementById('get-tx-btn');
 const importHashesBtn = document.getElementById('import-hashes-btn');
-// const newWalletBtn = document.getElementById('new-wallet-btn');
 const saveDataHashBtn = document.getElementById('save-data-hash-btn');
 const saveFileHashBtn = document.getElementById('save-file-hash-btn');
 const sendEtherBtn = document.getElementById('send-ether-btn');
@@ -93,6 +94,19 @@ const startPeerBtn = document.getElementById('start-peer-btn');
 let hashes = {};
 let from = '';
 
+window.addEventListener('load', () => {
+  if (web3) {
+    setWeb3Provider(web3.currentProvider);
+    console.log('Set Web3 Provider!')
+    getAccountAddrs().then((addrs) => {
+      from = addrs[0];
+      console.log('Account:', from);
+    });
+  } else {
+    console.warn('could not get web3 provider from MetaMask');
+  }
+});
+
 callContractBtn.addEventListener('click', () => {
   if (contractSource.files.length) {
     readFileInput(contractSource, 'text').then((source) => {
@@ -103,7 +117,7 @@ callContractBtn.addEventListener('click', () => {
       const params = JSON.parse(`[${methodParams.value}]`);
       const to = sendTo.value;
       const value = parseFloat(sendValue.value);
-      return callContract(contract, from, 2000000, method, params, to, value);
+      return callContract(contract, from, method, params, to, value);
     }).then((val) => {
       console.log('Result:', val);
     });
@@ -121,7 +135,6 @@ clearFilesBtn.addEventListener('click', () => {
 deployContractBtn.addEventListener('click', () => {
   if (contractSource.files.length) {
     readFileInput(contractSource, 'text').then((source) => {
-      console.log(source);
       return deployContract(from, source);
     }).then((deployed) => {
       sendTo.value = deployed.address;
@@ -162,23 +175,6 @@ importHashesBtn.addEventListener('click', () => {
     });
   }
 });
-
-/*
-
-newWalletBtn.addEventListener('click', () => {
-  const entropy = prompt('Please enter some random text for entropy', '');
-  const mnemonic = generateMnemonic(entropy);
-  const hdkey = hdkeyFromMnemonic(mnemonic);
-  const wallet = defaultWallet(hdkey);
-  const password = prompt('Please enter a password', '');
-  if (!password) return;
-  from = wallet.getAddressString();
-  const input = wallet.toV3String(password);
-  setSignerProvider(input);
-  console.log('Address:', from);
-});
-
-*/
 
 saveDataHashBtn.addEventListener('click', () => {
   if (dataHash.value) {
@@ -221,7 +217,7 @@ sendTxBtn.addEventListener('click', () => {
       const params = JSON.parse(`[${methodParams.value}]`);
       const to = sendTo.value;
       const value = sendValue.value;
-      return sendTransaction(contract, from, 2000000, method, params, to, value);
+      return sendTransaction(contract, from, method, params, to, value);
     }).then((hash) => {
       txHash.value = hash;
       console.log('Sent transaction!');
@@ -238,7 +234,8 @@ setWalletBtn.addEventListener('click', () => {
   if (!password) return;
   from = wallet.getAddressString();
   const input = wallet.toV3String(password);
-  setSignerProvider(input);
+  const signer = newSignerProvider(input);
+  setWeb3Provider(signer);
   console.log('Address:', from);
 });
 
@@ -304,23 +301,6 @@ startPeerBtn.addEventListener('click', () => {
   });
 });
 
-function addButtons(form) {
-  Array.from(ols).forEach((ol, idx) => {
-    if (!ol.hidden && isAncestor(form, ol)) {
-      const remover = document.createElement('button');
-      remover.className = 'remover';
-      remover.id = 'remover-' + idx;
-      remover.textContent = '-';
-      form.insertBefore(remover, ol.parentElement);
-      const adder = document.createElement('button');
-      adder.className = 'adder';
-      adder.id = 'adder-' + idx;
-      adder.textContent = '+';
-      form.insertBefore(adder, remover);
-    }
-  });
-}
-
 const formHandler = () => {
   if (!schemaSelect.value || !formatSelect.value) return;
   formContainer.innerHTML = null;
@@ -345,7 +325,6 @@ const formHandler = () => {
     }
   }
   formContainer.appendChild(form);
-  addButtons(form);
 }
 
 formatSelect.addEventListener('change', formHandler);
@@ -376,59 +355,6 @@ document.body.addEventListener('keyup', (evt) => {
       }, 1000);
     }
   }
-});
-
-formContainer.addEventListener('click', (evt) => {
-    const btn = evt.target;
-    if (btn.nodeName !== 'BUTTON') return;
-    evt.preventDefault();
-    let div = btn.nextElementSibling;
-    if (div.nodeName !== 'DIV') {
-      div = div.nextElementSibling;
-      if (div.nodeName !== 'DIV') {
-        throw new Error('expected div; got ' + div.nodeName);
-      }
-    }
-    const ol = div.lastChild;
-    if (ol.nodeName !== 'OL') {
-      throw new Error('expected ol; got ' + ol.nodeName);
-    }
-    if (btn.className === 'remover') {
-      if (!ol.children.length) {
-        throw new Error('ol has no children');
-      }
-      if (ol.hasAttribute('required') &&
-          ol.hasAttribute('minitems') &&
-          parseInt(ol.attributes.minitems.value) === ol.children.length) {
-          const label = div.firstChild;
-          if (label.nodeName !== 'LABEL') {
-            throw new Error('expected label; got ' + label.nodeName);
-          }
-          alert(label.textContent + ' is required');
-      } else if (ol.children.length === 1) {
-        const li = ol.firstChild;
-        getInputs(li).forEach((input) => input.disabled = true);
-        li.hidden = true;
-      } else {
-        ol.removeChild(ol.lastChild);
-      }
-    } else if (btn.className === 'adder') {
-      const li = ol.firstChild;
-      if (ol.children.length === 1 && li.hidden) {
-        getInputs(li).forEach((input) => input.disabled = false);
-        li.hidden = false;
-      } else {
-        const clone = li.cloneNode(true);
-        getInputs(clone).forEach((input) => {
-          if (input.type === 'checkbox') input.checked = false;
-          else if (input.type === 'text') input.value = null;
-          else throw new Error('unexpected input type: ' + input.type);
-        });
-        ol.appendChild(clone);
-      }
-    } else {
-      throw new Error('expected adder or remover btn; got ' + btn.className);
-    }
 });
 
 formContainer.addEventListener('submit', (evt) => {
