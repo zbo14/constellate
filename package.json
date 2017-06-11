@@ -8,12 +8,13 @@
   "scripts": {
     "build": "babel src/ -d lib/",
     "bundle": "browserify index.js --require browserify-zlib-next:zlib > bundle.js",
-    "_comment": "test command from https://github.com/Envoke-org/envokeJS/blob/master/package.json",
+    "_comment": "test command from https://github.com/ipfs/js-ipfs/blob/master/examples/bundle-browserify/package.json",
     "flow": "flow --show-all-errors",
     "flow:file": "read -p 'Enter filename: ' filename && export FILENAME=$filename && flow check-contents < src/${FILENAME}",
     "gulp": "gulp",
     "remove-types:file": "read -p 'Enter filename: ' filename && export FILENAME=$filename && flow-remove-types src/${FILENAME} | js-beautify -o lib/${FILENAME}",
-    "test": "mocha --compilers js:babel-core/register --require babel-polyfill --recursive './test/*-test.js'"
+    "test": "mocha --compilers js:babel-core/register --require babel-polyfill --recursive './test/*-test.js'",
+    "_comment": "test command from https://github.com/Envoke-org/envokeJS/blob/master/package.json"
   },
   "babel": {
     "presets": [
@@ -21,7 +22,7 @@
       "flow"
     ]
   },
-  "devDependencies": {
+  "dependencies": {
     "ajv": "^5.0.0",
     "babel-cli": "^6.24.1",
     "babel-plugin-syntax-flow": "^6.18.0",
@@ -29,12 +30,15 @@
     "babel-plugin-typecheck": "^3.9.0",
     "babel-preset-es2015": "^6.24.1",
     "babel-preset-flow": "^6.23.0",
+    "bip39": "^2.3.1",
     "browserify": "^14.3.0",
     "bs58": "^4.0.0",
     "chai": "^3.5.0",
     "cids": "^0.5.0",
     "eslint": "^3.19.0",
+    "ethjs-provider-signer": "^0.1.4",
     "ethereumjs-util": "^5.1.1",
+    "ethereumjs-wallet": "^0.6.0",
     "flow-bin": "^0.44.0",
     "flow-remove-types": "^1.2.1",
     "gulp": "^3.9.1",
@@ -60,6 +64,8 @@
     "tweetnacl": "^1.0.0-rc.1",
     "urlsafe-base64": "^1.0.0",
     "vinyl-buffer": "^1.0.0",
-    "vinyl-source-stream": "^1.1.0"
+    "vinyl-source-stream": "^1.1.0",
+    "web3": "^0.19.0",
+    "web3-provider-engine": "^12.2.3"
   }
 }

@@ -3,9 +3,27 @@
     <title>constellate</title>
   </head>
   <body>
+    <!--<button id='new-wallet-btn'>new wallet</button>-->
+    <button id='set-wallet-btn'>set wallet</button><br>
+    <button id='get-account-details-btn'>get account details</button><br><br>
+    <button id='get-tx-btn'>get tx</button><input type='text' id='tx-hash' /><br><br>
+    <label>contract method</label>
+    <input type='text' id='contract-method' /><br>
+    <label>contract source</label>
+    <input type='file' id='contract-source' /><button id='deploy-contract-btn'>deploy contract</button><br>
+    <label>method params</label>
+    <input type='text' id='method-params' /><br>
+    <label>send to</label>
+    <input type='text' id='send-to' /><br>
+    <label>send value</label>
+    <input type='text' id='send-value' /><br>
+    <button id='call-contract-btn'>call contract</button>
+    <button id='send-ether-btn'>send ether</button>
+    <button id='send-tx-btn'>send tx</button><br><br>
     <button id='start-peer-btn'>start peer</button><br><br>
     <button id='add-data-btn'>add data</button><br>
-    <button id='get-data-btn'>get data</button><input type='text' id='data-hash' /><button id='save-data-hash-btn'>save hash</button><br>
+    <button id='get-data-btn'>get data</button>
+    <button id='sign-data-btn'>sign data</button><input type='text' id='data-hash' /><button id='save-data-hash-btn'>save hash</button><br>
     <button id='clear-data-btn'>clear data</button><br>
     <button id='export-hashes-btn'>export hashes</button><a id='export-hashes' download='hashes.json'>hashes</a><br>
     <button id='import-hashes-btn'>import hashes</button><input id='import-hashes' type='file' accept='application/json' /><br><br>

@@ -1,10 +1,26 @@
+'use strict';
+
 const CID = require('cids');
 const { Context } = require('./lib/context.js');
-const { isDescendant } = require('./lib/util.js');
 require('setimmediate');
 
 const {
-  newAnchor,
+  callContract,
+  compileSource,
+  defaultWallet,
+  deployContract,
+  generateMnemonic,
+  getAccountDetails,
+  getTransaction,
+  hdkeyFromMnemonic,
+  newContract,
+  sendEther,
+  sendTransaction,
+  signData,
+  setSignerProvider
+} = require('./lib/ethereum.js');
+
+const {
   formToObject,
   getInputs,
   objectToForm,
@@ -12,7 +28,7 @@ const {
 } = require('./lib/form.js');
 
 const {
-  addFileInput,
+  addFile,
   getCBOR,
   getFile,
   putCBOR,
@@ -26,6 +42,14 @@ const {
   validate
 } = require('./lib/linked-data.js');
 
+const {
+  isAncestor,
+  newAnchor,
+  readFileInput
+} = require('./lib/util.js');
+
+const contractMethod = document.getElementById('contract-method');
+const contractSource = document.getElementById('contract-source');
 const data = document.getElementById('data');
 const dataHash = document.getElementById('data-hash');
 const exportHashes = document.getElementById('export-hashes');
@@ -34,8 +58,12 @@ const fileInput = document.getElementById('file-input');
 const files = document.getElementById('files');
 const formContainer = document.getElementById('form-container');
 const importHashes = document.getElementById('import-hashes');
+const methodParams = document.getElementById('method-params');
 const ols = document.getElementsByTagName('ol');
+const sendTo = document.getElementById('send-to');
+const sendValue = document.getElementById('send-value');
 const textarea = document.querySelector('textarea');
+const txHash = document.getElementById('tx-hash');
 
 const formatSelect = document.getElementById('format-select');
 const keySelect = document.getElementById('key-select');
@@ -43,17 +71,44 @@ const schemaSelect = document.getElementById('schema-select');
 
 const addDataBtn = document.getElementById('add-data-btn');
 const addFileBtn = document.getElementById('add-file-btn');
+const callContractBtn = document.getElementById('call-contract-btn');
 const clearDataBtn = document.getElementById('clear-data-btn');
 const clearFilesBtn = document.getElementById('clear-files-btn');
+const deployContractBtn = document.getElementById('deploy-contract-btn');
 const exportHashesBtn = document.getElementById('export-hashes-btn');
+const getAccountDetailsBtn = document.getElementById('get-account-details-btn');
 const getDataBtn = document.getElementById('get-data-btn');
 const getFileBtn = document.getElementById('get-file-btn');
+const getTxBtn = document.getElementById('get-tx-btn');
 const importHashesBtn = document.getElementById('import-hashes-btn');
+// const newWalletBtn = document.getElementById('new-wallet-btn');
 const saveDataHashBtn = document.getElementById('save-data-hash-btn');
 const saveFileHashBtn = document.getElementById('save-file-hash-btn');
+const sendEtherBtn = document.getElementById('send-ether-btn');
+const sendTxBtn = document.getElementById('send-tx-btn');
+const setWalletBtn = document.getElementById('set-wallet-btn');
+const signDataBtn = document.getElementById('sign-data-btn');
 const startPeerBtn = document.getElementById('start-peer-btn');
 
 let hashes = {};
+let from = '';
+
+callContractBtn.addEventListener('click', () => {
+  if (contractSource.files.length) {
+    readFileInput(contractSource, 'text').then((source) => {
+      return compileSource(source);
+    }).then((compiled) => {
+      const contract = newContract(compiled);
+      const method = contractMethod.value;
+      const params = JSON.parse(`[${methodParams.value}]`);
+      const to = sendTo.value;
+      const value = parseFloat(sendValue.value);
+      return callContract(contract, from, 2000000, method, params, to, value);
+    }).then((val) => {
+      console.log('Result:', val);
+    });
+  }
+});
 
 clearDataBtn.addEventListener('click', () => {
   data.innerHTML = null;
@@ -63,6 +118,19 @@ clearFilesBtn.addEventListener('click', () => {
   files.innerHTML = null;
 });
 
+deployContractBtn.addEventListener('click', () => {
+  if (contractSource.files.length) {
+    readFileInput(contractSource, 'text').then((source) => {
+      console.log(source);
+      return deployContract(from, source);
+    }).then((deployed) => {
+      sendTo.value = deployed.address;
+      txHash.value = deployed.transactionHash;
+      console.log('Deployed contract!');
+    });
+  }
+});
+
 exportHashesBtn.addEventListener('click', () => {
   if (Object.keys(hashes).length) {
     const blob = new Blob([JSON.stringify(hashes, null, 2)], { type: 'application/json' });
@@ -70,16 +138,47 @@ exportHashesBtn.addEventListener('click', () => {
   }
 });
 
-importHashesBtn.addEventListener('click', () => {
-  if (importHashes.files.length) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      hashes = JSON.parse(reader.result);
-      console.log('hashes:', JSON.stringify(hashes, null, 2));
-    }
-    reader.readAsText(importHashes.files[0]);
+getAccountDetailsBtn.addEventListener('click', () => {
+  if (from) {
+    getAccountDetails(from).then((details) => {
+      console.log('Account Details:', JSON.stringify(details, null, 2));
+    });
   }
 });
+
+getTxBtn.addEventListener('click', () => {
+  if (txHash.value) {
+    getTransaction(txHash.value).then((tx) => {
+      console.log(JSON.stringify(tx, null, 2));
+    });
+  }
+});
+
+importHashesBtn.addEventListener('click', () => {
+  if (importHashes.files.length) {
+    readFileInput(importHashes, 'text').then((result) => {
+      hashes = JSON.parse(result);
+      console.log('hashes:', JSON.stringify(hashes, null, 2));
+    });
+  }
+});
+
+/*
+
+newWalletBtn.addEventListener('click', () => {
+  const entropy = prompt('Please enter some random text for entropy', '');
+  const mnemonic = generateMnemonic(entropy);
+  const hdkey = hdkeyFromMnemonic(mnemonic);
+  const wallet = defaultWallet(hdkey);
+  const password = prompt('Please enter a password', '');
+  if (!password) return;
+  from = wallet.getAddressString();
+  const input = wallet.toV3String(password);
+  setSignerProvider(input);
+  console.log('Address:', from);
+});
+
+*/
 
 saveDataHashBtn.addEventListener('click', () => {
   if (dataHash.value) {
@@ -101,9 +200,60 @@ saveFileHashBtn.addEventListener('click', () => {
   }
 });
 
+sendEtherBtn.addEventListener('click', () => {
+  const to = sendTo.value;
+  const value = sendValue.value;
+  if (to && value) {
+    sendEther(from, to, value).then((hash) => {
+      txHash.value = hash;
+      console.log('Sent ether');
+    });
+  }
+});
+
+sendTxBtn.addEventListener('click', () => {
+  if (contractSource.files.length) {
+    readFileInput(contractSource, 'text').then((source) => {
+      return compileSource(source);
+    }).then((compiled) => {
+      const contract = newContract(compiled);
+      const method = contractMethod.value;
+      const params = JSON.parse(`[${methodParams.value}]`);
+      const to = sendTo.value;
+      const value = sendValue.value;
+      return sendTransaction(contract, from, 2000000, method, params, to, value);
+    }).then((hash) => {
+      txHash.value = hash;
+      console.log('Sent transaction!');
+    });
+  }
+});
+
+setWalletBtn.addEventListener('click', () => {
+  const mnemonic = prompt('Please enter mnemonic', '');
+  if (!mnemonic) return;
+  const hdkey = hdkeyFromMnemonic(mnemonic);
+  const wallet = defaultWallet(hdkey);
+  const password = prompt('Please enter a password', '');
+  if (!password) return;
+  from = wallet.getAddressString();
+  const input = wallet.toV3String(password);
+  setSignerProvider(input);
+  console.log('Address:', from);
+});
+
+signDataBtn.addEventListener('click', () => {
+  const data = dataHash.value;
+  if (data) {
+    signData(from, data).then((sig) => {
+      console.log('Signature:', sig);
+    });
+  }
+});
+
 startPeerBtn.addEventListener('click', () => {
-  startPeer().then((info) => {
-    console.log('Peer info:', info);
+  startPeer().then((details) => {
+    console.log('Peer details:', details);
     putCBOR(Context).then((cid) => {
       hashes.context = cid.toBaseEncodedString();
     });
@@ -119,7 +269,11 @@ startPeerBtn.addEventListener('click', () => {
     });
     addFileBtn.addEventListener('click', () => {
       if (fileInput.files.length) {
-        addFileInput(fileInput).then((result) => {
+        readFileInput(fileInput, 'array-buffer').then((ab) => {
+          const buf = Buffer.from(ab);
+          const path = fileInput.files[0].name;
+          return addFile(buf, path);
+        }).then((result) => {
           console.log('Added file!');
           fileHash.value = result.hash;
         });
@@ -152,7 +306,7 @@ startPeerBtn.addEventListener('click', () => {
 
 function addButtons(form) {
   Array.from(ols).forEach((ol, idx) => {
-    if (!ol.hidden && isDescendant(form, ol)) {
+    if (!ol.hidden && isAncestor(form, ol)) {
       const remover = document.createElement('button');
       remover.className = 'remover';
       remover.id = 'remover-' + idx;

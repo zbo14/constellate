@@ -68,11 +68,11 @@ function isBoolean(bool: any): boolean {
   return bool != null && typeof bool === 'boolean';
 }
 
-function isDescendant(ancestor: HTMLElement, elem: HTMLElement): boolean {
+function isAncestor(ancestor: HTMLElement, elem: HTMLElement): boolean {
   if (!elem) return false;
   if (ancestor == elem) return true;
   const parent: HTMLElement = (elem.parentElement: any);
-  return isDescendant(ancestor, parent);
+  return isAncestor(ancestor, parent);
 }
 
 function isNumber(num: any): boolean {
@@ -117,11 +117,18 @@ function promiseSeq(...fns: Function[]): Promise<any> {
     }, Promise.resolve()).catch(console.error);
 }
 
-function readFileInput(input: HTMLInputElement): Promise<ArrayBuffer> {
+function readFileInput(input: HTMLInputElement, readAs: string): Promise<ArrayBuffer> {
   const reader = new FileReader();
   return new Promise((resolve, reject) => {
     reader.onload = () => resolve(reader.result);
-    reader.readAsArrayBuffer(input.files[0]);
+    const file = input.files[0];
+    if (readAs === 'array-buffer') {
+      reader.readAsArrayBuffer(file);
+    } else if (readAs === 'text') {
+      reader.readAsText(file);
+    } else {
+      throw new Error('unexpected readAs: ' + readAs);
+    }
   });
 }
 
@@ -175,9 +182,9 @@ exports.digestSHA3 = digestSHA3;
 exports.encodeBase58 = encodeBase58;
 exports.encodeBase64 = encodeBase64;
 exports.hasKeys = hasKeys;
+exports.isAncestor = isAncestor;
 exports.isArray = isArray;
 exports.isBoolean = isBoolean;
-exports.isDescendant = isDescendant;
 exports.isNumber = isNumber;
 exports.isObject = isObject;
 exports.isString = isString;
@@ -190,3 +197,47 @@ exports.transform = transform;
 exports.traverse = traverse;
 exports.withoutIndex = withoutIndex;
 exports.withoutKeys = withoutKeys;
+
+/*
+
+The following code is adapted from..
+https://github.com/ipfs/js-ipfs/blob/master/examples/transfer-files/public/js/app.js#L58
+
+------------------------------- LICENSE -------------------------------
+
+The MIT License (MIT)
+
+Copyright (c) 2014 Juan Batiz-Benet
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+*/
+
+function newAnchor(data: Buffer[], type: string): HTMLAnchorElement {
+  const a = document.createElement('a');
+  const blob = new Blob(data, { type });
+  const filename = blob.type.replace('/', '.');
+  const url = URL.createObjectURL(blob);
+  a.setAttribute('href', url);
+  a.setAttribute('download', filename);
+  a.innerText = filename;
+  return a;
+}
+
+exports.newAnchor = newAnchor;

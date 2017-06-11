@@ -39,12 +39,8 @@ const os = require('os');
 const path = require('path');
 
 const {
-  encodeBase58,
   isObject,
-  orderStringify,
-  readFileInput,
-  transform,
-  withoutKeys
+  transform
 } = require('../lib/util.js');
 
 // @flow
@@ -61,14 +57,6 @@ function addFile(data: Buffer|ReadableStream, path: string): Promise<Object> {
     path: path
   }).then((result) => {
     return result[0];
-  });
-}
-
-function addFileInput(fileInput: HTMLInputElement): Promise<Object> {
-  return readFileInput(fileInput).then((ab) => {
-    const buf = Buffer.from(ab);
-    const path = fileInput.files[0].name;
-    return addFile(buf, path);
   });
 }
 
@@ -163,7 +151,6 @@ function startPeer() {
 }
 
 exports.addFile = addFile;
-exports.addFileInput = addFileInput;
 exports.getCBOR = getCBOR;
 exports.getFile = getFile;
 exports.putCBOR = putCBOR;
