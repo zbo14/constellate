@@ -22,8 +22,8 @@ const {
 // @flow
 
 /**
-* @module constellate/src/form
-*/
+ * @module constellate/src/form
+ */
 
 function newInput(type: string, val?: any): HTMLInputElement {
   const input = document.createElement('input');

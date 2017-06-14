@@ -1,5 +1,4 @@
-const { Context } = require('../lib/context.js');
-const { promiseSeq } = require('../lib/util.js');
+const { promiseSequence } = require('../lib/util.js');
 
 const {
   createReadStream,
@@ -13,87 +12,100 @@ const {
   startPeer
 } = require('../lib/ipfs.js');
 
+const data = {};
 const hashes = {};
-const objs = {};
 
 function setDataHash(name) {
-  return putCBOR(objs[name]).then((cid) => {
+  return putCBOR(data[name]).then((cid) => {
     hashes[name] = cid.toBaseEncodedString();
   });
 }
 
 function setFileHash(path) {
   const readStream = createReadStream(__dirname + path);
-  return addFile(readStream, '').then((result) => {
-    hashes[path] = result.hash;
+  return addFile(readStream, '').then((hash) => {
+    hashes[path] = hash;
   });
 }
 
-objs.context = Context;
+startPeer().then(() => {
 
-promiseSeq(
-  startPeer,
-  () => setDataHash('context')
+  data.externalAccount = {
+    '@context': 'http://ethon.consensys.net/',
+    '@type': 'ExternalAccount',
+    accountPublicKey: '0x9679ef1d1b14e180244409421d55875e9c705012e89846546dbb7ceb00e4213797e2e2235b55e51521ad0a468fa05cd2df70dc6d937883cde3bff7bb01b0f43b',
+    address: '0xc7b0395675becc4e2947b2a287e9dc1ed3133e61'
+  }
 
-).then(() => {
+  writeFileSync(__dirname + '/ethon/external-account.json', JSON.stringify(data.externalAccount));
 
-  objs.composer = {
-      '@context': { '/': hashes.context },
+  return setDataHash('externalAccount');
+
+}).then(() => {
+
+  data.composer = {
+      '@context': 'http://schema.org/',
       '@type': 'Person',
+      birthDate: '1995-01-01',
+      controlsAccount: [{ '/': hashes.externalAccount }],
       email: 'composer@example.com',
-      name: 'composer',
-      url: 'http://composer.com'
+      familyName: 'lastName',
+      givenName: 'firstName',
+      url: 'http://composer-homepage.com'
   }
 
-  objs.lyricist = {
-      '@context': { '/': hashes.context },
+  data.lyricist = {
+      '@context': 'http://schema.org/',
       '@type': 'Person',
+      birthDate: '1995-01-02',
       email: 'lyricist@example.com',
-      name: 'lyricist',
-      url: 'http://lyricist.com'
+      familyName: 'smith',
+      givenName: 'word',
+      url: 'http://lyricist-homepage.com'
   }
 
-  objs.performer = {
-      '@context': { '/': hashes.context },
+  data.performer = {
+      '@context': 'http://schema.org/',
       '@type': 'MusicGroup',
       email: 'performer@example.com',
       name: 'performer',
       sameAs: ['http://bandcamp-page.com'],
-      url: 'http://performer.com'
+      url: 'http://performer-homepage.com'
   }
 
-  objs.producer = {
-      '@context': { '/': hashes.context },
+  data.producer = {
+      '@context': 'http://schema.org/',
       '@type': 'Person',
-      name: 'producer',
+      birthDate: '1995-01-03',
+      familyName: 'lastName',
+      givenName: 'firstName',
       sameAs: ['http://soundcloud-page.com'],
-      url: 'http://producer.com'
+      url: 'http://producer-homepage.com'
   }
 
-  objs.publisher = {
-      '@context': { '/': hashes.context },
+  data.publisher = {
+      '@context': 'http://schema.org/',
       '@type': 'Organization',
       email: 'publisher@example.com',
       name: 'publisher',
-      url: 'http://publisher.com'
+      url: 'http://publisher-homepage.com'
   }
 
-  objs.recordLabel = {
-      '@context': { '/': hashes.context },
+  data.recordLabel = {
+      '@context': 'http://schema.org/',
       '@type': 'Organization',
       email: 'recordLabel@example.com',
-      name: 'recordLabel',
-      url: 'http://recordLabel.com'
+      name: 'recordLabel'
   }
 
-  writeFileSync(__dirname + '/party/composer.json', JSON.stringify(objs.composer));
-  writeFileSync(__dirname + '/party/lyricist.json', JSON.stringify(objs.lyricist));
-  writeFileSync(__dirname + '/party/performer.json', JSON.stringify(objs.performer));
-  writeFileSync(__dirname + '/party/producer.json', JSON.stringify(objs.producer));
-  writeFileSync(__dirname + '/party/publisher.json', JSON.stringify(objs.publisher));
-  writeFileSync(__dirname + '/party/recordLabel.json', JSON.stringify(objs.recordLabel));
+  writeFileSync(__dirname + '/party/composer.json', JSON.stringify(data.composer));
+  writeFileSync(__dirname + '/party/lyricist.json', JSON.stringify(data.lyricist));
+  writeFileSync(__dirname + '/party/performer.json', JSON.stringify(data.performer));
+  writeFileSync(__dirname + '/party/producer.json', JSON.stringify(data.producer));
+  writeFileSync(__dirname + '/party/publisher.json', JSON.stringify(data.publisher));
+  writeFileSync(__dirname + '/party/recordLabel.json', JSON.stringify(data.recordLabel));
 
-  return promiseSeq(
+  return promiseSequence(
     () => setDataHash('composer'),
     () => setDataHash('lyricist'),
     () => setDataHash('performer'),
@@ -106,15 +118,15 @@ promiseSeq(
 
 }).then(() => {
 
-    objs.audio = {
-        '@context': { '/': hashes.context },
+    data.audio = {
+        '@context': 'http://schema.org/',
         '@type': 'AudioObject',
         contentUrl:  { '/': hashes['/test.mp3'] },
         encodingFormat: 'mp3'
     }
 
-    objs.composition = {
-        '@context': { '/': hashes.context },
+    data.composition = {
+        '@context': 'http://schema.org/',
         '@type': 'MusicComposition',
         composer: [{ '/': hashes.composer }],
         iswcCode: 'T-034.524.680-1',
@@ -123,18 +135,18 @@ promiseSeq(
         publisher: [{ '/': hashes.publisher }]
     }
 
-    objs.image = {
-        '@context': { '/': hashes.context },
+    data.image = {
+        '@context': 'http://schema.org/',
         '@type': 'ImageObject',
         contentUrl: { '/': hashes['/test.png'] },
         encodingFormat: 'png'
     }
 
-    writeFileSync(__dirname + '/meta/composition.json', JSON.stringify(objs.composition));
-    writeFileSync(__dirname + '/meta/audio.json', JSON.stringify(objs.audio));
-    writeFileSync(__dirname + '/meta/image.json', JSON.stringify(objs.image));
+    writeFileSync(__dirname + '/meta/composition.json', JSON.stringify(data.composition));
+    writeFileSync(__dirname + '/meta/audio.json', JSON.stringify(data.audio));
+    writeFileSync(__dirname + '/meta/image.json', JSON.stringify(data.image));
 
-    return promiseSeq(
+    return promiseSequence(
         () => setDataHash('audio'),
         () => setDataHash('composition'),
         () => setDataHash('image')
@@ -142,8 +154,8 @@ promiseSeq(
 
 }).then(() => {
 
-    objs.recording = {
-        '@context': { '/': hashes.context },
+    data.recording = {
+        '@context': 'http://schema.org/',
         '@type': 'MusicRecording',
         audio: [{ '/': hashes.audio }],
         byArtist: [{ '/': hashes.performer }],
@@ -152,14 +164,14 @@ promiseSeq(
         recordLabel: [{ '/': hashes.recordLabel }]
     }
 
-    writeFileSync(__dirname + '/meta/recording.json', JSON.stringify(objs.recording));
+    writeFileSync(__dirname + '/meta/recording.json', JSON.stringify(data.recording));
 
     return setDataHash('recording');
 
 }).then(() => {
 
-    objs.album = {
-        '@context': { '/': hashes.context },
+    data.album = {
+        '@context': 'http://schema.org/',
         '@type': 'MusicAlbum',
         albumProductionType: 'DemoAlbum',
         albumReleaseType: 'SingleRelease',
@@ -170,120 +182,110 @@ promiseSeq(
         track: [{ '/': hashes.recording }]
     }
 
-    objs.playlist = {
-      '@context': { '/': hashes.context },
+    data.playlist = {
+      '@context': 'http://schema.org/',
       '@type': 'MusicPlaylist',
       image: { '/': hashes.image },
       name: 'just 1 song',
       track: [{ '/': hashes.recording }]
     }
 
-    writeFileSync(__dirname + '/meta/album.json', JSON.stringify(objs.album));
-    writeFileSync(__dirname + '/meta/playlist.json', JSON.stringify(objs.playlist));
+    writeFileSync(__dirname + '/meta/album.json', JSON.stringify(data.album));
+    writeFileSync(__dirname + '/meta/playlist.json', JSON.stringify(data.playlist));
 
     return setDataHash('album');
 
 }).then(() => {
 
-  objs.release = {
-    '@context': { '/': hashes.context },
+  data.release = {
+    '@context': 'http://schema.org/',
     '@type': 'MusicRelease',
     musicReleaseFormat: 'DigitalFormat',
     recordLabel: [{ '/': hashes.recordLabel }],
     releaseOf: { '/': hashes.album }
   }
 
-  writeFileSync(__dirname + '/meta/release.json', JSON.stringify(objs.release));
+  writeFileSync(__dirname + '/meta/release.json', JSON.stringify(data.release));
 
   return setDataHash('release');
 
 }).then(() => {
-
-  objs.compositionCopyright = {
-    '@context': { '/': hashes.context },
+  data.compositionCopyright = {
+    '@context': 'http://coalaip.org/',
     '@type': 'Copyright',
     rightsOf: { '/': hashes.composition },
     territory: {
       '@type': 'Place',
-      name: 'US'
+      geo: {
+        '@type': 'GeoCoordinates',
+        addressCountry: 'US'
+      }
     },
     validFrom: '2018-01-01T00:00:00Z',
     validThrough: '2088-01-01T00:00:00Z'
   }
 
-  objs.compositionLicense = {
-    '@context': { '/': hashes.context },
-    '@type': 'CreativeWork',
-    text: 'some text for composition license...'
+  data.contractAccount = {
+    '@context': 'http://ethon.consensys.net/',
+    '@type': 'ContractAccount',
+    accountCodeHash: 'YZXy2LY8zNi5RffMoaGJBnwNz9QnapUx118dMfeWA+M=',
+    address: '0xff2409ea254d83d2fcb6b62b85553d5fb87008fc'
   }
 
-  objs.compositionRightContract = {
-    '@context': { '/': hashes.context },
-    '@type': 'CreativeWork',
-    text: 'some text saying composition right is assigned to publisher...'
-  }
-
-  objs.recordingCopyright = {
-    '@context': { '/': hashes.context },
+  data.recordingCopyright = {
+    '@context': 'http://coalaip.org/',
     '@type': 'Copyright',
     rightsOf: { '/': hashes.recording },
     territory: {
       '@type': 'Place',
-      name: 'US'
+      geo: {
+        '@type': 'GeoCoordinates',
+        addressCountry: 'US'
+      }
     },
     validFrom: '2017-10-01T00:00:00Z',
     validTo: '2076-10-01T00:00:00Z'
   }
 
-  objs.recordingLicense = {
-    '@context': { '/': hashes.context },
-    '@type': 'CreativeWork',
-    text: 'some text for recording license...'
-  }
+  writeFileSync(__dirname + '/coala/composition-copyright.json', JSON.stringify(data.compositionCopyright));
+  writeFileSync(__dirname + '/ethon/contract-account.json', JSON.stringify(data.contractAccount));
+  writeFileSync(__dirname + '/coala/recording-copyright.json', JSON.stringify(data.recordingCopyright));
 
-  objs.recordingRightContract =  {
-    '@context': { '/': hashes.context },
-    '@type': 'CreativeWork',
-    text: 'some text saying recording right is assigned to record label...'
-  }
-
-  writeFileSync(__dirname + '/coala/composition-copyright.json', JSON.stringify(objs.compositionCopyright));
-  writeFileSync(__dirname + '/coala/composition-license.json', JSON.stringify(objs.compositionLicense));
-  writeFileSync(__dirname + '/coala/composition-right-contract.json', JSON.stringify(objs.compositionRightContract));
-
-  writeFileSync(__dirname + '/coala/recording-copyright.json', JSON.stringify(objs.recordingCopyright));
-  writeFileSync(__dirname + '/coala/recording-license.json', JSON.stringify(objs.recordingLicense));
-  writeFileSync(__dirname + '/coala/recording-right-contract.json', JSON.stringify(objs.recordingRightContract));
-
-  return promiseSeq(
+  return promiseSequence(
     () => setDataHash('compositionCopyright'),
-    () => setDataHash('compositionLicense'),
-    () => setDataHash('compositionRightContract'),
-    () => setDataHash('recordingCopyright'),
-    () => setDataHash('recordingLicense'),
-    () => setDataHash('recordingRightContract')
+    () => setDataHash('contractAccount'),
+    () => setDataHash('recordingCopyright')
   );
 
 }).then(() => {
 
-  objs.compositionCopyrightAssertion = {
-    '@context': { '/': hashes.context },
+  data.compositionCopyrightAssertion = {
+    '@context': [
+      'http://coalaip.org/',
+      'http://schema.org/'
+    ],
     '@type': 'ReviewAction',
     asserter: { '/': hashes.composer },
     assertionSubject: { '/': hashes.compositionCopyright },
     assertionTruth: true
   }
 
-  objs.compositionRight = {
-    '@context': { '/': hashes.context },
+  data.compositionRight = {
+    '@context': [
+      'http://coalaip.org/',
+      'http://schema.org/'
+    ],
     '@type': 'Right',
     exclusive: true,
-    license: { '/': hashes.compositionLicense },
+    license: { '/': hashes.contractAccount },
     percentageShares: 70,
     rightContext: ['commercial'],
     territory: {
       '@type': 'Place',
-      name: 'US'
+      geo: {
+        '@type': 'GeoCoordinates',
+        addressCountry: 'US'
+      }
     },
     usageType: ['publish'],
     source: { '/': hashes.compositionCopyright },
@@ -291,14 +293,17 @@ promiseSeq(
     validThrough: '2068-01-01T00:00:00Z'
   }
 
-  objs.compositionRightAssignment = {
-    '@context': { '/': hashes.context },
+  data.compositionRightAssignment = {
+    '@context': 'http://coalaip.org/',
     '@type': 'RightsTransferAction',
-    transferContract: { '/': hashes.compositionRightContract }
+    transferContract: { '/': hashes.contractAccount }
   }
 
-  objs.recordingCopyrightAssertion = {
-    '@context': { '/': hashes.context },
+  data.recordingCopyrightAssertion = {
+    '@context': [
+      'http://coalaip.org/',
+      'http://schema.org/'
+    ],
     '@type': 'ReviewAction',
     asserter: { '/': hashes.performer },
     assertionSubject: { '/': hashes.recordingCopyright },
@@ -306,16 +311,22 @@ promiseSeq(
     error: 'validThrough'
   }
 
-  objs.recordingRight = {
-    '@context': { '/': hashes.context },
+  data.recordingRight = {
+    '@context': [
+      'http://coalaip.org/',
+      'http://schema.org/'
+    ],
     '@type': 'Right',
     exclusive: true,
-    license: { '/': hashes.recordingLicense },
+    license: { '/': hashes.contractAccount },
     percentageShares: 60,
     rightContext: ['commercial'],
     territory: {
       '@type': 'Place',
-      name: 'US'
+      geo: {
+        '@type': 'GeoCoordinates',
+        addressCountry: 'US'
+      }
     },
     usageType: ['play', 'sell'],
     source: { '/': hashes.recordingCopyright },
@@ -323,22 +334,20 @@ promiseSeq(
     validThrough: '2057-10-01T00:00:00Z'
   }
 
-  objs.recordingRightAssignment = {
-    '@context': { '/': hashes.context },
+  data.recordingRightAssignment = {
+    '@context': 'http://coalaip.org/',
     '@type': 'RightsTransferAction',
-    transferContract: { '/': hashes.recordingRightContract }
+    transferContract: { '/': hashes.contractAccount }
   }
 
-  writeFileSync(__dirname + '/coala/composition-copyright-assertion.json', JSON.stringify(objs.compositionCopyrightAssertion));
-  writeFileSync(__dirname + '/coala/composition-right.json', JSON.stringify(objs.compositionRight));
-  writeFileSync(__dirname + '/coala/composition-right-assignment.json', JSON.stringify(objs.compositionRightAssignment));
-  writeFileSync(__dirname + '/coala/recording-copyright-assertion.json', JSON.stringify(objs.recordingCopyrightAssertion));
-  writeFileSync(__dirname + '/coala/recording-right.json', JSON.stringify(objs.recordingRight));
-  writeFileSync(__dirname + '/coala/recording-right-assignment.json', JSON.stringify(objs.recordingRightAssignment));
+  writeFileSync(__dirname + '/coala/composition-copyright-assertion.json', JSON.stringify(data.compositionCopyrightAssertion));
+  writeFileSync(__dirname + '/coala/composition-right.json', JSON.stringify(data.compositionRight));
+  writeFileSync(__dirname + '/coala/composition-right-assignment.json', JSON.stringify(data.compositionRightAssignment));
+  writeFileSync(__dirname + '/coala/recording-copyright-assertion.json', JSON.stringify(data.recordingCopyrightAssertion));
+  writeFileSync(__dirname + '/coala/recording-right.json', JSON.stringify(data.recordingRight));
+  writeFileSync(__dirname + '/coala/recording-right-assignment.json', JSON.stringify(data.recordingRightAssignment));
 
-  console.log(hashes.context);
-
-  return promiseSeq(
+  return promiseSequence(
     () => setDataHash('compositionCopyrightAssertion'),
     () => setDataHash('compositionRight'),
     () => setDataHash('compositionRightAssignment'),

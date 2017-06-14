@@ -1,17 +1,12 @@
 'use strict';
 
-const bs58 = require('bs58');
 const fs = require('fs');
-const RIPEMD160 = require('ripemd160');
-const sha256 = require('js-sha256').sha256;
-const sha3_256 = require('js-sha3').sha3_256;
-const urlsafeBase64  = require('urlsafe-base64');
 
 // @flow
 
 /**
-* @module constellate/src/util
-*/
+ * @module constellate/src/util
+ */
 
 function arrayFromObject(obj: Object): any[][] {
   return Object.keys(obj).map((key) => [key, obj[key]]);
@@ -21,47 +16,8 @@ function cloneObject(obj: Object): Object {
   return JSON.parse(JSON.stringify(obj));
 }
 
-function decodeBase58(str: string): Buffer {
-  return Buffer.from(bs58.decode(str));
-}
-
-function decodeBase64(str: string): Buffer {
-  return urlsafeBase64.decode(str);
-}
-
-function digestRIPEMD160(str: string): Buffer {
-  return new RIPEMD160().update(str).digest();
-}
-
-function digestSHA256(str: string): Buffer {
-  const hash = sha256.create();
-  hash.update(str);
-  return Buffer.from(hash.digest());
-}
-
-function digestSHA3(str: string): Buffer {
-  return Buffer.from(sha3_256.buffer(str));
-}
-
-function encodeBase58(buf: Buffer): string {
-  return bs58.encode(buf);
-}
-
-function encodeBase64(buf: Buffer): string {
-  return urlsafeBase64.encode(buf).toString('utf-8', 0, 3);
-}
-
-function hasKey(obj: Object, key: string): boolean {
-  return obj.hasOwnProperty(key) && obj[key] != null;
-}
-
-function hasKeys(obj: Object, ...keys: string[]): boolean {
-  if (!isArray(keys)) { return false; }
-  return keys.every((key) => hasKey(obj, key));
-}
-
 function isArray(arr: any): boolean {
-  return arr != null && Array.isArray(arr) && arr.length > 0;
+  return arr != null && Array.isArray(arr) && arr.length;
 }
 
 function isBoolean(bool: any): boolean {
@@ -80,23 +36,30 @@ function isNumber(num: any): boolean {
 }
 
 function isObject(obj: any): boolean {
-  return obj != null && obj.constructor === Object && Object.keys(obj).length > 0;
+  return obj != null && obj.constructor === Object && Object.keys(obj).length;
 }
 
 function isString(str: any): boolean {
-  return str != null && typeof str === 'string' && str.length > 0;
+  return str != null && typeof str === 'string' && str.length;
 }
 
-function isEqual(val1: any, val2: any): boolean {
-  return orderStringify(val1) === orderStringify(val2);
-}
-
-function now(): number {
-  return Date.now() / 1000 | 0;
+function newAnchor(data: Buffer[], type: string): HTMLAnchorElement {
+  const a = document.createElement('a');
+  const blob = new Blob(data, { type });
+  const filename = blob.type.replace('/', '.');
+  const url = URL.createObjectURL(blob);
+  a.setAttribute('href', url);
+  a.setAttribute('download', filename);
+  a.innerText = filename;
+  return a;
 }
 
 function objectFromArray(arr: any[][]): Object {
   return arr.reduce((result, [key, val]) => Object.assign({}, result, {[key]: val}), {});
+}
+
+function orderObject(obj: Object): Object {
+  return JSON.parse(orderStringify(obj));
 }
 
 // from http://stackoverflow.com/questions/16167581/sort-object-properties-and-json-stringify#comment73545624_40646557
@@ -111,10 +74,10 @@ function orderStringify(obj: Object, space?: number): Object {
   return JSON.stringify(obj, keys.sort(), space);
 }
 
-function promiseSeq(...fns: Function[]): Promise<any> {
+function promiseSequence(...fns: Function[]): Promise<any> {
     return fns.reduce((result, fn) => {
         return result.then(fn);
-    }, Promise.resolve()).catch(console.error);
+    }, Promise.resolve());
 }
 
 function readFileInput(input: HTMLInputElement, readAs: string): Promise<ArrayBuffer> {
@@ -165,79 +128,20 @@ function withoutIndex(arr: Array, idx: number): Array {
   return arr.slice(0, idx).concat(arr.slice(idx+1));
 }
 
-function withoutKeys(obj: Object, ...keys: string[]): Object {
-  return Object.keys(obj).reduce((result, key) => {
-    if (keys.includes(key)) { return result; }
-    return Object.assign({}, result, objectFromArray([[key, obj[key]]]));
-  }, {});
-}
-
 exports.arrayFromObject = arrayFromObject;
 exports.cloneObject = cloneObject;
-exports.decodeBase58 = decodeBase58;
-exports.decodeBase64 = decodeBase64;
-exports.digestRIPEMD160 = digestRIPEMD160;
-exports.digestSHA256 = digestSHA256;
-exports.digestSHA3 = digestSHA3;
-exports.encodeBase58 = encodeBase58;
-exports.encodeBase64 = encodeBase64;
-exports.hasKeys = hasKeys;
 exports.isAncestor = isAncestor;
 exports.isArray = isArray;
 exports.isBoolean = isBoolean;
 exports.isNumber = isNumber;
 exports.isObject = isObject;
 exports.isString = isString;
-exports.now = now;
+exports.newAnchor = newAnchor;
 exports.objectFromArray = objectFromArray;
+exports.orderObject = orderObject;
 exports.orderStringify = orderStringify;
-exports.promiseSeq = promiseSeq;
+exports.promiseSequence = promiseSequence;
 exports.readFileInput = readFileInput;
 exports.transform = transform;
 exports.traverse = traverse;
 exports.withoutIndex = withoutIndex;
-exports.withoutKeys = withoutKeys;
-
-/*
-
-The following code is adapted from..
-https://github.com/ipfs/js-ipfs/blob/master/examples/transfer-files/public/js/app.js#L58
-
-------------------------------- LICENSE -------------------------------
-
-The MIT License (MIT)
-
-Copyright (c) 2014 Juan Batiz-Benet
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-
-*/
-
-function newAnchor(data: Buffer[], type: string): HTMLAnchorElement {
-  const a = document.createElement('a');
-  const blob = new Blob(data, { type });
-  const filename = blob.type.replace('/', '.');
-  const url = URL.createObjectURL(blob);
-  a.setAttribute('href', url);
-  a.setAttribute('download', filename);
-  a.innerText = filename;
-  return a;
-}
-
-exports.newAnchor = newAnchor;

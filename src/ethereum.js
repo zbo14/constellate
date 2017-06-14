@@ -7,6 +7,7 @@ const ProviderEngine = require('web3-provider-engine');
 const RpcSubprovider = require('web3-provider-engine/subproviders/rpc');
 const { sign } = require('ethjs-signer');
 const SignerProvider = require('ethjs-provider-signer');
+const Transaction = require('ethereumjs-tx');
 const Wallet = require('ethereumjs-wallet');
 const Web3 = require('web3');
 const Web3Subprovider = require('web3-provider-engine/subproviders/web3');
@@ -17,43 +18,9 @@ const Web3Subprovider = require('web3-provider-engine/subproviders/web3');
  * @module constellate/src/ethereum
  */
 
-/*
-
-  The following code is adapted from..
-    > http://truffleframework.com/tutorials/using-infura-custom-provider
-    > https://github.com/MetaMask/provider-engine/blob/master/test/wallet.js
-
-*/
-
-const hdpath = "m/44'/60'/0'/0/";
-
-function defaultWallet(hdkey: Object): Object {
-  return getWallet(hdkey, 0);
-}
-
-function generateMnemonic(entropy?: string): string {
-  if (!entropy) return bip39.generateMnemonic();
-  return bip39.entropyToMnemonic(entropy);
-}
-
-function getWallet(hdkey: Object, n: number): Object {
-  return hdkey.derivePath(hdpath + n).getWallet();
-}
-
-function hdkeyFromMnemonic(mnemonic: string): Object {
-  if (!bip39.validateMnemonic(mnemonic)) {
-    throw new Error('invalid mnemonic');
-  }
-  return HDKey.fromMasterSeed(bip39.mnemonicToSeed(mnemonic));
-}
-
-exports.defaultWallet = defaultWallet;
-exports.generateMnemonic = generateMnemonic;
-exports.hdkeyFromMnemonic = hdkeyFromMnemonic;
+let web3;
 
 const rpcUrl = 'http://localhost:8545';
-
-let web3;
 
 function compileSource(source: string): Promise<Object> {
   return new Promise((resolve, reject) => {
@@ -80,10 +47,6 @@ function deployContract(from: string, source: string): Promise<Object> {
   });
 }
 
-function newContract(compiled: Object): Object {
-  return web3.eth.contract(compiled.info.abiDefinition);
-}
-
 function callContract(
   contract: Object, from: string, method: string,
   params: any[], to: string, value: number): Promise<any> {
@@ -100,16 +63,24 @@ function callContract(
   });
 }
 
-function getAccountAddrs(): Promise<string[]> {
+function getAccounts(): Promise<Object[]> {
   return new Promise((resolve, reject) => {
     web3.eth.getAccounts((err, addrs) => {
       if (err) return reject(err);
-      resolve(addrs);
+      const accounts = [];
+      for (let i = 0; i < addrs.length; i++) {
+        accounts.push({
+          '@context': 'http://ethon.consensys.net/',
+          '@type': 'Account',
+          address: addrs[i]
+        });
+        resolve(accounts);
+      }
     });
   });
 }
 
-function getAccountDetails(addr: string): Promise<Object> {
+function getBalanceAndNonce(addr: string): Promise<Object> {
   return new Promise((resolve, reject) => {
     web3.eth.getBalance(addr, (err, balance) => {
       if (err) return reject(err);
@@ -122,13 +93,80 @@ function getAccountDetails(addr: string): Promise<Object> {
   });
 }
 
+function getContractAccount(address: string): Promise<Object> {
+  return new Promise((resolve, reject) => {
+    web3.eth.getCode(address, (err, code) => {
+      if (err) return reject(err);
+      const accountCodeHash = Buffer.from(web3.sha3(code).slice(2), 'hex').toString('base64');
+      resolve({
+        '@context': 'http://ethon.consensys.net/',
+        '@type': 'ContractAccount',
+        accountCodeHash, address
+      });
+    });
+  });
+}
+
 function getTransaction(hash: string): Promise<Object> {
   return new Promise((resolve, reject) => {
     web3.eth.getTransaction(hash, (err, tx) => {
       if (err) return reject(err);
-      resolve(tx);
+      const obj : Object = {
+        '@context': 'http://ethon.consensys.net/',
+        '@type': 'Tx',
+        fromAccount: {
+          '@type': 'Account',
+          address: tx.from
+        },
+        msgGasPrice: parseInt(tx.gasPrice),
+        txGasUsed: tx.gas,
+        txHash: tx.hash,
+        txNonce: tx.nonce
+      }
+      if (tx.input !== '0x0') {
+        obj.msgPayload = tx.input;
+      }
+      if (tx.to !== '0x0') {
+        obj.toAccount = {
+          '@type': 'Account',
+          address: tx.to
+        }
+      }
+      const value = parseInt(tx.value);
+      if (value) {
+        obj.value = value;
+      }
+      resolve(obj);
     });
   });
+}
+
+function getTransactionReceipt(hash: string): Promise<Object> {
+  return new Promise((resolve, reject) => {
+    web3.eth.getTransactionReceipt(hash, (err, receipt) => {
+      if (err) return reject(err);
+      resolve(receipt);
+    });
+  });
+}
+
+function isEthereumAddress(addr: string): boolean {
+  return new Web3().isAddress(addr);
+}
+
+function newContract(compiled: Object): Object {
+  return web3.eth.contract(compiled.info.abiDefinition);
+}
+
+function newExternalAccount(address: string, mnemonic: string): Object {
+  const hdkey = hdkeyFromMnemonic(mnemonic);
+  const wallet = defaultWallet(hdkey);
+  const accountPublicKey = wallet.getPublicKeyString();
+  return {
+    '@context': 'http://ethon.consensys.net/',
+    '@type': 'ExternalAccount',
+    accountPublicKey, address
+  }
 }
 
 function newSignerProvider(input: string): Object {
@@ -147,7 +185,7 @@ function newSignerProvider(input: string): Object {
         return cb(new Error('password required'));
       }
       const wallet = Wallet.fromV3(input, password);
-      cb(null, sign(rawTx, '0x' + wallet.getPrivateKey().toString('hex')));
+      cb(null, sign(rawTx, wallet.getPrivateKeyString()));
     }
   });
 }
@@ -182,11 +220,14 @@ function setWeb3Provider(provider: Object) {
   web3 = new Web3(provider);
 }
 
-function signData(addr: string, data: string): Promise<string> {
+function signData(addr: string, data: string): Promise<Object> {
   return new Promise((resolve, reject) => {
     web3.eth.sign(addr, web3.sha3(data), (err, sig) => {
       if (err) return reject(err);
-      resolve(sig);
+      const r = '0x' + sig.slice(2, 66);
+      const s = '0x' + sig.slice(66, 130);
+      const v = parseInt(sig.slice(130, 132), 16) + 27;
+      resolve({ r, s, v });
     });
   });
 }
@@ -194,15 +235,48 @@ function signData(addr: string, data: string): Promise<string> {
 exports.callContract = callContract;
 exports.compileSource = compileSource;
 exports.deployContract = deployContract;
-exports.getAccountAddrs = getAccountAddrs;
-exports.getAccountDetails = getAccountDetails;
+exports.getBalanceAndNonce = getBalanceAndNonce;
+exports.getContractAccount = getContractAccount;
+exports.getAccounts = getAccounts;
 exports.getTransaction = getTransaction;
+exports.getTransactionReceipt = getTransactionReceipt;
+exports.isEthereumAddress = isEthereumAddress;
 exports.newContract = newContract;
+exports.newExternalAccount = newExternalAccount;
 exports.newSignerProvider = newSignerProvider;
 exports.sendEther = sendEther;
 exports.sendTransaction = sendTransaction;
 exports.setWeb3Provider = setWeb3Provider;
 exports.signData = signData;
+
+// The following code is adapted from http://truffleframework.com/tutorials/using-infura-custom-provider
+
+const hdpath = "m/44'/60'/0'/0/";
+
+function defaultWallet(hdkey: Object): Object {
+  return getWallet(hdkey, 0);
+}
+
+function generateMnemonic(entropy?: string): string {
+  if (!entropy) return bip39.generateMnemonic();
+  return bip39.entropyToMnemonic(entropy);
+}
+
+function getWallet(hdkey: Object, n: number): Object {
+  return hdkey.derivePath(hdpath + n).getWallet();
+}
+
+function hdkeyFromMnemonic(mnemonic: string): Object {
+  if (!bip39.validateMnemonic(mnemonic)) {
+    throw new Error('invalid mnemonic');
+  }
+  return HDKey.fromMasterSeed(bip39.mnemonicToSeed(mnemonic));
+}
+
+exports.defaultWallet = defaultWallet;
+exports.generateMnemonic = generateMnemonic;
+exports.hdkeyFromMnemonic = hdkeyFromMnemonic;
+
 
 /*
 

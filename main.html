@@ -3,9 +3,10 @@
     <title>constellate</title>
   </head>
   <body>
-    <button id='set-wallet-btn'>set wallet</button><br>
-    <button id='get-account-details-btn'>get account details</button><br><br>
-    <button id='get-tx-btn'>get tx</button><input type='text' id='tx-hash' /><br><br>
+    <button id='external-account-btn'>push external account</button><br>
+    <button id='get-tx-btn'>get tx</button><input type='text' id='tx-hash' /><br>
+    <button id='clear-tx-btn'>clear tx</button><br>
+    <div id='tx-container'></div><br><br>
     <label>contract method</label>
     <input type='text' id='contract-method' /><br>
     <label>contract source</label>
@@ -19,24 +20,18 @@
     <button id='call-contract-btn'>call contract</button>
     <button id='send-ether-btn'>send ether</button>
     <button id='send-tx-btn'>send tx</button><br><br>
-    <button id='start-peer-btn'>start peer</button><br><br>
-    <button id='add-data-btn'>add data</button><br>
-    <button id='get-data-btn'>get data</button>
-    <button id='sign-data-btn'>sign data</button><input type='text' id='data-hash' /><button id='save-data-hash-btn'>save hash</button><br>
+    <button id='get-data-btn'>get data</button><input type='text' id='data-hash' /><button id='save-data-btn'>save data</button><br>
     <button id='clear-data-btn'>clear data</button><br>
-    <button id='export-hashes-btn'>export hashes</button><a id='export-hashes' download='hashes.json'>hashes</a><br>
-    <button id='import-hashes-btn'>import hashes</button><input id='import-hashes' type='file' accept='application/json' /><br><br>
-    <div id='data'></div><br><br>
+    <button id='export-btn'>export</button><br>
+    <a id='export-data' download='data.json'>data</a><br>
+    <a id='export-hashes' download='hashes.json'>hashes</a><br>
+    <button id='import-btn'>import</button><input id='import-hashes' type='file' accept='application/json' /><br><br>
+    <div id='data-container'></div><br><br>
     <button id='add-file-btn'>add file</button><input type='file' id='file-input' accept='audio/*,image/*' /><br>
-    <button id='get-file-btn'>get file</button><input type='text' id='file-hash' /><button id='save-file-hash-btn'>save hash</button><br>
+    <button id='get-file-btn'>get file</button><input type='text' id='file-hash' /><button id='save-file-btn'>save file</button><br>
     <button id='clear-files-btn'>clear files</button><br><br>
     <div id='files'></div><br><br>
     <hr>
-    <select id='format-select'>
-      <option selected disabled value=''>--</option>
-      <option value='ipld'>ipld</option>
-      <option value='json-ld'>jsond-ld</option>
-    </select>
     <select id='schema-select'>
       <option selected disabled value=''>--</option>
       <optgroup label='party'>
@@ -56,14 +51,11 @@
       <optgroup label='coala'>
         <option value='ReviewAction'>assertion</option>
         <option value='Copyright'>copyright</option>
-        <option value='CreativeWork'>license</option>
         <option value='Right'>right</option>
         <option value='RightsTransferAction'>rights assignment</option>
-        <option value='CreativeWork'>transfer contract</option>
       </optgroup>
     </select><br>
     <div id='form-container'></div><br>
-    <textarea></textarea>
   </body>
   <script src='./bundle.js'></script>
 </html>

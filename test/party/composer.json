@@ -1,1 +1,1 @@
-{"@context":{"/":"zdpuAyqdCdddQzsLkNiT7UixP3pxWbm5UD2MMiUGrkfJwx6ig"},"@type":"Person","email":"composer@example.com","name":"composer","url":"http://composer.com"}
+{"@context":"http://schema.org/","@type":"Person","birthDate":"1995-01-01","controlsAccount":[{"/":"zdpuAu7YEPSErvBzfkCmCtkTXMi7WeMg2xkhqG1uBvGA8wYE8"}],"email":"composer@example.com","familyName":"lastName","givenName":"firstName","url":"http://composer-homepage.com"}

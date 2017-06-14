@@ -1,1 +1,1 @@
-{"@context":{"/":"zdpuAyqdCdddQzsLkNiT7UixP3pxWbm5UD2MMiUGrkfJwx6ig"},"@type":"ReviewAction","asserter":{"/":"zdpuAwL1XdLzLwkNHbqCxdAodqCn8D5UMNr3DMpcFauHTq3oV"},"assertionSubject":{"/":"zdpuArzpLbNX3hPbGrnVZNLc5TXZw94f1LhztNZnLraKgAK7e"},"assertionTruth":true}
+{"@context":["http://coalaip.org/","http://schema.org/"],"@type":"ReviewAction","asserter":{"/":"zdpuAtyASN3KHxQBvU7ZkLTJ5ogoY7MhFyHo8hGHt9aAR43BF"},"assertionSubject":{"/":"zdpuAwVDRzjSQh6efLG4wp3qLhpdaN9s4qph61552rbfWto5a"},"assertionTruth":true}

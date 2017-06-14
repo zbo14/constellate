@@ -33,6 +33,8 @@ THE SOFTWARE.
 'use strict';
 
 const CID = require('cids');
+const dagCBOR = require('ipld-dag-cbor');
+const dagPB = require('ipld-dag-pb')
 const IPFS = require('ipfs');
 const fileType = require('file-type');
 const os = require('os');
@@ -40,14 +42,15 @@ const path = require('path');
 
 const {
   isObject,
+  orderObject,
   transform
 } = require('../lib/util.js');
 
 // @flow
 
 /**
-* @module constellate/src/ipfs
-*/
+ * @module constellate/src/ipfs
+ */
 
 let node;
 
@@ -60,7 +63,24 @@ function addFile(data: Buffer|ReadableStream, path: string): Promise<Object> {
   });
 }
 
-function getCBOR(cid: Object|string, format: string): Promise<Object> {
+// https://github.com/ipfs/faq/issues/208
+function calcHash(data: Buffer|Object|ReadableStream): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (isObject(data)) {
+      dagCBOR.util.cid(obj, (err, cid) => {
+        if (err) return reject(err);
+        resolve(cid.toBaseEncodedString());
+      });
+    } else {
+      dagPB.DAGNode.create(data, (err, node) => {
+        if (err) return reject(err);
+        resolve(node.multihash);
+      });
+    }
+  });
+}
+
+function getCBOR(cid: Object|string): Promise<Object> {
   return new Promise((resolve, reject) => {
     node.dag.get(cid, (err, dagNode) => {
       if (err) return reject(err);
@@ -73,7 +93,7 @@ function getCBOR(cid: Object|string, format: string): Promise<Object> {
         }
         return val;
       });
-      resolve(obj);
+      resolve(orderObject(obj));
     });
   });
 }
@@ -103,7 +123,7 @@ function getFile(multihash: string): Promise<Object> {
 }
 
 function putCBOR(obj: Object): Promise<string> {
-  return node.dag.put(obj, {
+  return node.dag.put(orderObject(obj), {
     format: 'dag-cbor',
     hashAlg: 'sha2-256'
   });
@@ -111,7 +131,7 @@ function putCBOR(obj: Object): Promise<string> {
 
 function refreshPeers() {
   return node.swarm.peers().then(() => {
-    console.log('Refreshed peers');
+    // console.log('Refreshed peers');
   });
 }
 
@@ -151,6 +171,7 @@ function startPeer() {
 }
 
 exports.addFile = addFile;
+exports.calcHash = calcHash;
 exports.getCBOR = getCBOR;
 exports.getFile = getFile;
 exports.putCBOR = putCBOR;

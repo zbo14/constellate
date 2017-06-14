@@ -24,43 +24,43 @@ const release = JSON.parse(readFileSync(__dirname + '/meta/release.json'));
 describe('Meta', () => {
   it('validates AudioObject schema', () => {
     assert.isNull(
-      validateSchema(AudioObject('ipld'), audio),
+      validateSchema(AudioObject, audio),
       'should validate AudioObject schema'
     );
   });
   it('validates ImageObject schema', () => {
     assert.isNull(
-      validateSchema(ImageObject('ipld'), image),
+      validateSchema(ImageObject, image),
       'should validate ImageObject schema'
     );
   });
   it ('validates MusicAlbum schema', () => {
     assert.isNull(
-      validateSchema(MusicAlbum('ipld'), album),
+      validateSchema(MusicAlbum, album),
       'should validate MusicAlbum schema'
     );
   });
   it('validates MusicComposition schema', () => {
     assert.isNull(
-      validateSchema(MusicComposition('ipld'), composition),
+      validateSchema(MusicComposition, composition),
       'should validate MusicComposition schema'
     );
   });
   it('validates MusicPlaylist schema', () => {
     assert.isNull(
-      validateSchema(MusicPlaylist('ipld'), playlist),
+      validateSchema(MusicPlaylist, playlist),
       'should validate MusicPlaylist schema'
     );
   });
   it('validates MusicRecording schema', () => {
     assert.isNull(
-      validateSchema(MusicRecording('ipld'), recording),
+      validateSchema(MusicRecording, recording),
       'should validate MusicRecording schema'
     );
   });
   it('validates MusicRelease schema', () => {
     assert.isNull(
-      validateSchema(MusicRelease('ipld'), release),
+      validateSchema(MusicRelease, release),
       'should validate MusicRelease schema'
     );
   });

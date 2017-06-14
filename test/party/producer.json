@@ -1,1 +1,1 @@
-{"@context":{"/":"zdpuAyqdCdddQzsLkNiT7UixP3pxWbm5UD2MMiUGrkfJwx6ig"},"@type":"Person","name":"producer","sameAs":["http://soundcloud-page.com"],"url":"http://producer.com"}
+{"@context":"http://schema.org/","@type":"Person","birthDate":"1995-01-03","familyName":"lastName","givenName":"firstName","sameAs":["http://soundcloud-page.com"],"url":"http://producer-homepage.com"}

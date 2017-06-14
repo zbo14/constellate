@@ -31,12 +31,8 @@
     "ipfs-unixfs": "^0.1.11",
     "ipld-dag-cbor": "^0.11.1",
     "ipld-dag-pb": "^0.11.0",
-    "js-sha256": "^0.5.0",
-    "js-sha3": "^0.5.7",
     "multibase": "^0.3.4",
-    "ripemd160": "^2.0.1",
-    "setimmediate": "^1.0.5",
-    "urlsafe-base64": "^1.0.0"
+    "setimmediate": "^1.0.5"
   },
   "devDependencies": {
     "babel-cli": "^6.24.1",

@@ -9,10 +9,6 @@ import {
   Person
 } from '../lib/party.js';
 
-const MusicGroupIPLD = MusicGroup('ipld');
-const OrganizationIPLD = Organization('ipld');
-const PersonIPLD = Person('ipld');
-
 const composer = JSON.parse(readFileSync(__dirname + '/party/composer.json'));
 const lyricist = JSON.parse(readFileSync(__dirname + '/party/lyricist.json'));
 const performer = JSON.parse(readFileSync(__dirname + '/party/performer.json'));
@@ -23,37 +19,37 @@ const recordLabel = JSON.parse(readFileSync(__dirname + '/party/recordLabel.json
 describe('Party', () => {
   it('validates Person schema', () => {
     assert.isNull(
-      validateSchema(PersonIPLD, composer),
+      validateSchema(Person, composer),
       'should validate Person schema'
     );
   });
   it('validates Person schema', () => {
     assert.isNull(
-      validateSchema(PersonIPLD, lyricist),
+      validateSchema(Person, lyricist),
       'should validate Person schema'
     );
   });
   it('validates MusicGroup schema', () => {
     assert.isNull(
-      validateSchema(MusicGroupIPLD, performer),
+      validateSchema(MusicGroup, performer),
       'should validate MusicGroup schema'
     );
   });
   it('validates Person schema', () => {
     assert.isNull(
-      validateSchema(PersonIPLD, producer),
+      validateSchema(Person, producer),
       'should validate Person schema'
     );
   });
   it('validates Organization schema', () => {
     assert.isNull(
-      validateSchema(OrganizationIPLD, publisher),
+      validateSchema(Organization, publisher),
       'should validate Organization schema'
     );
   });
   it('validates Organization schema', () => {
     assert.isNull(
-      validateSchema(OrganizationIPLD, recordLabel),
+      validateSchema(Organization, recordLabel),
       'should validate Organization schema'
     );
   });

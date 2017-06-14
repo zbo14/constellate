@@ -1,5 +1,11 @@
 const CID = require('cids');
-const { validateSchema } = require('../lib/schema.js');
+
+const {
+  Account,
+  ContractAccount,
+  ExternalAccount,
+  Tx
+} = require('../lib/ethon.js');
 
 const {
   getCBOR,
@@ -8,7 +14,6 @@ const {
 
 const {
   Copyright,
-  CreativeWork,
   Right,
   ReviewAction,
   RightsTransferAction
@@ -32,15 +37,13 @@ const {
 
 const {
   Link,
-  Id
+  validateSchema
 } = require('../lib/schema.js');
 
 const {
-  arrayFromObject,
   cloneObject,
-  getLastItem,
-  isArray,
   isObject,
+  isString,
   transform,
   traverse
 } = require('../lib/util.js');
@@ -48,42 +51,47 @@ const {
 // @flow
 
 /**
-* @module constellate/src/linked-data
-*/
+ * @module constellate/src/linked-data
+ */
 
-function getTypeSchema(type: string, format: string): Object {
+function getTypeSchema(type: string): Object {
   switch(type) {
+    case 'Account':
+      return Account;
+    case 'ContractAccount':
+      return ContractAccount;
+    case 'ExternalAccount':
+      return ExternalAccount;
+    case 'Tx':
+      return Tx;
     case 'MusicGroup':
-      return MusicGroup(format);
+      return MusicGroup;
     case 'Organization':
-      return Organization(format);
+      return Organization;
     case 'Person':
-      return Person(format);
+      return Person;
     case 'AudioObject':
-      return AudioObject(format);
+      return AudioObject;
     case 'ImageObject':
-      return ImageObject(format);
+      return ImageObject;
     case 'MusicAlbum':
-      return MusicAlbum(format);
+      return MusicAlbum;
     case 'MusicComposition':
-      return MusicComposition(format);
+      return MusicComposition;
     case 'MusicPlaylist':
-      return MusicPlaylist(format);
+      return MusicPlaylist;
     case 'MusicRecording':
-      return MusicRecording(format);
+      return MusicRecording;
     case 'MusicRelease':
-      return MusicRelease(format);
+      return MusicRelease;
     case 'Copyright':
-      return Copyright(format);
-    case 'CreativeWork':
-      return CreativeWork(format);
+      return Copyright;
     case 'ReviewAction':
-      return ReviewAction(format);
+      return ReviewAction;
     case 'Right':
-      return Right(format);
+      return Right;
     case 'RightsTransferAction':
-      return RightsTransferAction(format);
-    //..
+      return RightsTransferAction;
     default:
       throw new Error('unexpected @type: ' + type);
   }
@@ -92,6 +100,9 @@ function getTypeSchema(type: string, format: string): Object {
 function isSubType(subType: string, type: string): boolean {
   if (subType === type) return true;
   switch(subType) {
+    case 'ContractAccount':
+    case 'ExternalAccount':
+      return isSubType('Account', type);
     case 'Action':
     case 'CreativeWork':
     case 'Intangible':
@@ -150,6 +161,7 @@ function getPropertyTypes(property: string): string[] {
       return ['MusicRecording'];
     case 'license':
     case 'transferContract':
+      return ['ContractAccount'];
     case 'rightsOf':
       return ['CreativeWork'];
     case 'source':
@@ -166,107 +178,40 @@ function getPropertyTypes(property: string): string[] {
   }
 }
 
+function getCID(path: string, val: any): ?Object {
+  const key = path.slice(-1)[0];
+  const errors = validateSchema(Link, { [key]: val });
+  return (!errors ? new CID(val) : null);
+}
+
 function resolveCID(cid: Object): Promise<any> {
   return new Promise((resolve, reject) => {
     if (cid.codec === 'dag-pb' && cid.version === 0) {
-      return getFile(cid.multihash).then((url) => {
-        resolve(url);
-      });
+      return getFile(cid.multihash).then(resolve);
     }
     if (cid.codec === 'dag-cbor' && cid.version === 1) {
-      return getCBOR(cid).then((dagNode) => {
-        resolve(dagNode);
-      });
+      return getCBOR(cid).then(resolve);
     }
     reject(new Error(`unexpected cid: codec=${cid.codec}, version=${cid.version}`));
   });
 }
 
-function hashFromId(id: string): string {
-  const cid = new CID(id.split('/').pop());
-  if ((cid.codec !== 'dag-pb' || cid.version !== 0)
-      && (cid.codec !== 'dag-cbor' || cid.version !== 1)) {
-    throw new Error(`unexpected cid: codec=${cid.codec}, version=${cid.version}`);
-  }
-  return cid.toBaseEncodedString();
-}
-
-function hashToId(hash: string): string {
-  const cid = new CID(hash);
-  if (cid.codec === 'dag-pb' && cid.version === 0) {
-    return 'ipfs:/ipfs/' + cid.toBaseEncodedString();
-  }
-  if (cid.codec === 'dag-cbor' && cid.version === 1) {
-    return 'ipfs:/ipld/' + cid.toBaseEncodedString();
-  }
-  reject(new Error(`unexpected cid: codec=${cid.codec}, version=${cid.version}`));
-}
-
-function convertObject(obj: Object, from: string, to: string): Object {
-  let fn;
-  if (from === 'ipld' && to === 'json-ld') {
-    fn = (val) => {
-      const errors = validateSchema(Link, val);
-      if (!!errors) return val;
-      return hashToId(val['/']);
-    }
-  } else if (from === 'json-ld' && to === 'ipld') {
-    fn = (val) => {
-      const errors = validateSchema(Id, val);
-      if (!!errors) return val;
-      return { '/': hashFromId(val) };
-    }
-  } else {
-    throw new Error(`invalid formats: from=${from}, to=${to}`)
-  }
-  return transform(obj, fn);
-}
-
-function validate(obj: Object, format: string): Promise<Object> {
+function validate(obj: Object): Promise<Object> {
   return new Promise((resolve, reject) => {
-    let getCID = () => {};
-    if (format === 'ipld') {
-      getCID = (val, path) => {
-        const key = path.slice(-1)[0];
-        const errors = validateSchema(Link, { [key] : val });
-        if (!!errors) return null;
-        return new CID(val);
-      }
-    } else if (format === 'json-ld') {
-      getCID = (val) => {
-        const errors = validateSchema(Id, val);
-        if (!!errors) return null;
-        return new CID(val.split('/').pop());
-      }
-    } else {
-      return reject(new Error('unexpected format: ' + format));
-    }
-    const schema = getTypeSchema(obj['@type'], format);
+    const schema = getTypeSchema(obj['@type']);
     const errors = validateSchema(schema, obj);
     if (errors) {
       return reject(new Error(JSON.stringify(errors)));
     }
     const promises = [];
     traverse(obj, (path, val, result) => {
-      const cid = getCID(val, path);
+      const cid = getCID(path, val);
       if (!cid) return;
       result.push(
         resolveCID(cid).then((resolved) => {
-          // if (resolved instanceof Blob) {}
-          if (resolved.type && (resolved.type.match(/audio|image/))) {
+          if ((resolved.type && resolved.type.match(/audio|image/))) {
             return resolved;
-          } else if (!isObject(resolved)) {
-            return reject(new Error('expected non-empty object; got ' + JSON.stringify(resolved)));
-          } else {
-            if (!!path.match(/@context/)) {
-              if (format === 'ipld') {
-                return { '/': val };
-              }
-              if (format === 'json-ld') {
-                return val;
-              }
-              // return resolved;
-            }
+          } else if (isObject(resolved)) {
             const keys = path.split('/');
             let key = keys.pop();
             if (!key) {
@@ -282,14 +227,16 @@ function validate(obj: Object, format: string): Promise<Object> {
             if (!types.some((type) => isSubType(subType, type))) {
               return reject(new Error('invalid @type for ' + key +  ': ' + subType));
             }
-            return validate(resolved, 'ipld');
+            return validate(resolved);
+          } else {
+            return reject(new Error('unexpected resolved: ' + JSON.stringify(resolved)));
           }
         }).then((val) => {
           return [path, val];
         })
       );
     }, promises);
-    const newObj = cloneObject(obj);
+    const expanded = cloneObject(obj);
     Promise.all(promises).then((results) => {
       for (let i = 0; i < results.length; i++) {
         const keys = results[i][0].split('/').filter((key) => !!key);
@@ -301,16 +248,13 @@ function validate(obj: Object, format: string): Promise<Object> {
         const val = results[i][1];
         const inner = keys.reduce((result, key) => {
           return result[key];
-        }, newObj);
+        }, expanded);
         inner[lastKey] = val;
       }
-      resolve(newObj);
+      resolve(expanded);
     });
   });
 }
 
-exports.convertObject = convertObject;
 exports.getTypeSchema = getTypeSchema;
-exports.hashFromId = hashFromId;
-exports.hashToId = hashToId;
 exports.validate = validate;

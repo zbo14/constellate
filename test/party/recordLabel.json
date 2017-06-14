@@ -1,1 +1,1 @@
-{"@context":{"/":"zdpuAyqdCdddQzsLkNiT7UixP3pxWbm5UD2MMiUGrkfJwx6ig"},"@type":"Organization","email":"recordLabel@example.com","name":"recordLabel","url":"http://recordLabel.com"}
+{"@context":"http://schema.org/","@type":"Organization","email":"recordLabel@example.com","name":"recordLabel"}
