@@ -23,49 +23,49 @@ const recordingRightAssignment = JSON.parse(readFileSync(__dirname + '/coala/rec
 describe('Coala', () => {
   it('validates Copyright schema', () => {
     assert.isNull(
-      validateSchema(Copyright, compositionCopyright),
+      validateSchema(compositionCopyright, Copyright),
       'should validate Copyright schema'
     );
   });
   it('validates Copyright schema', () => {
     assert.isNull(
-      validateSchema(Copyright, recordingCopyright),
+      validateSchema(recordingCopyright, Copyright),
       'should validate Copyright schema'
     );
   });
   it('validates ReviewAction schema', () => {
     assert.isNull(
-      validateSchema(ReviewAction, compositionCopyrightAssertion),
+      validateSchema(compositionCopyrightAssertion, ReviewAction),
       'should validate ReviewAction schema'
     );
   });
   it('validates ReviewAction schema', () => {
     assert.isNull(
-      validateSchema(ReviewAction, recordingCopyrightAssertion),
+      validateSchema(recordingCopyrightAssertion, ReviewAction),
       'should validate ReviewAction schema'
     );
   });
   it('validates Right schema', () => {
     assert.isNull(
-      validateSchema(Right, compositionRight),
+      validateSchema(compositionRight, Right),
       'should validate Right schema'
     );
   });
   it('validates Right schema', () => {
     assert.isNull(
-      validateSchema(Right, recordingRight),
+      validateSchema(recordingRight, Right),
       'should validate Right schema'
     );
   });
   it('validates RightsTransferAction schema', () => {
     assert.isNull(
-      validateSchema(RightsTransferAction, compositionRightAssignment),
+      validateSchema(compositionRightAssignment, RightsTransferAction),
       'should validate RightsTransferAction'
     );
   });
   it('validates RightsTransferAction schema', () => {
     assert.isNull(
-      validateSchema(RightsTransferAction, recordingRightAssignment),
+      validateSchema(recordingRightAssignment, RightsTransferAction),
       'should validate RightsTransferAction'
     );
   });

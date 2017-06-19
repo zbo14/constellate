@@ -24,43 +24,43 @@ const release = JSON.parse(readFileSync(__dirname + '/meta/release.json'));
 describe('Meta', () => {
   it('validates AudioObject schema', () => {
     assert.isNull(
-      validateSchema(AudioObject, audio),
+      validateSchema(audio, AudioObject),
       'should validate AudioObject schema'
     );
   });
   it('validates ImageObject schema', () => {
     assert.isNull(
-      validateSchema(ImageObject, image),
+      validateSchema(image, ImageObject),
       'should validate ImageObject schema'
     );
   });
   it ('validates MusicAlbum schema', () => {
     assert.isNull(
-      validateSchema(MusicAlbum, album),
+      validateSchema(album, MusicAlbum),
       'should validate MusicAlbum schema'
     );
   });
   it('validates MusicComposition schema', () => {
     assert.isNull(
-      validateSchema(MusicComposition, composition),
+      validateSchema(composition, MusicComposition),
       'should validate MusicComposition schema'
     );
   });
   it('validates MusicPlaylist schema', () => {
     assert.isNull(
-      validateSchema(MusicPlaylist, playlist),
+      validateSchema(playlist, MusicPlaylist),
       'should validate MusicPlaylist schema'
     );
   });
   it('validates MusicRecording schema', () => {
     assert.isNull(
-      validateSchema(MusicRecording, recording),
+      validateSchema(recording, MusicRecording),
       'should validate MusicRecording schema'
     );
   });
   it('validates MusicRelease schema', () => {
     assert.isNull(
-      validateSchema(MusicRelease, release),
+      validateSchema(release, MusicRelease),
       'should validate MusicRelease schema'
     );
   });

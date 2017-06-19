@@ -1,49 +1,19 @@
 'use strict';
 
-const CID = require('cids');
+const Form = require('./lib/form.js');
+const IpfsNode = require('./lib/ipfs-node.js');
+const ld = require('./lib/linked-data.js');
+const Web3Eth = require('./lib/web3-eth.js');
 require('setimmediate');
-
-const {
-  callContract,
-  compileSource,
-  deployContract,
-  getAccounts,
-  getBalanceAndNonce,
-  getContractAccount,
-  getTransaction,
-  newContract,
-  newExternalAccount,
-  sendEther,
-  sendTransaction,
-  setWeb3Provider
-} = require('./lib/ethereum.js');
-
-const {
-  formToObject,
-  getInputs,
-  objectToForm,
-  schemaToForm
-} = require('./lib/form.js');
-
-const {
-  addFile,
-  getCBOR,
-  getFile,
-  putCBOR,
-  startPeer
-} = require('./lib/ipfs.js');
-
-const {
-  getTypeSchema,
-  validate
-} = require('./lib/linked-data.js');
 
 const {
   isAncestor,
   newAnchor,
   readFileInput
-} = require('./lib/util.js');
+} = require('./lib/gen-util.js');
 
+const blockContainer = document.getElementById('block-container');
+const blockHash = document.getElementById('block-hash');
 const contractMethod = document.getElementById('contract-method');
 const contractSource = document.getElementById('contract-source');
 const dataContainer = document.getElementById('data-container');
@@ -54,7 +24,6 @@ const fileHash = document.getElementById('file-hash');
 const fileInput = document.getElementById('file-input');
 const files = document.getElementById('files');
 const formContainer = document.getElementById('form-container');
-const importHashes = document.getElementById('import-hashes');
 const methodParams = document.getElementById('method-params');
 const schemaSelect = document.getElementById('schema-select');
 const sendTo = document.getElementById('send-to');
@@ -70,10 +39,10 @@ const clearTxBtn = document.getElementById('clear-tx-btn');
 const deployContractBtn = document.getElementById('deploy-contract-btn');
 const exportBtn = document.getElementById('export-btn');
 const externalAccountBtn = document.getElementById('external-account-btn');
+const getBlockBtn = document.getElementById('get-block-btn');
 const getDataBtn = document.getElementById('get-data-btn');
 const getFileBtn = document.getElementById('get-file-btn');
 const getTxBtn = document.getElementById('get-tx-btn');
-const importBtn = document.getElementById('import-btn');
 const saveDataBtn = document.getElementById('save-data-btn');
 const saveFileBtn = document.getElementById('save-file-btn');
 const sendEtherBtn = document.getElementById('send-ether-btn');
@@ -81,77 +50,46 @@ const sendTxBtn = document.getElementById('send-tx-btn');
 
 let data = {},
     hashes = {},
-    myAccount = {};
+    myAccount = {},
+    web3eth;
+
+const node = new IpfsNode();
 
 window.addEventListener('load', () => {
   if (!web3) return console.warn('Could not get web3 from MetaMask');
-  setWeb3Provider(web3.currentProvider);
-  console.log('Set Web3 Provider');
-  getAccounts().then((accounts) => {
+  web3eth = new Web3Eth(web3.currentProvider);
+  web3eth.getAccounts().then((accounts) => {
     myAccount = accounts[0];
-    return getBalanceAndNonce(myAccount.address);
+    return web3eth.getBalanceAndNonce(myAccount.address);
   }).then((obj) => {
     console.log(`---- Account ----\naddress: "${myAccount.address}"\nbalance: ${obj.balance}\nnonce: ${obj.nonce}\n------------------`);
   });
 });
 
-startPeer().then((info) => {
-  console.log('Peer info:', info);
-  formContainer.addEventListener('submit', (evt) => {
-    evt.preventDefault();
-    const form = formContainer.firstChild;
-    const obj = formToObject(Array.from(form.children));
-    validate(obj).then(() => {
-      return putCBOR(obj);
-    }).then((cid) => {
-      dataHash.value = cid.toBaseEncodedString();
-      console.log('Added data');
+addFileBtn.addEventListener('click', () => {
+  if (fileInput.files.length) {
+    readFileInput(fileInput, 'array-buffer').then(ab => {
+      const buf = Buffer.from(ab);
+      return node.addFile(buf);
+    }).then(hash => {
+      fileHash.value = hash;
+      console.log('Added file');
     });
-  });
-  addFileBtn.addEventListener('click', () => {
-    if (fileInput.files.length) {
-      readFileInput(fileInput, 'array-buffer').then((ab) => {
-        const buf = Buffer.from(ab);
-        const path = fileInput.files[0].name;
-        return addFile(buf, path);
-      }).then((hash) => {
-        fileHash.value = hash;
-        console.log('Added file');
-      });
-    }
-  });
-  getDataBtn.addEventListener('click', () => {
-    getCBOR(dataHash.value).then((obj) => {
-      return validate(obj);
-    }).then((expanded) => {
-      const form = objectToForm(expanded);
-      dataContainer.innerHTML = null;
-      Array.from(form.children).forEach((div) => {
-        if (div.nodeName === 'DIV') dataContainer.appendChild(div);
-      });
-    });
-  });
-  getFileBtn.addEventListener('click', () => {
-    if (fileHash.value) {
-      getFile(fileHash.value).then((obj) => {
-        files.appendChild(newAnchor(obj.data, obj.type));
-      });
-    }
-  });
+  }
 });
 
 callContractBtn.addEventListener('click', () => {
   if (contractSource.files.length) {
-    readFileInput(contractSource, 'text').then((source) => {
-      return compileSource(source);
-    }).then((compiled) => {
-      const contract = newContract(compiled);
+    readFileInput(contractSource, 'text').then(source => {
+      return web3eth.compileSource(source);
+    }).then(compiled => {
+      const contract = web3eth.newContract(compiled);
       const method = contractMethod.value;
       const params = JSON.parse(`[${methodParams.value}]`);
       const to = sendTo.value;
       const value = parseFloat(sendValue.value);
-      return callContract(contract, myAccount.address, method, params, to, value);
-    }).then((val) => {
+      return web3eth.callContract(contract, myAccount.address, method, params, to, value);
+    }).then(val => {
       console.log('Result:', val);
     });
   }
@@ -172,18 +110,18 @@ clearTxBtn.addEventListener('click', () => {
 deployContractBtn.addEventListener('click', () => {
   if (contractSource.files.length) {
     let account;
-    readFileInput(contractSource, 'text').then((source) => {
-      return deployContract(myAccount.address, source);
-    }).then((deployed) => {
+    readFileInput(contractSource, 'text').then(source => {
+      return web3eth.deployContract(myAccount.address, source);
+    }).then(deployed => {
       sendTo.value = deployed.address;
       txHash.value = deployed.transactionHash;
-      return getContractAccount(deployed.address);
-    }).then((_account) => {
+      return web3eth.getContractAccount(deployed.address);
+    }).then(_account => {
       account = _account;
-      return validate(account);
+      return ld.validate(account);
     }).then(() => {
-      return putCBOR(account);
-    }).then((cid) => {
+      return node.addObject(account);
+    }).then(cid => {
       dataHash.value = cid.toBaseEncodedString();
       console.log('Deployed contract');
     });
@@ -205,30 +143,61 @@ exportBtn.addEventListener('click', () => {
 externalAccountBtn.addEventListener('click', () => {
   const mnemonic = prompt('Please enter your mnemonic', '');
   if (!mnemonic) return;
-  const account = newExternalAccount(myAccount.address, mnemonic);
-  putCBOR(account).then((cid) => {
+  const account = web3eth.newExternalAccount(myAccount.address, mnemonic);
+  node.addObject(account).then(cid => {
     dataHash.value = cid.toBaseEncodedString();
     console.log('Pushed external account');
   });
 });
 
-getTxBtn.addEventListener('click', () => {
-  if (txHash.value) {
-    getTransaction(txHash.value).then((tx) => {
-      return validate(tx);
-    }).then((expanded) => {
-      const form = objectToForm(expanded);
-      txContainer.innerHTML = null;
-      txContainer.appendChild(form);
+formContainer.addEventListener('submit', evt => {
+  evt.preventDefault();
+  const form = new Form(formContainer.firstChild);
+  const instance = form.instance();
+  ld.validate(instance).then(() => {
+    return node.addObject(instance);
+  }).then(cid => {
+    dataHash.value = cid.toBaseEncodedString();
+    console.log('Added data');
+  });
+});
+
+getBlockBtn.addEventListener('click', () => {
+  if (blockHash.value) {
+    web3eth.getBlock(blockHash.value).then(block => {
+      return ld.validate(block);
+    }).then(expanded => {
+      const form = new Form(expanded);
+      blockContainer.innerHTML = form.element();
     });
   }
 });
 
-importBtn.addEventListener('click', () => {
-  if (importHashes.files.length) {
-    readFileInput(importHashes, 'text').then((result) => {
-      hashes = JSON.parse(result);
-      console.log('Imported hashes');
+getDataBtn.addEventListener('click', () => {
+  node.getObject(dataHash.value).then(instance => {
+    return ld.validate(instance);
+  }).then(expanded => {
+    const form = new Form(expanded);
+    dataContainer.innerHTML = null;
+    dataContainer.appendChild(form.element());
+  });
+});
+
+getFileBtn.addEventListener('click', () => {
+  if (fileHash.value) {
+    node.getFile(fileHash.value).then(obj => {
+      files.appendChild(newAnchor(obj.data, obj.type));
+    });
+  }
+});
+
+getTxBtn.addEventListener('click', () => {
+  if (txHash.value) {
+    getTransaction(txHash.value).then(tx => {
+      return ld.validate(tx);
+    }).then(expanded => {
+      const form = new Form(expanded);
+      txContainer.innerHTML = form.element();
     });
   }
 });
@@ -237,12 +206,12 @@ saveDataBtn.addEventListener('click', () => {
   if (dataHash.value) {
     const name = prompt('Enter a name for the data', '');
     if (name) {
-      let obj;
-      getCBOR(dataHash.value).then((_obj) => {
-        obj = _obj;
-        return validate(obj);
+      let instance;
+      node.getObject(dataHash.value).then(_instance => {
+        instance = _instance;
+        return ld.validate(instance);
       }).then(() => {
-        data[name] = obj;
+        data[name] = instance;
         hashes[name] = dataHash.value;
         console.log(`Saved data as "${name}"`);
       });
@@ -264,7 +233,7 @@ sendEtherBtn.addEventListener('click', () => {
   const to = sendTo.value;
   const value = sendValue.value;
   if (to && value) {
-    sendEther(myAccount.address, to, value).then((hash) => {
+    web3eth.sendEther(myAccount.address, to, value).then(hash => {
       txHash.value = hash;
       console.log('Sent ether');
     });
@@ -274,24 +243,24 @@ sendEtherBtn.addEventListener('click', () => {
 sendTxBtn.addEventListener('click', () => {
   if (contractSource.files.length) {
     let tx;
-    readFileInput(contractSource, 'text').then((source) => {
-      return compileSource(source);
-    }).then((compiled) => {
-      const contract = newContract(compiled);
+    readFileInput(contractSource, 'text').then(source => {
+      return web3eth.compileSource(source);
+    }).then(compiled => {
+      const contract = web3eth.newContract(compiled);
       const method = contractMethod.value;
       const params = JSON.parse(`[${methodParams.value}]`);
       const to = sendTo.value;
       const value = sendValue.value;
-      return sendTransaction(contract, myAccount.address, method, params, to, value);
-    }).then((hash) => {
+      return web3eth.sendTransaction(contract, myAccount.address, method, params, to, value);
+    }).then(hash => {
       txHash.value = hash;
-      return getTransaction(hash);
-    }).then((_tx) => {
+      return web3eth.getTransaction(hash);
+    }).then(_tx => {
       tx = _tx;
-      return validate(tx);
+      return ld.validate(tx);
     }).then(() => {
-      return putCBOR(tx);
-    }).then((cid) => {
+      return node.addObject(tx);
+    }).then(cid => {
       dataHash.value = cid.toBaseEncodedString();
       console.log('Sent transaction');
     });
@@ -301,22 +270,11 @@ sendTxBtn.addEventListener('click', () => {
 schemaSelect.addEventListener('change', () => {
   if (!schemaSelect.value) return;
   formContainer.innerHTML = null;
-  const schema = getTypeSchema(schemaSelect.value);
-  const form = schemaToForm(schema);
-  let child, elem, input, label;
-  for (let i = 0; i < form.children.length; i++) {
-    child = form.children[i];
-    if (child.nodeName === 'DIV' &&
-        (elem = child.lastChild) &&
-        (label = child.firstChild) &&
-        label.textContent === '@context') {
-      break;
-    }
-  }
-  formContainer.appendChild(form);
+  const form = new Form(schemaSelect.value);
+  formContainer.appendChild(form.element());
 });
 
-document.body.addEventListener('keyup', (evt) => {
+document.body.addEventListener('keyup', evt => {
   const input = evt.target;
   if (input.nodeName !== 'INPUT' || input.type !== 'text') return;
   if (input.value[0] === '#') {

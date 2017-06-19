@@ -5,7 +5,7 @@ const fs = require('fs');
 // @flow
 
 /**
- * @module constellate/src/util
+ * @module constellate/src/gen-util
  */
 
 function arrayFromObject(obj: Object): any[][] {
@@ -62,13 +62,33 @@ function orderObject(obj: Object): Object {
   return JSON.parse(orderStringify(obj));
 }
 
-// from http://stackoverflow.com/questions/16167581/sort-object-properties-and-json-stringify#comment73545624_40646557
+// adapted from http://stackoverflow.com/questions/16167581/sort-object-properties-and-json-stringify#comment73545624_40646557
 
 function orderStringify(obj: Object, space?: number): Object {
   const keys = [];
   JSON.stringify(obj, (k, v) => {
     keys.push(k);
-    if (isArray(v)) v.sort();
+    if (isArray(v)) {
+      v.sort((x, y) => {
+        if (isObject(x) && isObject(y)) {
+          const xkeys = Object.keys(x).sort();
+          const ykeys = Object.keys(y).sort();
+          let i;
+          for (i = 0; i < xkeys.length && i < ykeys.length; i++) {
+            if (xkeys[i] < ykeys[i]) return -1;
+            if (xkeys[i] > ykeys[i]) return 1;
+          }
+          if (xkeys.length < ykeys.length) return -1;
+          if (xkeys.length > ykeys.length) return 1;
+          for (i = 0; i < xkeys.length && i < ykeys.length; i++) {
+            if (x[xkeys[i]] < y[ykeys[i]]) return -1;
+            if (x[xkeys[i]] > y[ykeys[i]]) return 1;
+          }
+          return 0;
+        }
+        return x < y;
+      });
+    }
     return v;
   });
   return JSON.stringify(obj, keys.sort(), space);

@@ -14,13 +14,13 @@ const externalAccount = JSON.parse(readFileSync(__dirname + '/ethon/external-acc
 describe('EthOn', () => {
   it('validates ContractAccount schema', () => {
     assert.isNull(
-      validateSchema(ContractAccount, contractAccount),
+      validateSchema(contractAccount, ContractAccount),
       'should validate ContractAccount schema'
     );
   });
   it('validates ExternalAccount schema', () => {
     assert.isNull(
-      validateSchema(ExternalAccount, externalAccount),
+      validateSchema(externalAccount, ExternalAccount),
       'should validate ExternalAccount schema'
     );
   });

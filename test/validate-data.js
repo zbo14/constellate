@@ -1,4 +1,4 @@
-const { validate } = require('../lib/linked-data.js');
+const { validateLD } = require('../lib/linked-data.js');
 const { promiseSequence } = require('../lib/util.js');
 
 const {
@@ -56,7 +56,7 @@ function setMultihash(path) {
 
 function getCBORAndValidate(name) {
   return getCBOR(cids[name]).then((dagNode) => {
-    return validate(dagNode);
+    return validateLD(dagNode);
   }).then(() => {
     console.log('Validated ' + name);
   });

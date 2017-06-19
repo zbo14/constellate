@@ -1,12 +1,10 @@
 'use strict';
 
-const {
-  Draft,
-  validateSchema
-} = require('../lib/schema.js');
+const Schema = require('../lib/schema.js');
 
 const {
   arrayFromObject,
+  cloneObject,
   isAncestor,
   isArray,
   isBoolean,
@@ -17,13 +15,45 @@ const {
   transform,
   traverse,
   withoutIndex
-} = require('../lib/util.js');
+} = require('../lib/gen-util.js');
+
+const {
+  ajv
+} = require('../lib/schema-util.js');
 
 // @flow
 
 /**
- * @module constellate/src/form
+ * @module constellate/src/schema-form
  */
+
+ module.exports = function(argv: HTMLFormElement|Object|string) {
+   let form : HTMLFormElement,
+       instance : Object,
+       schema : Object;
+   if (argv instanceof HTMLFormElement) {
+     form = (argv : any);
+     this.element = () => form;
+     this.instance = () => formToInstance(form);
+     this.schema = () => formToSchema(form);
+   } else if (isObject(argv)) {
+     instance = (argv : any);
+     form = instanceToForm(instance);
+     schema = formToSchema(form);
+     this.element = () => form;
+     this.instance = () => instance;
+     this.schema = () => schema;
+   } else if (isString(argv)) {
+     schema = new Schema(argv);
+     form = schemaToForm(schema);
+     instance = formToInstance(form);
+     this.element = () => form;
+     this.instance = () => instance;
+     this.schema = () => schema;
+   } else {
+     throw new Error('unexpected parameter: ' + JSON.stringify(argv));
+   }
+ }
 
 function newInput(type: string, val?: any): HTMLInputElement {
   const input = document.createElement('input');
@@ -36,10 +66,11 @@ function includeElement(elem : HTMLElement, label: HTMLLabelElement): boolean {
     switch (elem.nodeName) {
         case 'INPUT':
             const input : HTMLInputElement = (elem : any);
-            return input.type === 'checkbox' || !!input.value;
+            return input.type === 'checkbox' ||
+                  (!input.disabled && !input.hidden && !!input.value);
         case 'FIELDSET':
             if (!elem.children || !elem.children.length) return false;
-            return Array.from(elem.children).every((div) => {
+            return Array.from(elem.children).every(div => {
                 if (!div.children && !div.children.length) {
                     if (!elem.hasAttribute('required')) return false;
                     throw new Error(label.textContent + ' is required');
@@ -53,7 +84,7 @@ function includeElement(elem : HTMLElement, label: HTMLLabelElement): boolean {
                 if (!elem.hasAttribute('required')) return false;
                 throw new Error(label.textContent + ' is required');
             }
-            return Array.from(elem.children).some((li) => {
+            return Array.from(elem.children).some(li => {
                 if (!li.children || !li.children.length) return false;
                 elem = (li.firstChild : any);
                 return includeElement(elem, label);
@@ -72,7 +103,10 @@ function elementToSchema(elem: HTMLElement): Object {
       if (!elem.children.length) {
         throw new Error('fieldset has no children');
       }
-      return formToSchema(Array.from(elem.children));
+      const divs : HTMLDivElement[] = (Array.from(elem.children).filter(child => {
+        return child.nodeName === 'DIV';
+      }) : any);
+      return divsToSchema(divs);
     case 'INPUT':
       const input: HTMLInputElement = (elem: any);
       switch(input.type) {
@@ -87,7 +121,7 @@ function elementToSchema(elem: HTMLElement): Object {
       if (!elem.children.length) {
         throw new Error('ol has no children');
       }
-      const li = Array.from(elem.children).find((child) => child.nodeName === 'LI');
+      const li = Array.from(elem.children).find(child => child.nodeName === 'LI');
       if (!li) throw new Error('ol has no li');
       if (!li.children.length) {
         throw new Error('li has no children');
@@ -112,13 +146,16 @@ function elementToSchema(elem: HTMLElement): Object {
   }
 }
 
-function elementToValue(elem: HTMLElement): any {
+function elementToInstance(elem: HTMLElement): any {
   switch(elem.nodeName) {
     case 'FIELDSET':
       if (!elem.children.length) {
         throw new Error('fieldset has no children');
       }
-      return formToObject(Array.from(elem.children));
+      const divs : HTMLDivElement[] = (Array.from(elem.children).filter(child => {
+        return child.nodeName === 'DIV';
+      }) : any);
+      return divsToInstance(divs);
     case 'INPUT':
       const input: HTMLInputElement = (elem: any);
       switch(input.type) {
@@ -137,7 +174,7 @@ function elementToValue(elem: HTMLElement): any {
       }
       return Array.from(elem.children).reduce((result, child) => {
           if (child.nodeName !== 'LI') { return result; }
-          return result.concat(elementToValue(child.children[0]));
+          return result.concat(elementToInstance(child.children[0]));
       }, []);
     case 'SELECT':
       const select: HTMLSelectElement = (elem: any);
@@ -153,7 +190,7 @@ function schemaToElement(schema: Object): HTMLElement {
     case 'array':
       elem = document.createElement('ol');
       let li : HTMLLIElement;
-      [].concat(schema.items).forEach((item) => {
+      [].concat(schema.items).forEach(item => {
         li = document.createElement('li');
         li.appendChild(schemaToElement(item));
         elem.appendChild(li);
@@ -169,7 +206,7 @@ function schemaToElement(schema: Object): HTMLElement {
     case 'object':
       elem = document.createElement('fieldset');
       const form = schemaToForm(schema);
-      Array.from(form.children).forEach((div) => {
+      Array.from(form.children).forEach(div => {
         if (div.nodeName === 'DIV') elem.appendChild(div)
       });
       break;
@@ -181,7 +218,7 @@ function schemaToElement(schema: Object): HTMLElement {
         throw new Error('unexpected schema: ' + JSON.stringify(schema));
       }
       elem = document.createElement('select');
-      schema.enum.forEach((val) => {
+      schema.enum.forEach(val => {
         const option = document.createElement('option');
         option.textContent = val;
         option.value = val;
@@ -192,41 +229,41 @@ function schemaToElement(schema: Object): HTMLElement {
   return elem;
 }
 
-function valueToElement(val: any): HTMLElement {
-  if (isArray(val.data) && isString(val.type)) {
-    const data: Buffer[] = (val.data : any);
-    const type: string = (val.type : any);
+function instanceToElement(instance: any): HTMLElement {
+  if (isArray(instance.data) && isString(instance.type)) {
+    const data: Buffer[] = (instance.data : any);
+    const type: string = (instance.type : any);
     return newAnchor(data, type);
   }
-  if (isArray(val)) {
+  if (isArray(instance)) {
     const ol = document.createElement('ol');
     let elem, li;
-    val.forEach((v) => {
-      elem = valueToElement(v);
+    instance.forEach(v => {
+      elem = instanceToElement(v);
       li = document.createElement('li');
       li.appendChild(elem);
       ol.appendChild(li);
     });
     return ol;
   }
-  if (isBoolean(val)) {
-    return newInput('checkbox', val);
+  if (isBoolean(instance)) {
+    return newInput('checkbox', instance);
   }
-  if (isNumber(val)) {
-    return newInput('number', val);
+  if (isNumber(instance)) {
+    return newInput('number', instance);
   }
-  if (isObject(val)) {
+  if (isObject(instance)) {
     const fieldset = document.createElement('fieldset');
-    const form = objectToForm(val);
-    Array.from(form.children).forEach((div) => {
+    const form = instanceToForm(instance);
+    Array.from(form.children).forEach(div => {
       if (div.nodeName === 'DIV') fieldset.appendChild(div);
     });
     return fieldset;
   }
-  if (isString(val)) {
-    return newInput('text', val);
+  if (isString(instance)) {
+    return newInput('text', instance);
   }
-  throw new Error('unexpected value: ' + JSON.stringify(val));
+  throw new Error('unexpected instance: ' + JSON.stringify(instance));
 }
 
 function getAttributes(elem: HTMLElement, schema: Object): Object {
@@ -257,7 +294,7 @@ function getAttributes(elem: HTMLElement, schema: Object): Object {
   }, schema);
   if (elem.nodeName !== 'SELECT') return result;
   return Object.assign({}, result, {
-    enum: Array.from(elem.children).map((child) => {
+    enum: Array.from(elem.children).map(child => {
       const option: HTMLOptionElement = (child: any);
       return option.value;
     })
@@ -293,7 +330,7 @@ function setAttribute(elem: HTMLElement, key: string, val: any) {
       return;
     case 'readonly':
       elem.hidden = val;
-      getInputs(elem).forEach((input) => {
+      getInputs(elem).forEach(input => {
         input.disabled = val;
       });
       return;
@@ -310,12 +347,19 @@ function setAttribute(elem: HTMLElement, key: string, val: any) {
   }
 }
 
-function formToObject(divs : HTMLElement[]): Object {
+function formToInstance(form: HTMLFormElement): Object {
+  if (!form.children.length) {
+    throw new Error('form has no children');
+  }
+  const divs: HTMLDivElement[] = (Array.from(form.children).filter(child => {
+    return child.nodeName === 'DIV';
+  }) : any);
+  return divsToInstance(divs);
+}
+
+function divsToInstance(divs : HTMLDivElement[]): Object {
   let elem : HTMLElement, label : HTMLLabelElement;
   return divs.reduce((result, div) => {
-    if (div.nodeName !== 'DIV') {
-      return result;
-    }
     if (!(elem = (div.lastChild : any))) {
       throw new Error('expected element');
     }
@@ -325,18 +369,25 @@ function formToObject(divs : HTMLElement[]): Object {
     if (!includeElement(elem, label)) {
       return result;
     }
-    const val = elementToValue(elem);
-    if (val == null || (isArray(val) && val.some((x) => x == null))) return result;
-    return Object.assign({}, result, { [label.textContent]: val } );
+    const instance = elementToInstance(elem);
+    if (instance == null || (isArray(instance) && instance.some(x => x == null))) return result;
+    return Object.assign({}, result, { [label.textContent]: instance } );
   }, {});
 }
 
-function formToSchema(divs: HTMLElement[]): Object  {
+function formToSchema(form: HTMLFormElement): Object {
+  if (!form.children.length) {
+    throw new Error('form has no children');
+  }
+  const divs : HTMLDivElement[] = (Array.from(form.children).filter(child => {
+    return child.nodeName === 'DIV';
+  }) : any);
+  return divsToSchema(divs);
+}
+
+function divsToSchema(divs: HTMLDivElement[]): Object  {
   let elem : HTMLElement, label : HTMLLabelElement;
-  return divs.reduce((result, div) => {
-    if (div.nodeName !== 'DIV') {
-      return result;
-    }
+  const schema = divs.reduce((result, div) => {
     if (!(elem = (div.lastChild : any))) {
       throw new Error('expected element');
     }
@@ -347,7 +398,9 @@ function formToSchema(divs: HTMLElement[]): Object  {
       return result;
     }
     const schema = elementToSchema(elem);
-    if (elem.hasAttribute('required')) result.required.push(label.textContent);
+    if (elem.hasAttribute('required')) {
+      result.required.push(label.textContent);
+    }
     return Object.assign({}, result, {
       properties: Object.assign({}, result.properties,
         { [label.textContent]: getAttributes(elem, schema) }
@@ -355,11 +408,11 @@ function formToSchema(divs: HTMLElement[]): Object  {
       required: result.required
     });
   }, {
-    $schema: Draft,
+    type: 'object',
     properties: {},
-    required: [],
-    type: 'object'
+    required: []
   });
+  return new Schema(schema);
 }
 
 function addButtons(form: HTMLFormElement) {
@@ -381,7 +434,7 @@ function addButtons(form: HTMLFormElement) {
 }
 
 function addButtonListener(form: HTMLFormElement) {
-  form.addEventListener('click', (evt: Event) => {
+  form.addEventListener('click', evt => {
       const btn : HTMLButtonElement = (evt.target: any);
       if (btn.nodeName !== 'BUTTON') return;
       evt.preventDefault();
@@ -421,6 +474,7 @@ function addButtonListener(form: HTMLFormElement) {
           const inputs : HTMLInputElement[] = (Array.from(li.querySelectorAll('input')) : any);
           for (let i = 0; i < inputs.length; i++) {
             inputs[i].disabled = true;
+            inputs[i].value = '';
           }
           li.hidden = true;
         } else {
@@ -453,12 +507,12 @@ function addButtonListener(form: HTMLFormElement) {
   });
 }
 
-function objectToForm(obj: Object): HTMLFormElement {
-  const elems = transform(obj, (val) => {
-    return valueToElement(val);
+function instanceToForm(instance: Object): HTMLFormElement {
+  const elems = transform(instance, subInstance => {
+    return instanceToElement(subInstance);
   });
   const form = document.createElement('form');
-  Object.keys(elems).forEach((key) => {
+  Object.keys(elems).forEach(key => {
     const div = document.createElement('div');
     const label = document.createElement('label');
     label.textContent = key;
@@ -467,7 +521,6 @@ function objectToForm(obj: Object): HTMLFormElement {
     form.appendChild(div);
   });
   form.appendChild(newInput('submit'));
-  addButtons(form);
   addButtonListener(form);
   return form;
 }
@@ -489,7 +542,7 @@ function isInputEvent(evt: Event, input: HTMLInputElement): boolean {
 }
 
 function propertyDependencyHandler(div2: HTMLElement, negate: boolean): Function {
-  return (evt) => {
+  return evt => {
     const input : HTMLInputElement = (evt.target : any);
     if (!input || input.nodeName !== 'INPUT') return;
     if (!isInputEvent(evt, input)) return;
@@ -506,7 +559,7 @@ function propertyDependencyHandler(div2: HTMLElement, negate: boolean): Function
       if (!adder) throw new Error('expected adder and remover btns');
       adder.hidden = remover.hidden = hidden;
     }
-    getInputs(elem2).forEach((input) => {
+    getInputs(elem2).forEach(input => {
       input.disabled = disabled;
       input.required = required;
     });
@@ -514,21 +567,22 @@ function propertyDependencyHandler(div2: HTMLElement, negate: boolean): Function
 }
 
 function schemaDependencyHandler1(div2 : HTMLElement, negate: boolean, schema: Object): Function {
-  return (evt) => {
+  return evt => {
     const input : HTMLInputElement = (evt.target : any);
     if (!input || input.nodeName !== 'INPUT' || !hasInputValue(input)) return;
     if (!isInputEvent(evt, input)) return;
     const elem2 : HTMLElement = (div2.lastChild : any);
     if (!elem2) throw new Error('expected element');
-    const errors = validateSchema(schema, elementToValue(elem2));
-    if (!errors === negate) {
+    const validate = ajv.compile(schema);
+    validate(elementToInstance(elem2));
+    if (!validate.errors === negate) {
       div2.replaceChild(schemaToElement(schema), elem2);
     }
   }
 }
 
 function schemaDependencyHandler2(div1: HTMLElement, div2: HTMLElement, negate: boolean, schema : Object): Function {
-  return (evt) => {
+  return evt => {
     const input : HTMLInputElement = (evt.target : any);
     if (!input || input.nodeName !== 'INPUT') return;
     if (!isInputEvent(evt, input)) return;
@@ -537,15 +591,16 @@ function schemaDependencyHandler2(div1: HTMLElement, div2: HTMLElement, negate: 
     if (!getInputs(elem1).some(hasInputValue)) return;
     const elem2 : HTMLElement = (div2.lastChild : any);
     if (!elem2) throw new Error('expected element');
-    const errors = validateSchema(schema, elementToValue(elem2));
-    if (!errors === negate) {
+    const validate = ajv.compile(schema);
+    validate(elementToInstance(elem2));
+    if (!validate.errors === negate) {
       div2.replaceChild(schemaToElement(schema), elem2);
     }
   }
 }
 
-function schemaHandler(divs: HTMLElement[], finder: Function, subschemas: Object[], validator: Function): Function {
-  return (evt) => {
+function schemaHandler(divs: HTMLElement[], finder: Function, subSchemas: Object[], validator: Function): Function {
+  return evt => {
     const input: HTMLInputElement = (evt.target : any);
     if (!input || input.nodeName !== 'INPUT') return;
     if (!isInputEvent(evt, input)) return;
@@ -562,17 +617,17 @@ function schemaHandler(divs: HTMLElement[], finder: Function, subschemas: Object
       }
       promises.push(finder(label.textContent));
       if (includeElement(elem, label)) {
-        Object.assign(val, { [label.textContent]: elementToValue(elem) });
+        Object.assign(val, { [label.textContent]: elementToInstance(elem) });
       }
     }
     if (validator(val)) return;
-    Promise.all(promises).then((finds) => {
+    Promise.all(promises).then(finds => {
       for (let i = 0; i < divs.length; i++) {
         if (finds[i]) {
           elem = (divs[i].lastChild : any);
           label = (divs[i].firstChild : any);
           if (includeElement(elem, label)) {
-            divs[i].replaceChild(schemaToElement(subschemas[i]), elem);
+            divs[i].replaceChild(schemaToElement(subSchemas[i]), elem);
           }
         }
       }
@@ -581,7 +636,7 @@ function schemaHandler(divs: HTMLElement[], finder: Function, subschemas: Object
 }
 
 function setDependencies(deps: Object, form: HTMLFormElement, negate: boolean) {
-  const divs : HTMLElement[] = Array.from(form.children).filter((child) => {
+  const divs : HTMLElement[] = Array.from(form.children).filter(child => {
     if (child && child.nodeName === 'DIV') return (child : any);
   });
   const keys = Object.keys(deps);
@@ -591,7 +646,7 @@ function setDependencies(deps: Object, form: HTMLFormElement, negate: boolean) {
     if (!keys.includes(label1.textContent)) return;
     const dep = deps[label1.textContent];
     if (isArray(dep)) {
-      withoutIndex(divs, i).forEach((div2) => {
+      withoutIndex(divs, i).forEach(div2 => {
         const label2 : HTMLLabelElement = (div2.firstChild : any);
         if (!label2 || label2.nodeName !== 'LABEL') throw new Error('expected label');
         if (!dep.includes(label2.textContent)) return;
@@ -603,7 +658,7 @@ function setDependencies(deps: Object, form: HTMLFormElement, negate: boolean) {
       if (!isObject(dep.properties)) {
         throw new Error('expected non-empty object for dep properties');
       }
-      withoutIndex(divs, i).forEach((div2) => {
+      withoutIndex(divs, i).forEach(div2 => {
         const label2 : HTMLLabelElement = (div2.firstChild : any);
         if (!label2 || label2.nodeName !== 'LABEL') throw new Error('expected label');
         const schema : Object = (dep.properties[label2.textContent] : any);
@@ -643,52 +698,56 @@ function findInSchema(schema: Object): Function {
 function findInSchemas(schemas: Object[]): Function {
   return (key: string): Promise<boolean> => {
     return new Promise((resolve, _) => {
-      const promises = schemas.map((schema) => {
+      const promises = schemas.map(schema => {
         return findInSchema(schema)(key);
       });
-      Promise.all(promises).then((finds) => {
-        resolve(finds.some((found) => found));
+      Promise.all(promises).then(finds => {
+        resolve(finds.some(found => found));
       });
     });
   }
 }
 
 function validate(schema: Object, negate: boolean): Function {
-  return (val: Object): boolean => {
-    const errors = validateSchema(schema, val);
-    return !!errors === negate;
+  const validate = ajv.compile(schema);
+  return (instance: Object): boolean => {
+    validate(instance);
+    return !!validate.errors === negate;
   }
 }
 
 function validateAllOf(schemas: Object[], negate: boolean): Function {
-  return (val: Object): boolean => {
-    return schemas.some((schema) => {
-      const errors = validateSchema(schema, val);
-      return !!errors === negate;
+  const validates = schemas.map(schema => ajv.compile(schema));
+  return (instance: Object): boolean => {
+    return validates.some(validate => {
+      validate(instance);
+      return !!validate.errors === negate;
     });
   }
 }
 
 function validateAnyOf(schemas: Object[], negate: boolean): Function {
-  return (val: Object): boolean => {
-    return schemas.some((schema) => {
-      const errors = validateSchema(schema, val);
-      return !!errors === negate;
+  const validates = schemas.map(schema => ajv.compile(schema));
+  return (instance: Object): boolean => {
+    return validates.some(validate => {
+      validate(instance);
+      return !!validate.errors === negate;
     });
   }
 }
 
 function validateOneOf(schemas: Object[], negate: boolean): Function {
-  return (val: Object): boolean => {
-    return schemas.filter((schema) => {
-      const errors = validateSchema(schema, val);
-      return !!errors === negate;
+  const validates = schemas.map(schema => ajv.compile(schema));
+  return (instance: Object): boolean => {
+    return validates.filter(validate => {
+      validate(instance);
+      return !!validate.errors === negate;
     }).length === 1;
   }
 }
 
-function setSchema(form: HTMLFormElement, negate: boolean, schema: Object, subschemas: Object[], keyword?: string) {
-  const divs : HTMLElement[] = Array.from(form.children).filter((child) => {
+function setSchema(form: HTMLFormElement, negate: boolean, schema: Object, subSchemas: Object[], keyword?: string) {
+  const divs : HTMLElement[] = Array.from(form.children).filter(child => {
     if (child && child.nodeName === 'DIV') return (child : any);
   });
   let finder : Function, validator : Function;
@@ -714,7 +773,7 @@ function setSchema(form: HTMLFormElement, negate: boolean, schema: Object, subsc
         throw new Error('unexpected keyword: ' + JSON.stringify(keyword));
     }
   }
-  const handler = schemaHandler(divs, finder, subschemas, validator);
+  const handler = schemaHandler(divs, finder, subSchemas, validator);
   form.addEventListener('click', handler);
   form.addEventListener('input', handler);
 }
@@ -726,10 +785,10 @@ function schemaToForm(schema: Object): HTMLFormElement {
   const form = document.createElement('form');
   const props = schema.properties;
   const reqs = schema.required;
-  const subschemas = [];
+  const subSchemas = [];
   let div : HTMLDivElement, elem : HTMLElement, label : HTMLLabelElement;
-  arrayFromObject(props).forEach(([key, subschema]) => {
-    elem = schemaToElement(subschema);
+  arrayFromObject(props).forEach(([key, subSchema]) => {
+    elem = schemaToElement(subSchema);
     if (isArray(reqs) && reqs.includes(key)) setAttribute(elem, 'required', true);
     div = (document.createElement('div') : any);
     label = (document.createElement('label') : any);
@@ -738,28 +797,22 @@ function schemaToForm(schema: Object): HTMLFormElement {
     div.appendChild(label);
     div.appendChild(elem);
     form.appendChild(div);
-    subschemas.push(subschema);
+    subSchemas.push(subSchema);
   });
   if (isObject(schema.dependencies)) {
     setDependencies(schema.dependencies, form, false);
   }
   if (isObject(schema.not)) {
-    setSchema(form, true, schema.not, subschemas);
+    setSchema(form, true, schema.not, subSchemas);
     if (isObject(schema.not.dependencies)) {
       setDependencies(schema.not.dependencies, form, true);
     }
   }
-  setSchema(form, false, schema, subschemas, 'allOf');
-  setSchema(form, false, schema, subschemas, 'anyOf');
-  setSchema(form, false, schema, subschemas, 'oneOf');
+  setSchema(form, false, schema, subSchemas, 'allOf');
+  setSchema(form, false, schema, subSchemas, 'anyOf');
+  setSchema(form, false, schema, subSchemas, 'oneOf');
   form.appendChild(newInput('submit'));
   addButtons(form);
   addButtonListener(form);
   return form;
 }
-
-exports.formToObject = formToObject;
-exports.formToSchema = formToSchema;
-exports.getInputs = getInputs;
-exports.objectToForm = objectToForm;
-exports.schemaToForm = schemaToForm;

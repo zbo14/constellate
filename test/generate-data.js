@@ -157,7 +157,7 @@ startPeer().then(() => {
     data.recording = {
         '@context': 'http://schema.org/',
         '@type': 'MusicRecording',
-        audio: [{ '/': hashes.audio }],
+        audio: { '/': hashes.audio },
         byArtist: [{ '/': hashes.performer }],
         producer: [{ '/': hashes.producer }],
         recordingOf: { '/': hashes.composition },

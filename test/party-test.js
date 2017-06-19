@@ -19,37 +19,37 @@ const recordLabel = JSON.parse(readFileSync(__dirname + '/party/recordLabel.json
 describe('Party', () => {
   it('validates Person schema', () => {
     assert.isNull(
-      validateSchema(Person, composer),
+      validateSchema(composer, Person),
       'should validate Person schema'
     );
   });
   it('validates Person schema', () => {
     assert.isNull(
-      validateSchema(Person, lyricist),
+      validateSchema(lyricist, Person),
       'should validate Person schema'
     );
   });
   it('validates MusicGroup schema', () => {
     assert.isNull(
-      validateSchema(MusicGroup, performer),
+      validateSchema(performer, MusicGroup),
       'should validate MusicGroup schema'
     );
   });
   it('validates Person schema', () => {
     assert.isNull(
-      validateSchema(Person, producer),
+      validateSchema(producer, Person),
       'should validate Person schema'
     );
   });
   it('validates Organization schema', () => {
     assert.isNull(
-      validateSchema(Organization, publisher),
+      validateSchema(publisher, Organization),
       'should validate Organization schema'
     );
   });
   it('validates Organization schema', () => {
     assert.isNull(
-      validateSchema(Organization, recordLabel),
+      validateSchema(recordLabel, Organization),
       'should validate Organization schema'
     );
   });
