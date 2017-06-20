@@ -39,16 +39,12 @@ const {
    } else if (isObject(argv)) {
      instance = (argv : any);
      form = instanceToForm(instance);
-     schema = formToSchema(form);
      this.element = () => form;
      this.instance = () => instance;
-     this.schema = () => schema;
    } else if (isString(argv)) {
      schema = new Schema(argv);
      form = schemaToForm(schema);
-     instance = formToInstance(form);
      this.element = () => form;
-     this.instance = () => instance;
      this.schema = () => schema;
    } else {
      throw new Error('unexpected parameter: ' + JSON.stringify(argv));
@@ -434,7 +430,7 @@ function addButtons(form: HTMLFormElement) {
 }
 
 function addButtonListener(form: HTMLFormElement) {
-  form.addEventListener('click', evt => {
+  form.addEventListener('click', (evt: Event) => {
       const btn : HTMLButtonElement = (evt.target: any);
       if (btn.nodeName !== 'BUTTON') return;
       evt.preventDefault();

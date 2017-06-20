@@ -135,14 +135,14 @@ function getTypesForProperty(property: string): string[] {
  }
 }
 
-function isDescendantType(descendant: string, type: string): boolean {
-  if (descendant === type) return true;
+function isAncestorType(ancestor: string, descendant: string): boolean {
+  if (ancestor === descendant) return true;
   const parent = getParentType(descendant);
   if (!parent) return false;
-  return isDescendantType(parent, type);
+  return isAncestorType(ancestor, parent);
 }
 
 exports.getParentType = getParentType;
 exports.getSubTypes = getSubTypes;
-exports.isDescendantType = isDescendantType;
 exports.getTypesForProperty = getTypesForProperty;
+exports.isAncestorType = isAncestorType;

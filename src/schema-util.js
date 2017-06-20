@@ -113,11 +113,13 @@ function mergeObject(schema: Object, properties: Object, options?: Object): Obje
     if (options.required && options.required.length) {
       const required = [].concat(options.required);
       if (schema.required && schema.required.length) {
-        required.push(...schema.required);
+          required.push(...schema.required);
       }
-      merged.required = new Set(required.sort());
+      merged.required = Array.from(new Set(required)).sort();
     }
-    //..
+    const otherOptions = Object.assign({}, options);
+    delete otherOptions.required;
+    Object.assign(merged, otherOptions);
   }
   return merged;
 }

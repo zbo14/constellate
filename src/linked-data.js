@@ -11,7 +11,7 @@ const {
 
 const {
   getTypesForProperty,
-  isDescendantType
+  isAncestorType
 } = require('../lib/ontology.js');
 
 const {
@@ -38,7 +38,7 @@ function dereference(cid: Object, node: Object): Promise<any> {
       return node.getFile(cid.multihash).then(resolve);
     }
     if (cid.codec === 'dag-cbor' && cid.version === 1) {
-      return node.getCBOR(cid).then(resolve);
+      return node.getObject(cid).then(resolve);
     }
     reject(new Error(`unexpected cid: codec=${cid.codec}, version=${cid.version}`));
   });
@@ -49,7 +49,7 @@ function validate(instance: Object, node: Object): Promise<Object> {
     const schema = new Schema(instance['@type']);
     const errors = schema.validate(instance);
     if (errors) {
-      return reject(new Error(JSON.stringify(errors)));
+      return reject(new Error(errors));
     }
     const promises = [];
     traverse(instance, (path, val, result) => {
@@ -73,7 +73,7 @@ function validate(instance: Object, node: Object): Promise<Object> {
             }
             const descendant = deref['@type'];
             const types = getTypesForProperty(key);
-            if (!types.some((type) => isDescendantType(descendant, type))) {
+            if (!types.some((type) => isAncestorType(type, descendant))) {
               return reject(new Error('invalid type for ' + key +  ': ' + descendant));
             }
             return validate(deref, node);

@@ -2,15 +2,7 @@
 
 const bip39 = require('bip39');
 const HDKey = require('ethereumjs-wallet/HDKey');
-const HookedWalletTxSubprovider = require('web3-provider-engine/subproviders/hooked-wallet-ethtx');
-const ProviderEngine = require('web3-provider-engine');
-const RpcSubprovider = require('web3-provider-engine/subproviders/rpc');
-const { sign } = require('ethjs-signer');
-const SignerProvider = require('ethjs-provider-signer');
-const Transaction = require('ethereumjs-tx');
-const Wallet = require('ethereumjs-wallet');
 const Web3 = require('web3');
-const Web3Subprovider = require('web3-provider-engine/subproviders/web3');
 
 // @flow
 
@@ -21,10 +13,9 @@ const Web3Subprovider = require('web3-provider-engine/subproviders/web3');
 module.exports = function Web3Eth(provider: Object) {
   this.web3 = new Web3(provider);
   this.callContract = callContract;
-  this.compileSource = _compileSource(this.web3);
   this.deployContract = _deployContract(this.web3);
   this.getAccounts = _getAccounts(this.web3);
-  this.getBalanceAndNonce = _getBalanceAndNonce(this.web3);
+  this.getAccountStatus = _getAccountStatus(this.web3);
   this.getBlock = _getBlock(this.web3);
   this.getContractAccount = _getContractAccount(this.web3);
   this.getTransaction = _getTransaction(this.web3);
@@ -37,8 +28,8 @@ module.exports = function Web3Eth(provider: Object) {
 }
 
 function callContract(
-  contract: Object, from: string, method: string,
-  params: any[], to: string, value: number): Promise<any> {
+  contract: Object, from: string, method: string, to: string,
+  value: number, ...params: any[]): Promise<any> {
   const instance = contract.at(to);
   value *= 1.0e18;
   return new Promise((resolve, reject) => {
@@ -52,29 +43,15 @@ function callContract(
   });
 }
 
-function _compileSource(web3: Object): Function {
-  return (source: string): Promise<Object> => {
-    return new Promise((resolve, reject) => {
-      web3.eth.compile.solidity(source, (err, compiled) => {
-        if (err) return reject(err);
-        resolve(compiled);
-      });
-    });
-  }
-}
-
 function _deployContract(web3: Object): Function {
-  return (from: string, source: string): Promise<Object> => {
+  return (contract: Object, from: string): Promise<Object> => {
     return new Promise((resolve, reject) => {
-      _compileSource(web3)(source).then((compiled) => {
-        const contract = _newContract(web3)(compiled);
-        const data = compiled.code;
-        web3.eth.estimateGas({ data }, (err, gas) => {
+      const data = contract.code;
+      web3.eth.estimateGas({ data }, (err, gas) => {
+        if (err) return reject(err);
+        contract.new({ data, from, gas }, (err, deployed) => {
           if (err) return reject(err);
-          contract.new({ data, from, gas }, (err, deployed) => {
-            if (err) return reject(err);
-            if (deployed.address) resolve(deployed);
-          });
+          if (deployed.address) resolve(deployed);
         });
       });
     });
@@ -100,12 +77,12 @@ function _getAccounts(web3: Object): Function {
   }
 }
 
-function _getBalanceAndNonce(web3: Object): Function {
-  return (addr: string): Promise<Object> => {
+function _getAccountStatus(web3: Object): Function {
+  return (address: string): Promise<Object> => {
     return new Promise((resolve, reject) => {
-      web3.eth.getBalance(addr, (err, balance) => {
+      web3.eth.getBalance(address, (err, balance) => {
         if (err) return reject(err);
-          web3.eth.getTransactionCount(addr, (err, nonce) => {
+          web3.eth.getTransactionCount(address, (err, nonce) => {
           if (err) return reject(err);
           balance /= 1.0e18;
           resolve({ balance, nonce });
@@ -116,19 +93,18 @@ function _getBalanceAndNonce(web3: Object): Function {
 }
 
 function _getBlock(web3: Object): Function {
-  return (hash: string): Promise<Object> => {
+  return (argv: number|string): Promise<Object> => {
     return new Promise((resolve, reject) => {
-      web3.eth.getBlock(hash, (err, block) => {
+      web3.eth.getBlock(argv, (err, block) => {
         if (err) return reject(err);
         const instance : Object  = {
           '@context': 'http://ethon.consensys.net/',
           '@type': 'Block',
-          blockCreationTime: new Date(block.timestamp).toISOString(),
-          blockDifficulty: block.difficulty,
+          blockCreationTime: new Date(block.timestamp*1000).toISOString(),
+          blockDifficulty: block.difficulty.toString(),
           blockGasLimit: block.gasLimit,
           blockGasUsed: block.gasUsed,
           blockHash: block.hash,
-          blockNonce: block.nonce,
           blockSize: block.size,
           createsPostBlockState: {
             '@type': 'WorldState',
@@ -150,6 +126,9 @@ function _getBlock(web3: Object): Function {
             transactionsRoot: block.transactionsRoot
           },
           number: block.number
+        }
+        if (block.nonce !== '0x0') {
+          instance.blockNonce = block.nonce;
         }
         if (block.uncles.length) {
           instance.knowsOfUncle = block.uncles.map((blockHash) => {
@@ -226,8 +205,16 @@ function _getTransactionReceipt(web3: Object): Function {
 }
 
 function _newContract(web3: Object): Function {
-  return (compiled: Object): Object => {
-    return web3.eth.contract(compiled.info.abiDefinition);
+  return (source: string): Promise<Object> => {
+    return new Promise((resolve, reject) => {
+      web3.eth.compile.solidity(source, (err, compiled) => {
+        if (err) return reject(err);
+        const contract = web3.eth.contract(compiled.info.abiDefinition);
+        console.log(contract, compiled);
+        contract.code = compiled.code;
+        resolve(contract);
+      });
+    });
   }
 }
 
@@ -255,8 +242,8 @@ function _sendEther(web3: Object): Function {
 }
 
 function sendTransaction(
-  contract: Object, from: string, method: string,
-  params: any[], to: string, value: number): Promise<string> {
+  contract: Object, from: string, method: string, to: string,
+  value: number, ...params: any[]): Promise<string> {
   const instance = contract.at(to);
   value *= 1.0e18;
   return new Promise((resolve, reject) => {
@@ -271,9 +258,9 @@ function sendTransaction(
 }
 
 function _signData(web3: Object): Function {
-  return (addr: string, data: string): Promise<Object> => {
+  return (address: string, data: string): Promise<Object> => {
     return new Promise((resolve, reject) => {
-      web3.eth.sign(addr, new Web3().sha3(data), (err, sig) => {
+      web3.eth.sign(address, new Web3().sha3(data), (err, sig) => {
         if (err) return reject(err);
         const r = '0x' + sig.slice(2, 66);
         const s = '0x' + sig.slice(66, 130);
@@ -290,11 +277,6 @@ const hdpath = "m/44'/60'/0'/0/";
 
 function defaultWallet(hdkey: Object): Object {
   return getWallet(hdkey, 0);
-}
-
-function generateMnemonic(entropy?: string): string {
-  if (!entropy) return bip39.generateMnemonic();
-  return bip39.entropyToMnemonic(entropy);
 }
 
 function getWallet(hdkey: Object, n: number): Object {

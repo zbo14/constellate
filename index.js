@@ -33,6 +33,7 @@ const txHash = document.getElementById('tx-hash');
 
 const addFileBtn = document.getElementById('add-file-btn');
 const callContractBtn = document.getElementById('call-contract-btn');
+const clearBlockBtn = document.getElementById('clear-block-btn');
 const clearDataBtn = document.getElementById('clear-data-btn');
 const clearFilesBtn = document.getElementById('clear-files-btn');
 const clearTxBtn = document.getElementById('clear-tx-btn');
@@ -58,11 +59,11 @@ const node = new IpfsNode();
 window.addEventListener('load', () => {
   if (!web3) return console.warn('Could not get web3 from MetaMask');
   web3eth = new Web3Eth(web3.currentProvider);
-  web3eth.getAccounts().then((accounts) => {
+  web3eth.getAccounts().then(accounts => {
     myAccount = accounts[0];
-    return web3eth.getBalanceAndNonce(myAccount.address);
-  }).then((obj) => {
-    console.log(`---- Account ----\naddress: "${myAccount.address}"\nbalance: ${obj.balance}\nnonce: ${obj.nonce}\n------------------`);
+    return web3eth.getAccountStatus(myAccount.address);
+  }).then(status => {
+    console.log(`---- Account ----\naddress: "${myAccount.address}"\nbalance: ${status.balance}\nnonce: ${status.nonce}\n------------------`);
   });
 });
 
@@ -81,19 +82,22 @@ addFileBtn.addEventListener('click', () => {
 callContractBtn.addEventListener('click', () => {
   if (contractSource.files.length) {
     readFileInput(contractSource, 'text').then(source => {
-      return web3eth.compileSource(source);
-    }).then(compiled => {
-      const contract = web3eth.newContract(compiled);
+      return web3eth.newContract(source);
+    }).then(contract => {
       const method = contractMethod.value;
       const params = JSON.parse(`[${methodParams.value}]`);
       const to = sendTo.value;
       const value = parseFloat(sendValue.value);
-      return web3eth.callContract(contract, myAccount.address, method, params, to, value);
+      return web3eth.callContract(contract, myAccount.address, method, to, value, ...params);
     }).then(val => {
       console.log('Result:', val);
     });
   }
 });
+
+clearBlockBtn.addEventListener('click', () => {
+  blockContainer.innerHTML = null;
+})
 
 clearDataBtn.addEventListener('click', () => {
   dataContainer.innerHTML = null;
@@ -111,14 +115,16 @@ deployContractBtn.addEventListener('click', () => {
   if (contractSource.files.length) {
     let account;
     readFileInput(contractSource, 'text').then(source => {
-      return web3eth.deployContract(myAccount.address, source);
+      return web3eth.newContract(source);
+    }).then(contract => {
+      return web3eth.deployContract(contract, myAccount.address);
     }).then(deployed => {
       sendTo.value = deployed.address;
       txHash.value = deployed.transactionHash;
       return web3eth.getContractAccount(deployed.address);
     }).then(_account => {
       account = _account;
-      return ld.validate(account);
+      return ld.validate(account, node);
     }).then(() => {
       return node.addObject(account);
     }).then(cid => {
@@ -154,7 +160,7 @@ formContainer.addEventListener('submit', evt => {
   evt.preventDefault();
   const form = new Form(formContainer.firstChild);
   const instance = form.instance();
-  ld.validate(instance).then(() => {
+  ld.validate(instance, node).then(() => {
     return node.addObject(instance);
   }).then(cid => {
     dataHash.value = cid.toBaseEncodedString();
@@ -165,17 +171,18 @@ formContainer.addEventListener('submit', evt => {
 getBlockBtn.addEventListener('click', () => {
   if (blockHash.value) {
     web3eth.getBlock(blockHash.value).then(block => {
-      return ld.validate(block);
+      return ld.validate(block, node);
     }).then(expanded => {
       const form = new Form(expanded);
-      blockContainer.innerHTML = form.element();
+      blockContainer.innerHTML = null;
+      blockContainer.appendChild(form.element());
     });
   }
 });
 
 getDataBtn.addEventListener('click', () => {
   node.getObject(dataHash.value).then(instance => {
-    return ld.validate(instance);
+    return ld.validate(instance, node);
   }).then(expanded => {
     const form = new Form(expanded);
     dataContainer.innerHTML = null;
@@ -193,11 +200,12 @@ getFileBtn.addEventListener('click', () => {
 
 getTxBtn.addEventListener('click', () => {
   if (txHash.value) {
-    getTransaction(txHash.value).then(tx => {
-      return ld.validate(tx);
+    web3eth.getTransaction(txHash.value).then(tx => {
+      return ld.validate(tx, node);
     }).then(expanded => {
       const form = new Form(expanded);
-      txContainer.innerHTML = form.element();
+      txContainer.innerHTML = null;
+      txContainer.appendChild(form.element());
     });
   }
 });
@@ -209,7 +217,7 @@ saveDataBtn.addEventListener('click', () => {
       let instance;
       node.getObject(dataHash.value).then(_instance => {
         instance = _instance;
-        return ld.validate(instance);
+        return ld.validate(instance, node);
       }).then(() => {
         data[name] = instance;
         hashes[name] = dataHash.value;
@@ -244,20 +252,19 @@ sendTxBtn.addEventListener('click', () => {
   if (contractSource.files.length) {
     let tx;
     readFileInput(contractSource, 'text').then(source => {
-      return web3eth.compileSource(source);
-    }).then(compiled => {
-      const contract = web3eth.newContract(compiled);
+      return web3eth.newContract(source);
+    }).then(contract => {
       const method = contractMethod.value;
       const params = JSON.parse(`[${methodParams.value}]`);
       const to = sendTo.value;
       const value = sendValue.value;
-      return web3eth.sendTransaction(contract, myAccount.address, method, params, to, value);
+      return web3eth.sendTransaction(contract, myAccount.address, method, to, value, ...params);
     }).then(hash => {
       txHash.value = hash;
       return web3eth.getTransaction(hash);
     }).then(_tx => {
       tx = _tx;
-      return ld.validate(tx);
+      return ld.validate(tx, node);
     }).then(() => {
       return node.addObject(tx);
     }).then(cid => {

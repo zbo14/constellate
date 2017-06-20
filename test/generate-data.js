@@ -1,4 +1,5 @@
-const { promiseSequence } = require('../lib/util.js');
+const { promiseSequence } = require('../lib/gen-util.js');
+const IpfsNode = require('../lib/ipfs-node');
 
 const {
   createReadStream,
@@ -6,42 +7,35 @@ const {
   writeFileSync
 } = require('fs');
 
-const {
-  addFile,
-  putCBOR,
-  startPeer
-} = require('../lib/ipfs.js');
-
 const data = {};
 const hashes = {};
 
+const node = new IpfsNode();
+
 function setDataHash(name) {
-  return putCBOR(data[name]).then((cid) => {
+  return node.addObject(data[name]).then((cid) => {
     hashes[name] = cid.toBaseEncodedString();
   });
 }
 
 function setFileHash(path) {
   const readStream = createReadStream(__dirname + path);
-  return addFile(readStream, '').then((hash) => {
+  return node.addFile(readStream, '').then((hash) => {
     hashes[path] = hash;
   });
 }
 
-startPeer().then(() => {
 
-  data.externalAccount = {
-    '@context': 'http://ethon.consensys.net/',
-    '@type': 'ExternalAccount',
-    accountPublicKey: '0x9679ef1d1b14e180244409421d55875e9c705012e89846546dbb7ceb00e4213797e2e2235b55e51521ad0a468fa05cd2df70dc6d937883cde3bff7bb01b0f43b',
-    address: '0xc7b0395675becc4e2947b2a287e9dc1ed3133e61'
-  }
+data.externalAccount = {
+  '@context': 'http://ethon.consensys.net/',
+  '@type': 'ExternalAccount',
+  accountPublicKey: '0x9679ef1d1b14e180244409421d55875e9c705012e89846546dbb7ceb00e4213797e2e2235b55e51521ad0a468fa05cd2df70dc6d937883cde3bff7bb01b0f43b',
+  address: '0xc7b0395675becc4e2947b2a287e9dc1ed3133e61'
+}
 
-  writeFileSync(__dirname + '/ethon/external-account.json', JSON.stringify(data.externalAccount));
+writeFileSync(__dirname + '/ethon/external-account.json', JSON.stringify(data.externalAccount));
 
-  return setDataHash('externalAccount');
-
-}).then(() => {
+setDataHash('externalAccount').then(() => {
 
   data.composer = {
       '@context': 'http://schema.org/',

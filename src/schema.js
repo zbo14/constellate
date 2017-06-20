@@ -251,6 +251,7 @@ const MusicPlaylist = newObject({
 });
 
 const AudioObject = mergeObject(MediaObject, {
+    '@type': newType('AudioObject'),
     bitrate: String,
     duration: newString({
         pattern: '^T(\\d+H)?(\\d+M)?(\\d+S)?$'
@@ -265,6 +266,7 @@ const AudioObject = mergeObject(MediaObject, {
 });
 
 const ImageObject = mergeObject(MediaObject, {
+    '@type': newType('ImageObject'),
     encodingFormat: newEnum([
         '',
         'jpeg',
@@ -477,11 +479,11 @@ const Block = newObject({
     '@context': newContext('http://ethon.consensys.net/'),
     '@type': newType('Block'),
     blockCreationTime: DateTime,
-    blockDifficulty: WholeNumber,
+    blockDifficulty: String,
     blockGasLimit: WholeNumber,
     blockGasUsed: WholeNumber,
     blockHash: Hex32,
-    blockNonce: WholeNumber,
+    blockNonce: newString({ pattern: '^0x[A-Fa-f0-9]{16}$' }),
     blockSize: WholeNumber,
     createsPostBlockState: newObject({
       '@type': newType('WorldState'),
