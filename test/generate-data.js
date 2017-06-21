@@ -60,15 +60,6 @@ node.start().then(() => {
       url: 'http://lyricist-homepage.com'
   }
 
-  data.performer = {
-      '@context': 'http://schema.org/',
-      '@type': 'MusicGroup',
-      email: 'performer@example.com',
-      name: 'performer',
-      sameAs: ['http://bandcamp-page.com'],
-      url: 'http://performer-homepage.com'
-  }
-
   data.producer = {
       '@context': 'http://schema.org/',
       '@type': 'Person',
@@ -83,7 +74,7 @@ node.start().then(() => {
       '@context': 'http://schema.org/',
       '@type': 'Organization',
       email: 'publisher@example.com',
-      name: 'publisher',
+      name: 'publisher name',
       url: 'http://publisher-homepage.com'
   }
 
@@ -96,7 +87,6 @@ node.start().then(() => {
 
   writeFileSync(__dirname + '/party/composer.json', JSON.stringify(data.composer));
   writeFileSync(__dirname + '/party/lyricist.json', JSON.stringify(data.lyricist));
-  writeFileSync(__dirname + '/party/performer.json', JSON.stringify(data.performer));
   writeFileSync(__dirname + '/party/producer.json', JSON.stringify(data.producer));
   writeFileSync(__dirname + '/party/publisher.json', JSON.stringify(data.publisher));
   writeFileSync(__dirname + '/party/recordLabel.json', JSON.stringify(data.recordLabel));
@@ -104,7 +94,6 @@ node.start().then(() => {
   return promiseSequence(
     () => setDataHash('composer'),
     () => setDataHash('lyricist'),
-    () => setDataHash('performer'),
     () => setDataHash('producer'),
     () => setDataHash('publisher'),
     () => setDataHash('recordLabel'),
@@ -114,10 +103,21 @@ node.start().then(() => {
 
 }).then(() => {
 
+    data.band = {
+        '@context': 'http://schema.org/',
+        '@type': 'MusicGroup',
+        email: 'band@example.com',
+        member: [{ '/': hashes.composer }],
+        name: 'band name',
+        url: 'http://band-homepage.com'
+    }
+
     data.audio = {
         '@context': 'http://schema.org/',
         '@type': 'AudioObject',
+        bitrate: '320',
         contentUrl:  { '/': hashes['/test.mp3'] },
+        duration: 'T4M33S',
         encodingFormat: 'mp3'
     }
 
@@ -125,6 +125,7 @@ node.start().then(() => {
         '@context': 'http://schema.org/',
         '@type': 'MusicComposition',
         composer: [{ '/': hashes.composer }],
+        genre: 'slimecore',
         iswcCode: 'T-034.524.680-1',
         lyricist: [{ '/': hashes.lyricist }],
         name: 'song-title',
@@ -138,11 +139,13 @@ node.start().then(() => {
         encodingFormat: 'png'
     }
 
+    writeFileSync(__dirname + '/party/band.json', JSON.stringify(data.band));
     writeFileSync(__dirname + '/meta/composition.json', JSON.stringify(data.composition));
     writeFileSync(__dirname + '/meta/audio.json', JSON.stringify(data.audio));
     writeFileSync(__dirname + '/meta/image.json', JSON.stringify(data.image));
 
     return promiseSequence(
+        () => setDataHash('band'),
         () => setDataHash('audio'),
         () => setDataHash('composition'),
         () => setDataHash('image')
@@ -154,10 +157,9 @@ node.start().then(() => {
         '@context': 'http://schema.org/',
         '@type': 'MusicRecording',
         audio: [{ '/': hashes.audio }],
-        byArtist: [{ '/': hashes.performer }],
+        byArtist: [{ '/': hashes.band }],
         producer: [{ '/': hashes.producer }],
-        recordingOf: { '/': hashes.composition },
-        recordLabel: [{ '/': hashes.recordLabel }]
+        recordingOf: { '/': hashes.composition }
     }
 
     writeFileSync(__dirname + '/meta/recording.json', JSON.stringify(data.recording));
@@ -171,9 +173,9 @@ node.start().then(() => {
         '@type': 'MusicAlbum',
         albumProductionType: 'DemoAlbum',
         albumReleaseType: 'SingleRelease',
-        byArtist: [{ '/': hashes.performer }],
+        byArtist: [{ '/': hashes.band }],
         image: { '/': hashes.image },
-        name: 'ding ding dooby doo',
+        name: 'album title',
         producer: [{ '/': hashes.producer }],
         track: [{ '/': hashes.recording }]
     }
@@ -207,7 +209,10 @@ node.start().then(() => {
 
 }).then(() => {
   data.compositionCopyright = {
-    '@context': 'http://coalaip.org/',
+    '@context': [
+      'http://coalaip.org/',
+      'http://schema.org/'
+    ],
     '@type': 'Copyright',
     rightsOf: { '/': hashes.composition },
     territory: {
@@ -229,7 +234,10 @@ node.start().then(() => {
   }
 
   data.recordingCopyright = {
-    '@context': 'http://coalaip.org/',
+    '@context': [
+      'http://coalaip.org/',
+      'http://schema.org/'
+    ],
     '@type': 'Copyright',
     rightsOf: { '/': hashes.recording },
     territory: {
@@ -290,7 +298,10 @@ node.start().then(() => {
   }
 
   data.compositionRightAssignment = {
-    '@context': 'http://coalaip.org/',
+    '@context': [
+      'http://coalaip.org/',
+      'http://schema.org/'
+    ],
     '@type': 'RightsTransferAction',
     transferContract: { '/': hashes.contractAccount }
   }
@@ -301,7 +312,7 @@ node.start().then(() => {
       'http://schema.org/'
     ],
     '@type': 'ReviewAction',
-    asserter: { '/': hashes.performer },
+    asserter: { '/': hashes.band },
     assertionSubject: { '/': hashes.recordingCopyright },
     assertionTruth: false,
     error: 'validThrough'
@@ -331,7 +342,10 @@ node.start().then(() => {
   }
 
   data.recordingRightAssignment = {
-    '@context': 'http://coalaip.org/',
+    '@context': [
+      'http://coalaip.org/',
+      'http://schema.org/'
+    ],
     '@type': 'RightsTransferAction',
     transferContract: { '/': hashes.contractAccount }
   }

@@ -14,7 +14,7 @@ const node = new IpfsNode();
 
 data.composer = JSON.parse(readFileSync(__dirname + '/party/composer.json'));
 data.lyricist = JSON.parse(readFileSync(__dirname + '/party/lyricist.json'));
-data.performer = JSON.parse(readFileSync(__dirname + '/party/performer.json'));
+data.band = JSON.parse(readFileSync(__dirname + '/party/band.json'));
 data.producer = JSON.parse(readFileSync(__dirname + '/party/producer.json'));
 data.publisher = JSON.parse(readFileSync(__dirname + '/party/publisher.json'));
 data.recordLabel = JSON.parse(readFileSync(__dirname + '/party/recordLabel.json'));
@@ -70,7 +70,7 @@ return node.start().then(() => {
     () => setCID('externalAccount'),
     () => setCID('composer'),
     () => setCID('lyricist'),
-    () => setCID('performer'),
+    () => setCID('band'),
     () => setCID('producer'),
     () => setCID('publisher'),
     () => setCID('recordLabel'),

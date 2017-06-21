@@ -1,1 +1,1 @@
-{"@context":"http://coalaip.org/","@type":"RightsTransferAction","transferContract":{"/":"zdpuAmoUdEBgEJ6aPJBkZMm1qr1cNW3uD9nxJr2j3JU2F6xaN"}}
+{"@context":["http://coalaip.org/","http://schema.org/"],"@type":"RightsTransferAction","transferContract":{"/":"zdpuAmoUdEBgEJ6aPJBkZMm1qr1cNW3uD9nxJr2j3JU2F6xaN"}}
