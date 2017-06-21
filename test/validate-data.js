@@ -1,21 +1,16 @@
-const { validateLD } = require('../lib/linked-data.js');
-const { promiseSequence } = require('../lib/util.js');
+const { promiseSequence } = require('../lib/gen-util.js');
+const IpfsNode = require('../lib/ipfs-node.js');
+const ld = require('../lib/linked-data.js');
 
 const {
   createReadStream,
   readFileSync
 } = require('fs');
 
-const {
-  addFile,
-  getCBOR,
-  putCBOR,
-  startPeer
-} = require('../lib/ipfs.js');
-
 const cids = {};
 const data = {};
 const multihashes = {};
+const node = new IpfsNode();
 
 data.composer = JSON.parse(readFileSync(__dirname + '/party/composer.json'));
 data.lyricist = JSON.parse(readFileSync(__dirname + '/party/lyricist.json'));
@@ -45,33 +40,31 @@ data.recordingCopyrightAssertion = JSON.parse(readFileSync(__dirname + '/coala/r
 data.recordingRight = JSON.parse(readFileSync(__dirname + '/coala/recording-right.json'));
 data.recordingRightAssignment = JSON.parse(readFileSync(__dirname + '/coala/recording-right-assignment.json'));
 
-function setMultihash(path) {
-  const readStream = createReadStream(__dirname + path);
-  return addFile(readStream, '').then((hash) => {
-    const name = path.split('/').pop()
-    console.log(name + ': ' + hash);
-    multihashes[path] = hash;
-  });
-}
-
-function getCBORAndValidate(name) {
-  return getCBOR(cids[name]).then((dagNode) => {
-    return validateLD(dagNode);
+function getObjectAndValidate(name) {
+  return node.getObject(cids[name]).then(obj => {
+    return ld.validate(obj, node);
   }).then(() => {
     console.log('Validated ' + name);
   });
 }
 
 function setCID(name) {
-  return putCBOR(data[name]).then((cid) => {
+  return node.addObject(data[name]).then(cid => {
     console.log(name + ': ' + cid.toBaseEncodedString());
     cids[name] = cid;
   });
 }
 
-startPeer().then((details) => {
+function setMultihash(path) {
+  const readStream = createReadStream(__dirname + path);
+  return node.addFile(readStream).then(multihash => {
+    const name = path.split('/').pop()
+    console.log(name + ': ' + multihash);
+    multihashes[path] = multihash;
+  });
+}
 
-  console.log('Peer details:', details);
+return node.start().then(() => {
 
   return promiseSequence(
     () => setCID('externalAccount'),
@@ -104,17 +97,22 @@ startPeer().then((details) => {
 }).then(() => {
 
   return promiseSequence(
-    () => getCBORAndValidate('composition'),
-    () => getCBORAndValidate('compositionCopyright'),
-    () => getCBORAndValidate('compositionCopyrightAssertion'),
-    () => getCBORAndValidate('compositionRight'),
-    () => getCBORAndValidate('compositionRightAssignment'),
-    () => getCBORAndValidate('recording'),
-    () => getCBORAndValidate('recordingCopyright'),
-    () => getCBORAndValidate('recordingCopyrightAssertion'),
-    () => getCBORAndValidate('recordingRight'),
-    () => getCBORAndValidate('recordingRightAssignment'),
-    () => getCBORAndValidate('release')
+    () => getObjectAndValidate('composition'),
+    () => getObjectAndValidate('compositionCopyright'),
+    () => getObjectAndValidate('compositionCopyrightAssertion'),
+    () => getObjectAndValidate('compositionRight'),
+    () => getObjectAndValidate('compositionRightAssignment'),
+    () => getObjectAndValidate('recording'),
+    () => getObjectAndValidate('recordingCopyright'),
+    () => getObjectAndValidate('recordingCopyrightAssertion'),
+    () => getObjectAndValidate('recordingRight'),
+    () => getObjectAndValidate('recordingRightAssignment'),
+    () => getObjectAndValidate('release')
   );
 
-}).then(() => console.log('done'));
+}).then(() => {
+
+  console.log('Validation complete');
+  process.exit();
+
+});

@@ -108,7 +108,7 @@ module.exports = function(argv: Object|string) {
   this.validate = (instance) => {
     validate(instance);
     if (!validate.errors) return null;
-    return JSON.stringify(validate.errors, null, 2);
+    return new Error(JSON.stringify(validate.errors));
   }
 }
 

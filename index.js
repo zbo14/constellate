@@ -56,6 +56,8 @@ let data = {},
 
 const node = new IpfsNode();
 
+node.start();
+
 window.addEventListener('load', () => {
   if (!web3) return console.warn('Could not get web3 from MetaMask');
   web3eth = new Web3Eth(web3.currentProvider);

@@ -9,7 +9,7 @@
     "gulp": "gulp",
     "remove-types": "read -p 'Enter filename: ' filename && export FILENAME=$filename && flow-remove-types src/${FILENAME} | js-beautify -o lib/${FILENAME}",
     "start": "http-server -a localhost -p 8888 -o -c-1",
-    "test": "mocha --compilers js:babel-core/register --require babel-polyfill --recursive './test/*-test.js'"
+    "test": "cd test/ && node generate-data.js && node validate-data.js"
   },
   "babel": {
     "presets": [

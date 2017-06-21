@@ -25,23 +25,25 @@ function setFileHash(path) {
   });
 }
 
+node.start().then(() => {
 
-data.externalAccount = {
-  '@context': 'http://ethon.consensys.net/',
-  '@type': 'ExternalAccount',
-  accountPublicKey: '0x9679ef1d1b14e180244409421d55875e9c705012e89846546dbb7ceb00e4213797e2e2235b55e51521ad0a468fa05cd2df70dc6d937883cde3bff7bb01b0f43b',
-  address: '0xc7b0395675becc4e2947b2a287e9dc1ed3133e61'
-}
+  data.externalAccount = {
+    '@context': 'http://ethon.consensys.net/',
+    '@type': 'ExternalAccount',
+    accountPublicKey: '0x9679ef1d1b14e180244409421d55875e9c705012e89846546dbb7ceb00e4213797e2e2235b55e51521ad0a468fa05cd2df70dc6d937883cde3bff7bb01b0f43b',
+    address: '0xc7b0395675becc4e2947b2a287e9dc1ed3133e61'
+  }
 
-writeFileSync(__dirname + '/ethon/external-account.json', JSON.stringify(data.externalAccount));
+  writeFileSync(__dirname + '/ethon/external-account.json', JSON.stringify(data.externalAccount));
 
-setDataHash('externalAccount').then(() => {
+  return setDataHash('externalAccount');
+
+}).then(() => {
 
   data.composer = {
       '@context': 'http://schema.org/',
       '@type': 'Person',
       birthDate: '1995-01-01',
-      controlsAccount: [{ '/': hashes.externalAccount }],
       email: 'composer@example.com',
       familyName: 'lastName',
       givenName: 'firstName',
@@ -151,7 +153,7 @@ setDataHash('externalAccount').then(() => {
     data.recording = {
         '@context': 'http://schema.org/',
         '@type': 'MusicRecording',
-        audio: { '/': hashes.audio },
+        audio: [{ '/': hashes.audio }],
         byArtist: [{ '/': hashes.performer }],
         producer: [{ '/': hashes.producer }],
         recordingOf: { '/': hashes.composition },
@@ -350,4 +352,9 @@ setDataHash('externalAccount').then(() => {
     () => setDataHash('recordingRightAssignment')
   );
 
-}).then(() => console.log('done'));
+}).then(() => {
+
+  console.log('Generated data');
+  process.exit();
+
+});

@@ -28,8 +28,8 @@ const {
 
 function getCID(path: string, val: any): ?Object {
   const key = path.slice(-1)[0];
-  const errors = linkSchema.validate({ [key]: val });
-  return (!errors ? new CID(val) : null);
+  const err = linkSchema.validate({ [key]: val });
+  return (!err ? new CID(val) : null);
 }
 
 function dereference(cid: Object, node: Object): Promise<any> {
@@ -47,10 +47,8 @@ function dereference(cid: Object, node: Object): Promise<any> {
 function validate(instance: Object, node: Object): Promise<Object> {
   return new Promise((resolve, reject) => {
     const schema = new Schema(instance['@type']);
-    const errors = schema.validate(instance);
-    if (errors) {
-      return reject(new Error(errors));
-    }
+    const err = schema.validate(instance);
+    if (err) return reject(err);
     const promises = [];
     traverse(instance, (path, val, result) => {
       const cid = getCID(path, val);

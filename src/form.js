@@ -24,7 +24,7 @@ const {
 // @flow
 
 /**
- * @module constellate/src/schema-form
+ * @module constellate/src/form
  */
 
  module.exports = function(argv: HTMLFormElement|Object|string) {

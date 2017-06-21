@@ -112,6 +112,18 @@ const node = new IpfsNode();
 
 `Promise<Object>`
 
+#### node.start
+
+##### Returns
+
+`Promise`
+
+#### node.stop
+
+##### Returns
+
+`Promise`
+
 #### node.version
 
 ##### Returns
@@ -221,7 +233,7 @@ schema = new Schema('MusicRecording');
 
 ##### Returns
 
-`string|null` - an error message if validation fails, null if validation passes.
+`Error|null` - an error if validation fails, null if validation passes.
 
 TODO: separate doc outlining JSON schema.
 
@@ -249,7 +261,7 @@ window.addEventListener('load', () => {
 #### web3eth.callContract
 
 ##### Parameters
-`Object` - a [contract](#newcontract) object.
+`Object` - a [contract](#web3ethnewcontract) object.
 
 `string` - the caller's address.
 
@@ -267,7 +279,7 @@ window.addEventListener('load', () => {
 #### web3eth.deployContract
 
 ##### Parameters
-`Object` - the [contract](#newcontract) object.
+`Object` - the [contract](#web3ethnewcontract) object.
 
 `string` - the deployer's address.
 
@@ -342,7 +354,7 @@ window.addEventListener('load', () => {
 #### web3eth.sendTransaction
 
 ##### Parameters
-`Object` - the [contract](#newcontract) object.
+`Object` - the [contract](#web3ethnewcontract) object.
 
 `string` - the sender's address.
 

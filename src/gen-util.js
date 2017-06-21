@@ -86,7 +86,9 @@ function orderStringify(obj: Object, space?: number): Object {
           }
           return 0;
         }
-        return x < y;
+        if (x < y) return -1;
+        if (x > y) return 1;
+        return 0;
       });
     }
     return v;

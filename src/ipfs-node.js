@@ -69,16 +69,28 @@ module.exports = function() {
       sharding: true
     }
   });
-  this.ipfs.on('start', () => {
-    console.log('Started IPFS Node');
-    setInterval(_refreshPeers(this.ipfs), 1000);
-  });
   this.addFile = _addFile(this.ipfs);
   this.addObject = _addObject(this.ipfs);
   this.calcHash = calcHash;
   this.getFile = _getFile(this.ipfs);
   this.getObject = _getObject(this.ipfs);
   this.info = this.ipfs.id;
+  this.start = () => {
+    return new Promise((resolve, _) => {
+      this.ipfs.on('start', () => {
+        this.intervalId = setInterval(_refreshPeers(this.ipfs), 1000);
+        resolve(console.log('Started IPFS Node'));
+      });
+    });
+  }
+  this.stop = () => {
+    return new Promise((resolve, _) => {
+      return this.ipfs.stop(() => {
+        clearInterval(this.intervalId);
+        resolve(console.log('Stopped IPFS Node'));
+      });
+    });
+  }
   this.version = this.ipfs.version;
 }
 
