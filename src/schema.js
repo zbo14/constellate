@@ -291,39 +291,54 @@ const Copyright = mergeObject(Intangible, {
     required: ['rightsOf']
 });
 
+const DigitalFingerprint = mergeObject(Intangible, {
+    '@context': newContext(
+      'http://coalaip.org/',
+      'http://schema.org/'
+    ),
+    '@type': newType('DigitalFingerprint'),
+    fingerprint: String,
+    fingerprintOf: Link
+  }, {
+    required: [
+      'fingerprint',
+      'fingerprintOf'
+    ]
+});
+
 
 const Right = mergeObject(Intangible, {
-        '@context': newContext(
-            'http://coalaip.org/',
-            'http://schema.org/'
-        ),
-        '@type': newType('Right'),
-        exclusive: Boolean,
-        license: Link,
-        numberOfUses: newNumber({
-            minimum: 1
-        }),
-        percentageShares: newNumber({
-            minimum: 1,
-            maximum: 100
-        }),
-        rightContext: newArray(String, {
-            minItems: 1,
-            uniqueItems: true
-        }),
-        source: Link,
-        territory: Territory,
-        usageType: newArray(String, {
-            minItems: 1,
-            uniqueItems: true
-        }),
-        validFrom: DateTime,
-        validThrough: DateTime
-    }, {
-    required: [
-        'license',
-        'source'
-    ]
+    '@context': newContext(
+        'http://coalaip.org/',
+        'http://schema.org/'
+    ),
+    '@type': newType('Right'),
+    exclusive: Boolean,
+    license: Link,
+    numberOfUses: newNumber({
+        minimum: 1
+    }),
+    percentageShares: newNumber({
+        minimum: 1,
+        maximum: 100
+    }),
+    rightContext: newArray(String, {
+        minItems: 1,
+        uniqueItems: true
+    }),
+    source: Link,
+    territory: Territory,
+    usageType: newArray(String, {
+        minItems: 1,
+        uniqueItems: true
+    }),
+    validFrom: DateTime,
+    validThrough: DateTime
+}, {
+  required: [
+    'license',
+    'source'
+  ]
 });
 
 const Organization = mergeObject(Thing, {
@@ -501,6 +516,9 @@ module.exports = function(argv: Object|string) {
             break;
         case 'Copyright':
             Object.assign(this, Copyright);
+            break;
+        case 'DigitalFingerprint':
+            Object.assign(this, DigitalFingerprint);
             break;
         case 'Right':
             Object.assign(this, Right);
