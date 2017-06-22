@@ -260,7 +260,7 @@
 ### [Copyright](https://github.com/COALAIP/specs/tree/master/schema#rrm-right)
 ##### Thing > Intangible > Copyright
 
-`rightsOf` - merkle-link to a [Creativework](#creativework)
+`rightsOf` - merkle-link to a [CreativeWork](#creativework)
 
 `territory` - [Place](http://schema.org/Place) with country code
 
@@ -286,6 +286,13 @@
     "validThrough": "2088-01-01T00:00:00Z"
 }
 ```
+
+### [DigitalFingerprint](https://github.com/COALAIP/specs/tree/master/schema#fingerprinting)
+##### Thing > Intangible > DigitalFingerprint
+
+`fingerprint` - string
+
+`fingerprintOf` - merkle-link to media blob
 
 
 ### [Right](https://github.com/COALAIP/specs/tree/master/schema#rrm-right)
