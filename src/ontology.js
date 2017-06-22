@@ -20,6 +20,7 @@ function getParentType(type: string): string {
     case 'MusicRecording':
       return 'CreativeWork';
     case 'Copyright':
+    case 'DigitalFingerprint':
     case 'Right':
       return 'Intangible';
     case 'AudioObject':
@@ -65,6 +66,7 @@ function getSubTypes(type: string): string[] {
     case 'Intangible':
       return [
         'Copyright',
+        'DigitalFingerprint',
         'Right'
       ];
     case 'MediaObject':
