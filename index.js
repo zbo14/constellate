@@ -3,6 +3,7 @@
 const Form = require('./lib/form.js');
 const IpfsNode = require('./lib/ipfs-node.js');
 const ld = require('./lib/linked-data.js');
+const request = require('browser-request');
 const Web3Eth = require('./lib/web3-eth.js');
 require('setimmediate');
 
@@ -40,6 +41,7 @@ const clearTxBtn = document.getElementById('clear-tx-btn');
 const deployContractBtn = document.getElementById('deploy-contract-btn');
 const exportBtn = document.getElementById('export-btn');
 const externalAccountBtn = document.getElementById('external-account-btn');
+const fingerprintBtn = document.getElementById('fingerprint-btn');
 const getBlockBtn = document.getElementById('get-block-btn');
 const getDataBtn = document.getElementById('get-data-btn');
 const getFileBtn = document.getElementById('get-file-btn');
@@ -156,6 +158,30 @@ externalAccountBtn.addEventListener('click', () => {
     dataHash.value = cid.toBaseEncodedString();
     console.log('Pushed external account');
   });
+});
+
+fingerprintBtn.addEventListener('click', () => {
+  if (fileHash.value) {
+    const filepath = prompt('Enter path to audio file', '');
+    if (!filepath) return;
+    request({
+      json: { filepath },
+      method: 'POST',
+      url: 'http://localhost:8888/fingerprint',
+    }, (err, _, body) => {
+        if (err) throw err;
+        const obj = Object.assign({}, body, {
+          fingerprintOf: {
+            '/': fileHash.value
+          }
+        });
+        node.addObject(obj).then(cid => {
+          dataHash.value = cid.toBaseEncodedString();
+          console.log('Calculated fingerprint');
+        });
+      }
+    );
+  }
 });
 
 formContainer.addEventListener('submit', evt => {

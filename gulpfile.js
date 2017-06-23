@@ -36,6 +36,6 @@ gulp.task('bundle', function() {
   .pipe(sourcemaps.init({ loadMaps: true }))
   .on('error', gutil.log)
   .pipe(rename({ basename: 'bundle' }))
-  .pipe(sourcemaps.write('./'))
-  .pipe(gulp.dest('./'));
+  .pipe(sourcemaps.write('./public'))
+  .pipe(gulp.dest('./public'));
 });

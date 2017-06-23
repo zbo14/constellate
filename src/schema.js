@@ -297,7 +297,10 @@ const DigitalFingerprint = mergeObject(Intangible, {
       'http://schema.org/'
     ),
     '@type': newType('DigitalFingerprint'),
-    fingerprint: String,
+    fingerprint: newString({
+      // from https://stackoverflow.com/questions/475074/regex-to-parse-or-validate-base64-data#comment28944795_5885097
+      pattern: '^(?:[A-Za-z0-9+/]{4})+(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}‌​=)?$'
+    }),
     fingerprintOf: Link
   }, {
     required: [
