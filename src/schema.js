@@ -2,7 +2,8 @@
 
 const {
   isObject,
-  isString
+  isString,
+  orderObject
 } = require('../lib/gen-util.js');
 
 const {
@@ -485,69 +486,70 @@ const Tx = newObject({
 });
 
 module.exports = function(argv: Object|string) {
+  let schema;
   if (isObject(argv)) {
-    Object.assign(this, argv);
+    schema = argv;
   } else if (isString(argv)) {
     switch(argv) {
         case 'ReviewAction':
-            Object.assign(this, ReviewAction);
+            schema = ReviewAction;
             break;
         case 'RightsTransferAction':
-            Object.assign(this, RightsTransferAction);
+            schema = RightsTransferAction;
             break;
         case 'MusicComposition':
-            Object.assign(this, MusicComposition);
+            schema = MusicComposition;
             break;
         case 'MusicRecording':
-            Object.assign(this, MusicRecording);
+            schema = MusicRecording;
             break;
         case 'AudioObject':
-            Object.assign(this, AudioObject);
+            schema = AudioObject;
             break;
         case 'ImageObject':
-            Object.assign(this, ImageObject);
+            schema = ImageObject;
             break;
         case 'MusicPlaylist':
-            Object.assign(this, MusicPlaylist);
+            schema = MusicPlaylist;
             break;
         case 'MusicAlbum':
-            Object.assign(this, MusicAlbum);
+            schema = MusicAlbum;
             break;
         case 'MusicRelease':
-            Object.assign(this, MusicRelease);
+            schema = MusicRelease;
             break;
         case 'Copyright':
-            Object.assign(this, Copyright);
+            schema = Copyright;
             break;
         case 'DigitalFingerprint':
-            Object.assign(this, DigitalFingerprint);
+            schema = DigitalFingerprint;
             break;
         case 'Right':
-            Object.assign(this, Right);
+            schema = Right;
             break;
         case 'Organization':
-            Object.assign(this, Organization);
+            schema = Organization;
             break;
         case 'MusicGroup':
-            Object.assign(this, MusicGroup);
+            schema = MusicGroup;
             break;
         case 'Person':
-            Object.assign(this, Person);
+            schema = Person;
             break;
         case 'Account':
-            Object.assign(this, Account);
+            schema = Account;
             break;
         case 'ContractAccount':
-            Object.assign(this, ContractAccount);
+            schema = ContractAccount;
             break;
         case 'ExternalAccount':
-            Object.assign(this, ExternalAccount);
+            schema = ExternalAccount;
             break;
         case 'Block':
-            Object.assign(this, Block);
+            schema = Block;
             break;
         case 'Tx':
-            Object.assign(this, Tx);
+            schema = Tx;
             break;
         default:
             throw new Error('unexpected type: ' + argv);
@@ -555,6 +557,7 @@ module.exports = function(argv: Object|string) {
   } else {
     throw new Error('unexpected parameter: ' + JSON.stringify(argv));
   }
+  Object.assign(this, orderObject(schema));
   const validate = ajv.compile(this);
   this.validate = (instance) => {
     validate(instance);

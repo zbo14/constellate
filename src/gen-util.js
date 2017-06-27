@@ -102,7 +102,7 @@ function promiseSequence(...fns: Function[]): Promise<any> {
     }, Promise.resolve());
 }
 
-function readFileInput(input: HTMLInputElement, readAs: string): Promise<ArrayBuffer> {
+function readFileInput(input: HTMLInputElement, readAs: string): Promise<ArrayBuffer|string> {
   const reader = new FileReader();
   return new Promise((resolve, reject) => {
     reader.onload = () => resolve(reader.result);

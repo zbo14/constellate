@@ -4,6 +4,10 @@ const bip39 = require('bip39');
 const HDKey = require('ethereumjs-wallet/HDKey');
 const Web3 = require('web3');
 
+const {
+  orderObject
+} = require('../lib/gen-util.js');
+
 // @flow
 
 /**
@@ -135,7 +139,7 @@ function _getBlock(web3: Object): Function {
             return { '@type': 'Block', blockHash };
           });
         }
-        resolve(instance);
+        resolve(orderObject(instance));
       });
     });
   }
@@ -187,7 +191,7 @@ function _getTransaction(web3: Object): Function {
         if (value) {
           instance.value = value;
         }
-        resolve(instance);
+        resolve(orderObject(instance));
       });
     });
   }
@@ -210,7 +214,7 @@ function _newContract(web3: Object): Function {
       web3.eth.compile.solidity(source, (err, compiled) => {
         if (err) return reject(err);
         const contract = web3.eth.contract(compiled.info.abiDefinition);
-        console.log(contract, compiled);
+        // console.log(contract, compiled);
         contract.code = compiled.code;
         resolve(contract);
       });

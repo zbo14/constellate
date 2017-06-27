@@ -369,6 +369,6 @@ node.start().then(() => {
 }).then(() => {
 
   console.log('Generated data');
-  process.exit();
+  return node.stop();
 
-});
+}).then(process.exit);

@@ -85,7 +85,7 @@ function validate(instance: Object, node: Object): Promise<Object> {
     const expanded = cloneObject(instance);
     Promise.all(promises).then(results => {
       for (let i = 0; i < results.length; i++) {
-        const keys = results[i][0].split('/').filter((key) => !!key);
+        const keys = results[i][0].split('/').filter(key => !!key);
         let lastKey = keys.pop();
         if (!lastKey) {
           keys.pop();

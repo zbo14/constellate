@@ -1,6 +1,4 @@
 bundle.*
 .DS_Store
 *.log
-*.mp3
 node_modules
-*.png

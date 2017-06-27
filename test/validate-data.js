@@ -113,6 +113,6 @@ return node.start().then(() => {
 }).then(() => {
 
   console.log('Validation complete');
-  process.exit();
+  return node.stop();
 
-});
+}).then(process.exit);

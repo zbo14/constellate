@@ -12,6 +12,7 @@ const {
   isObject,
   isString,
   newAnchor,
+  orderObject,
   transform,
   traverse,
   withoutIndex
@@ -45,7 +46,7 @@ const {
      schema = new Schema(argv);
      form = schemaToForm(schema);
      this.element = () => form;
-     this.schema = () => schema;
+     this.schema = () => _schema;
    } else {
      throw new Error('unexpected parameter: ' + JSON.stringify(argv));
    }
@@ -355,7 +356,7 @@ function formToInstance(form: HTMLFormElement): Object {
 
 function divsToInstance(divs : HTMLDivElement[]): Object {
   let elem : HTMLElement, label : HTMLLabelElement;
-  return divs.reduce((result, div) => {
+  const instance = divs.reduce((result, div) => {
     if (!(elem = (div.lastChild : any))) {
       throw new Error('expected element');
     }
@@ -369,6 +370,7 @@ function divsToInstance(divs : HTMLDivElement[]): Object {
     if (instance == null || (isArray(instance) && instance.some(x => x == null))) return result;
     return Object.assign({}, result, { [label.textContent]: instance } );
   }, {});
+  return orderObject(instance);
 }
 
 function formToSchema(form: HTMLFormElement): Object {
@@ -408,7 +410,7 @@ function divsToSchema(divs: HTMLDivElement[]): Object  {
     properties: {},
     required: []
   });
-  return new Schema(schema);
+  return new Schema(orderObject(schema));
 }
 
 function addButtons(form: HTMLFormElement) {
