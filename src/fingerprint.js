@@ -1,4 +1,3 @@
-const btoa = require('btoa');
 const fpcalc = require('fpcalc');
 
 // @flow
@@ -7,24 +6,22 @@ const fpcalc = require('fpcalc');
  * @module constellate/src/fingerprint.js
  */
 
-module.exports = function(filepath: string, length?: number) {
+module.exports = function() {
   this.calculate = (filepath: string, length: number): Promise<Object> => {
-    const options = { raw: true };
+    const options : Object = {};
     if (length) Object.assign(options, { length });
     return new Promise((resolve, reject) => {
       fpcalc(filepath, options, (err, result) => {
         if (err) return reject(err);
-        const raw = result.fingerprint;
-        const enc = btoa(raw.join(','));
-        this.raw = () => raw;
-        this.encode = () => enc;
+        const encoded = result.fingerprint;
+        this.decode(encoded);
         resolve({
           '@context': [
             'http://coalaip.org/',
             'http://schema.org/'
           ],
           '@type': 'DigitalFingerprint',
-          fingerprint: this.encode()
+          fingerprint: encoded
         });
       });
     });
@@ -36,21 +33,31 @@ module.exports = function(filepath: string, length?: number) {
     if (!other.raw || !other.raw().length) {
       throw new Error('could not get other raw fingerprint');
     }
-    return compare(this.raw, other.raw);
+    return compare(this.raw(), other.raw());
   }
-  this.decode = (enc: string) => {
-    const raw = atob(enc).split(',');
+  this.encode = (): string => {
+    if (!this.raw || !this.raw().length) {
+      throw new Error('could not get raw fingerprint');
+    }
+    const compressed = compress(1, this.raw());
+    return base64Encode(compressed).toString();
+  }
+  this.decode = (encoded: string) => {
+    if (this.raw && this.raw().length) {
+      console.warn('overwriting raw fingerprint');
+    }
+    const ui8 = base64Decode(Buffer.from(encoded));
+    const raw = decompress(ui8);
     this.raw = () => raw;
-    this.encode = () => enc;
   }
-  this.match = (other: Object): boolean => {
-    if (!this.raw ||!this.raw().length) {
+  this.match = (other: Object): Object[] => {
+    if (!this.raw || !this.raw().length) {
       throw new Error('could not get this raw fingerprint');
     }
     if (!other.raw || !other.raw().length) {
       throw new Error('could not get other raw fingerprint');
     }
-    return match(/* matchThreshold */, this.raw, other.raw);
+    return match(10.0, this.raw(), other.raw());
   }
 }
 
@@ -58,19 +65,21 @@ function popcnt(x: number): number {
   return ((x >>> 0).toString(2).match(/1/g) || []).length;
 }
 
-function resize(arr: number[], size: number): number[] {
-  if (arr.length >= size) return arr.slice(0, size);
-  return arr.concat(Array.apply(null, { length: size-arr.length }).map(() => 0));
+function add(arr: any[], i: number, x: number) {
+  if (i < arr.length) arr[i] = x;
+  arr.push(x);
 }
 
 function hammingDistance(x1: number, x2: number): number {
-  const bitseg = (x1 >>> 0).toString(2);
-  const bits2 = (x2 >>> 0).toString(2);
-  if (bitseg.length !== bits2.length) {
-    throw new Error('different number of bits');
+  let bits1 = (x1 >>> 0).toString(2);
+  let bits2 = (x2 >>> 0).toString(2);
+  if (bits1.length > bits2.length) {
+    bits2 = '0'.repeat(bits1.length - bits2.length) + bits2;
+  } else if (bits1.length < bits2.length) {
+    bits1 = '0'.repeat(bits2.length - bits1.length) + bits1;
   }
-  return Array.from(bitseg).reduce((result, bit, i) => {
-    if (bit ^ bits2[i]) result++;
+  return Array.from(bits1).reduce((result, bit, i) => {
+    if (bit !== bits2[i]) result++;
     return result;
   }, 0);
 }
@@ -81,25 +90,31 @@ function compare(raw1: number[], raw2: number[]): number {
   if (!raw1.length || !raw2.length) {
     throw new Error('cannot compare empty fingerprint');
   }
-  const diff = raw1.length - raw2.length;
-  const errs = [];
-  let i, j;
-  if (diff) {
-    for (i = 0; i <= diff; i++) {
-      errs.push(0)
-      for (j = 0; j < raw2.length; j++) {
-        errs[i] += popcnt(fp1[i+j] ^ fp2[j]);
+  const diff = Math.abs(raw1.length - raw2.length);
+  let err = 0, i;
+  if (!diff) {
+    for (i = 0; i < raw1.length; i++) {
+      err += popcnt(raw1[i] ^ raw2[i]);
+    }
+  } else {
+    let j;
+    const errs = new Uint32Array(diff);
+    if (raw1.length > raw2.length) {
+      for (i = 0; i < errs.length; i++) {
+        for (j = 0; j < raw2.length; j++) {
+          errs[i] += popcnt(raw1[i+j] ^ raw2[j]);
+        }
+      }
+    } else {
+      for (i = 0; i < errs.length; i++) {
+        for (j = 0; j < raw1.length; j++) {
+          errs[i] += popcnt(raw1[j] ^ raw2[i+j]);
+        }
       }
     }
-    return 1 - Math.min(...errs) / 32 / raw2.length;
+    err = Math.min(...errs);
   }
-  for (i = 0; i <= diff; i++) {
-    errs.push(0)
-    for (j = 0; j < raw1.length; j++) {
-      errs[i] += popcnt(fp1[j] ^ fp2[i+j]);
-    }
-  }
-  return 1 - Math.min(...errs) / 32 / raw1.length;
+  return 1 - err / 32 / Math.min(raw1.length, raw2.length);
 }
 
 /*
@@ -132,6 +147,371 @@ THE SOFTWARE.
 
 */
 
+// from https://github.com/acoustid/chromaprint/blob/master/src/utils/base64.h
+
+function getBase64EncodedSize(size: number): number {
+  return (size * 4 + 2) / 3;
+}
+
+function getBase64DecodedSize(size: number): number {
+  return size * 3 / 4;
+}
+
+function base64Encode(input: Uint8Array, terminate?: bool): Buffer {
+  const kBase64Chars = Buffer.from('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_');
+  let size = input.length;
+  const output = Buffer.alloc(getBase64EncodedSize(size));
+  let i = 0, j = 0;
+  while (size >= 3) {
+    output[i++] = kBase64Chars[(input[j] >> 2) & 63];
+    output[i++] = kBase64Chars[((input[j] << 4 ) | (input[j+1] >> 4)) & 63];
+    output[i++] = kBase64Chars[((input[j+1] << 2) | (input[j+2] >> 6)) & 63];
+    output[i++] = kBase64Chars[input[j+2] & 63];
+    j += 3;
+    size -= 3;
+  }
+  if (size) {
+    output[i++] = kBase64Chars[(input[j] >> 2) & 63];
+    if (size === 1) {
+      output[i++] = kBase64Chars[(input[j] << 4) & 63];
+    }
+    if (size === 2) {
+      output[i++] = kBase64Chars[((input[j] << 4) | (input[j+1] >> 4)) & 63];
+      output[i++] = kBase64Chars[(input[j+1] << 2) & 63];
+    }
+  }
+  if (terminate) output[i] = '\0'.charCodeAt(0);
+  return output;
+}
+
+function base64Decode(input: Buffer): Uint8Array {
+  const kBase64CharsReversed = [
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 62, 0, 0,
+  	52,	53, 54, 55, 56, 57, 58, 59,
+  	60, 61, 0, 0, 0, 0, 0, 0,
+
+  	0, 0, 1, 2, 3, 4, 5, 6,
+  	7, 8, 9, 10, 11, 12, 13, 14,
+  	15, 16, 17, 18, 19,	20, 21, 22,
+  	23, 24, 25, 0, 0, 0, 0, 63,
+  	0, 26, 27, 28, 29, 30, 31, 32,
+  	33,	34, 35, 36, 37,	38, 39, 40,
+  	41,	42, 43, 44, 45, 46, 47, 48,
+  	49,	50, 51, 0, 0, 0, 0, 0,
+
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0,
+  	0, 0, 0, 0, 0, 0, 0, 0
+  ];
+  let size = input.length;
+  const output = new Uint8Array(getBase64DecodedSize(size));
+  let i = 0, j = 0;
+  while (size >= 4) {
+    output[i++] = (kBase64CharsReversed[input[j] & 255] << 2) | (kBase64CharsReversed[input[j+1] & 255] >> 4);
+    output[i++] = ((kBase64CharsReversed[input[j+1] & 255] << 4) & 255) | (kBase64CharsReversed[input[j+2] & 255] >> 2);
+    output[i++] = ((kBase64CharsReversed[input[j+2] & 255] << 6) & 255) | kBase64CharsReversed[input[j+3] & 255];
+    j += 4;
+    size -=4;
+  }
+  if (size >= 2) {
+    output[i++] = (kBase64CharsReversed[input[j] & 255] << 2) | (kBase64CharsReversed[input[j+1] & 255] >> 4);
+    if (size === 3) {
+      output[i] = ((kBase64CharsReversed[input[j+1] & 255] << 4) & 255) | (kBase64CharsReversed[input[j+2] & 255] >> 2);
+    }
+  }
+  return output;
+}
+
+// from https://github.com/acoustid/chromaprint/blob/master/src/fingerprint_compressor.cpp
+
+const kNormalBits = 3;
+const kMaxNormalValue = (1 << kNormalBits) - 1;
+
+function compress(algorithm: number, input: Uint32Array): Uint8Array {
+  const size = input.length;
+  let normalBits = [], exceptionalBits = [];
+  if (size) {
+    normalBits = new Array(size);
+    exceptionalBits = new Array(Math.round(size / 10));
+    let bit, lastBit, x, value;
+    let i, j = 0, k = 0;
+    for (i = 0; i < size; i++) {
+      bit = 1;
+      lastBit = 0;
+      x = input[i];
+      if (i) x ^= input[i-1];
+      while (!!x) {
+        if (x & 1) {
+          if ((value = bit - lastBit) >= kMaxNormalValue) {
+            add(normalBits, j++, kMaxNormalValue);
+            add(exceptionalBits, k++, value - kMaxNormalValue);
+          } else {
+            add(normalBits, j++, value);
+          }
+          lastBit = bit;
+        }
+        x >>>= 1;
+        bit++;
+      }
+      add(normalBits, j++ , 0);
+    }
+    normalBits = normalBits.slice(0, j);
+    exceptionalBits = exceptionalBits.slice(0, k);
+  }
+  const packedInt3ArraySize = getPackedInt3ArraySize(normalBits.length);
+  const output = new Uint8Array(4 + packedInt3ArraySize + getPackedInt5ArraySize(exceptionalBits.length));
+  output[0] = algorithm & 255;
+  output[1] = (size >> 16) & 255;
+  output[2] = (size >> 8) & 255;
+  output[3] = size & 255;
+  output.set(packInt3Array(Uint8Array.from(normalBits)), 4);
+  output.set(packInt5Array(Uint8Array.from(exceptionalBits)), 4 + packedInt3ArraySize);
+  return output;
+}
+
+// from https://github.com/acoustid/chromaprint/blob/master/src/fingerprint_decompressor.cpp
+
+const kExceptionBits = 5;
+
+function decompress(input: Uint8Array): Uint32Array {
+  const size = input.length;
+  if (size < 4) {
+    throw new Error('fingerprint cannot be shorter than 4 bytes');
+  }
+  const algorithm = input[0];
+  const numValues = (input[1] << 16) | (input[2] << 8) | input[3];
+  let offset = 4;
+  let bits = unpackInt3Array(input.slice(offset));
+  let foundValues = 0, i, numExceptionalBits = 0;
+  for (i = 0; i < bits.length; i++) {
+    if (!bits[i]) {
+      if (++foundValues === numValues) {
+        bits = bits.slice(0, i+1);
+        break;
+      }
+    } else if (bits[i] === kMaxNormalValue) {
+      numExceptionalBits++;
+    }
+  }
+  if (foundValues !== numValues) {
+    throw new Error('fingerprint is too short, not enough data for normal bits');
+  }
+  offset += getPackedInt3ArraySize(bits.length);
+  if (size + 1 < Math.floor(offset + getPackedInt5ArraySize(numExceptionalBits))) {
+    throw new Error('fingerprint is too short, not enough data for exceptional bits');
+  }
+  if (numExceptionalBits) {
+    const exceptionalBits = unpackInt5Array(input.slice(offset));
+    let j = 0;
+    for (i = 0; i < bits.length; i++) {
+      if (bits[i] === kMaxNormalValue) {
+        bits[i] += exceptionalBits[j++];
+      }
+    }
+  }
+  return unpackBits(bits, numValues);
+}
+
+function unpackBits(bits: Uint8Array, size: number): Uint32Array {
+  const output = new Uint32Array(size).map(() => -1);
+  let bit = 0, value = 0;
+  let i = 0, j;
+  for (j = 0; j < bits.length; j++) {
+    if (!bits[j]) {
+      output[i] = (!i ? value : output[i-1] ^ value);
+      bit = 0;
+      value = 0;
+      i++;
+      continue;
+    }
+    bit += bits[j];
+    value |= 1 << (bit - 1);
+  }
+  return output;
+}
+
+// from https://github.com/acoustid/chromaprint/blob/master/src/utils/pack_int3_array.h
+
+function getPackedInt3ArraySize(size: number): number {
+  return (size * 3 + 7) / 8;
+}
+
+function packInt3Array(input: Uint8Array): Uint8Array {
+  let size = input.length;
+  const output = new Uint8Array(getPackedInt3ArraySize(size));
+  let i = 0, j = 0;
+  while (size >= 8) {
+    output[i++] = (input[j] & 0x07) | ((input[j+1] & 0x07) << 3) | ((input[j+2] & 0x03) << 6);
+    output[i++] = ((input[j+2] & 0x04) >> 2) | ((input[j+3] & 0x07) << 1) | ((input[j+4] & 0x07) << 4) | ((input[j+5] & 0x01) << 7);
+    output[i++] = ((input[j+5] & 0x06) >> 1) | ((input[j+6] & 0x07) << 2) | ((input[j+7] & 0x07) << 5);
+    j += 8;
+    size -= 8;
+  }
+  if (size >= 1) {
+    output[i] = input[j] & 0x07;
+  }
+  if (size >= 2) {
+    output[i] |= (input[j+1] & 0x07) << 3;
+  }
+  if (size >= 3) {
+    output[i++] |= (input[j+2] & 0x03) << 6;
+    output[i] = (input[j+2] & 0x04) >> 2;
+  }
+  if (size >= 4) {
+    output[i] |= (input[j+3] & 0x07) << 1;
+  }
+  if (size >= 5) {
+    output[i] |= (input[j+4] & 0x07) << 4;
+  }
+  if (size >= 6) {
+    output[i++] |= (input[j+5] & 0x01) << 7;
+    output[i] = (input[j+5] & 0x06) >> 1;
+  }
+  if (size === 7) {
+    output[i] |= (input[j+6] & 0x07) << 2;
+  }
+  return output;
+}
+
+// from https://github.com/acoustid/chromaprint/blob/master/src/utils/pack_int5_array.h
+
+function getPackedInt5ArraySize(size: number): number {
+  return (size * 5 + 7) / 8;
+}
+
+function packInt5Array(input: Uint8Array): Uint8Array {
+  let size = input.length;
+  const output = new Uint8Array(getPackedInt5ArraySize(size));
+  let i = 0, j = 0;
+  while (size >= 8) {
+    output[i++] = (input[j] & 0x1f) | ((input[j+1] & 0x07) << 5);
+    output[i++] = ((input[j+1] & 0x18) >> 3) | ((input[j+2] & 0x1f) << 2) | ((input[j+3] & 0x01) << 7);
+    output[i++] = ((input[j+3] & 0x1e) >> 1) | ((input[j+4] & 0x0f) << 4);
+    output[i++] = ((input[j+4] & 0x10) >> 4) | ((input[j+5] & 0x1f) << 1) | ((input[j+6] & 0x03) << 6);
+    output[i++] = ((input[j+6] & 0x1c) >> 2) | ((input[j+7] & 0x1f) << 3);
+    j += 8;
+    size -= 8;
+  }
+  if (size >= 1) {
+    output[i] = input[j] & 0x1f;
+  }
+  if (size >= 2) {
+    output[i++] |= (input[j+1] & 0x07) << 5;
+    output[i] = (input[j+1] & 0x18) >> 3;
+  }
+  if (size >= 3) {
+    output[i] |= (input[j+2] & 0x1f) << 2;
+  }
+  if (size >= 4) {
+    output[i++] |= (input[j+3] & 0x01) << 7;
+    output[i] = (input[j+3] & 0x1e) >> 1;
+  }
+  if (size >= 5) {
+    output[i++] |= (input[j+4] & 0x0f) << 4;
+    output[i] = (input[j+4] & 0x10) >> 4;
+  }
+  if (size >= 6) {
+    output[i] |= (input[j+5] & 0x1f) << 1;
+  }
+  if (size === 7) {
+    output[i++] |= (input[j+6] & 0x03) << 6;
+    output[i] = (input[j+6] & 0x1c) >> 2;
+  }
+  return output;
+}
+
+// from https://github.com/acoustid/chromaprint/blob/master/src/utils/unpack_int3_array.h
+
+function getUnpackedInt3ArraySize(size: number): number {
+  return size * 8 / 3;
+}
+
+function unpackInt3Array(input: Uint8Array): Uint8Array {
+  let size = input.length;
+  const output = new Uint8Array(getUnpackedInt3ArraySize(size));
+  let i = 0, j = 0;
+  while (size >= 3) {
+    output[i++] = input[j] & 0x07;
+    output[i++] = (input[j] & 0x38) >> 3;
+    output[i++] = ((input[j] & 0xc0) >> 6) | ((input[j+1] & 0x01) << 2);
+    output[i++] = (input[j+1] & 0x0e) >> 1;
+    output[i++] = (input[j+1] & 0x70) >> 4;
+    output[i++] = ((input[j+1] & 0x80) >> 7) | ((input[j+2] & 0x03) << 1);
+    output[i++] = (input[j+2] & 0x1c) >> 2;
+    output[i++] = (input[j+2] & 0xe0) >> 5;
+    j += 3;
+    size -= 3;
+  }
+  if (size >= 1) {
+    output[i++] = input[j] & 0x07;
+    output[i++] = (input[j] & 0x38) >> 3;
+  }
+  if (size === 2) {
+    output[i++] = ((input[j] & 0xc0) >> 6) | ((input[j+1] & 0x01) << 2);
+    output[i++] = (input[j+1] & 0x0e) >> 1;
+    output[i++] = (input[j+1] & 0x70) >> 4;
+  }
+  return output;
+}
+
+// from https://github.com/acoustid/chromaprint/blob/master/src/utils/unpack_int5_array.h
+
+function getUnpackedInt5ArraySize(size: number): number {
+  return size * 8 / 5;
+}
+
+function unpackInt5Array(input: Uint8Array): Uint8Array {
+  let size = input.length;
+  const output = new Uint8Array(getUnpackedInt5ArraySize(size));
+  let i = 0, j = 0;
+  while (size >= 5) {
+    output[i++] = input[j] & 0x1f;
+    output[i++] = ((input[j] & 0xe0) >> 5) | ((input[j+1] & 0x03) << 3);
+    output[i++] = (input[j+1] & 0x7c) >> 2;
+    output[i++] = ((input[j+1] & 0x80) >> 7) | ((input[j+2] & 0x0f) << 1);
+    output[i++] = ((input[j+2] & 0xf0) >> 4) | ((input[j+3] & 0x01) << 4);
+    output[i++] = (input[j+3] & 0x3e) >> 1;
+    output[i++] = ((input[j+3] & 0xc0) >> 6) | ((input[j+4] & 0x07) << 2);
+    output[i++] = (input[j+4] & 0xf8) >> 3;
+    j += 5;
+    size -= 5;
+  }
+  if (size >= 1) {
+    output[i++] = input[j] & 0x1f;
+  }
+  if (size >= 2) {
+    output[i++] = ((input[j] & 0xe0) >> 5) | ((input[j+1] & 0x03) << 3);
+    output[i++] = (input[j+1] & 0x7c) >> 2;
+  }
+  if (size >= 3) {
+    output[i++] = ((input[j+1] & 0x80) >> 7) | ((input[j+2] & 0x0f) << 1);
+  }
+  if (size === 4) {
+    output[i++] = ((input[j+2] & 0xf0) >> 4) | ((input[j+3] & 0x01) << 4);
+    output[i++] = (input[j+3] & 0x3e) >> 1;
+  }
+  return output;
+}
+
 // from https://github.com/acoustid/chromaprint/blob/master/src/utils/gaussian_filter.h
 
 function ReflectIterator(size: number) {
@@ -140,27 +520,46 @@ function ReflectIterator(size: number) {
   this.size = size;
   this.moveForward = () => {
     if (this.forward) {
-      if (this.pos + 1 < this.size) this.pos++;
-      else this.forward = false;
+      if (this.pos + 1 === this.size) {
+        this.forward = false;
+      } else {
+        this.pos++;
+      }
     } else {
-      if (this.pos) this.pos--;
-      else this.forward = true;
+      if (!this.pos) {
+        this.forward = true;
+      } else {
+        this.pos--;
+      }
     }
   }
   this.moveBack = () => {
     if (this.forward) {
-      if (this.pos) this.pos--;
-      else this.forward = false;
+      if (!this.pos) {
+        this.forward = false;
+      } else {
+        this.pos--;
+      }
     } else {
-      if (this.pos + 1 < this.size) this.pos++;
-      else this.forward = true;
+      if (this.pos + 1 === this.size) {
+        this.forward = true;
+      } else {
+        this.pos++;
+      }
     }
   }
 }
 
-function boxFilter(input: number[], output: number[], w: number): number[] {
+function boxFilter(input: Uint32Array, output: Uint32Array, w: number): Uint32Array {
   const size = input.length;
-  const output = resize(output, size);
+  if (output.length > size) {
+    output = output.slice(0, size);
+  }
+  if (output.length < size) {
+    const tmp = output;
+    output = new Uint32Array(size);
+    output.set(tmp);
+  }
   if (!w || !size) return output;
   const wl = w / 2;
   const wr = w - wl;
@@ -171,7 +570,7 @@ function boxFilter(input: number[], output: number[], w: number): number[] {
     iter1.moveBack();
     iter2.moveBack();
   }
-  let sum;
+  let sum = 0;
   for (i = 0; i < w; i++) {
     sum += input[iter2.pos];
     iter2.moveForward();
@@ -204,13 +603,13 @@ function boxFilter(input: number[], output: number[], w: number): number[] {
   return output;
 }
 
-function gaussianFilter(input: number[], n: number, sigma: number): number[] {
+function gaussianFilter(input: Uint32Array, n: number, sigma: number): Uint32Array {
   const w = Math.floor(Math.sqrt(12 * sigma * sigma / n + 1));
   const wl = w - (w % 2 ? 0 : 1);
   const wu = wl + 2;
   const m = Math.round((12 * sigma * sigma - n * wl * wl - 4 * n * wl - 3 * n) / (-4 * wl - 4));
-  let i = 0, output = [];
-  for (; i < m; i++) {
+  let i, output = new Uint32Array([]);
+  for (i = 0; i < m; i++) {
     [input, output] = [boxFilter(input, output, wl), input];
   }
   for (; i < n; i++) {
@@ -222,55 +621,47 @@ function gaussianFilter(input: number[], n: number, sigma: number): number[] {
 
 // from https://github.com/acoustid/chromaprint/blob/master/src/utils/gradient.h
 
-function gradient(input: number[]): number[] {
-  const output = [];
-  if (!input.length) return output;
-  let i = 0;
+function gradient(input: Uint32Array, size: number): Uint32Array {
+  const output = new Uint32Array(size);
+  if (input.length <= 1) return output;
+  let i = 0, j = 0;
   let f0 = input[i++];
-  if (i === input.length) {
-    output.push(0)
-    return output;
-  }
   let f1 = input[i++];
-  output.push(f1 - f0);
+  output[j++] = f1 - f0;
   if (i === input.length) {
-    output.push(f1 - f0);
+    output[j] = f1 - f0;
     return output;
   }
   let f2 = input[i++];
-  while(true) {
-    output.push((f2 - f0) / 2);
-    if (i === input.length) {
-      output.push(f2 - f1);
-      return output;
-    }
-    [f0, f1, f2] = [f1, f2, input[i++]];
+  for ( ; i < input.length; i++) {
+    output[j++] = (f2 - f0) / 2;
+    [f0, f1, f2] = [f1, f2, input[i]];
   }
+  output[j] = f2 - f1;
+  return output;
 }
 
 // from https://github.com/acoustid/chromaprint/blob/master/src/fingerprint_matcher.h
 
-function Segment(pos1: number, pos2: number, duration: number, score: number, leftScore: number, rightScore: number) {
+function Segment(pos1: number, pos2: number, duration: number, score: number, leftScore?: number, rightScore?: number) {
   this.pos1 = pos1;
   this.pos2 = pos2;
   this.duration = duration;
   this.score = score;
-  this.leftScore = leftScore;
-  this.rightScore = rightScore;
-  this.publicScore = (): number => {
-    return Math.round(this.score * 100 + 0.5);
-  }
-  this.merged = (other: Object): Object => {
-    if (this.pos1 + this.duration !== other.pos1) {
-      throw new Error('this.pos1 + this.duration !== other.pos1');
-    }
-    if (this.pos2 + this.duration !== other.pos2) {
-      throw new Error('this.pos2 + this.duration !== other.pos2');
-    }
+  if (leftScore) this.leftScore = leftScore;
+  else this.leftScore = score;
+  if (rightScore) this.rightScore = rightScore;
+  else this.rightScore = score;
+  this.merge = (other: Object) => {
+    if (this.pos1 + this.duration !== other.pos1 ||
+        this.pos2 + this.duration !== other.pos2) return;
     const newDuration = this.duration + other.duration;
     const newScore = (this.score * this.duration + other.score * other.duration) / newDuration;
-    return new Segment(this.pos1, this.pos2, newDuration, newScore, score, other.score);
+    Object.assign(this, Segment(this.pos1, this.pos2, newDuration, newScore, score, other.score));
   }
+  // this.publicScore = (): number => {
+  //  return Math.round(this.score * 100 + 0.5);
+  // }
 }
 
 // from https://github.com/acoustid/chromaprint/blob/master/src/fingerprint_matcher.cpp
@@ -279,35 +670,35 @@ const ALIGN_BITS = 12;
 
 const alignStrip = x => x >>> (32 - ALIGN_BITS);
 
-function match(matchThreshold: number, raw1: number[], raw2: number[]): Error {
+function match(matchThreshold: number, raw1: Uint32Array, raw2: Uint32Array): Object[] {
   const hashShift = 32 - ALIGN_BITS;
   const hashMask = ((1 << ALIGN_BITS) - 1) << hashShift;
   const offsetMask = (1 << (32 - ALIGN_BITS - 1)) - 1;
   const sourceMask = 1 << (32 - ALIGN_BITS - 1);
   if (raw1.length + 1 >= offsetMask) {
-    return new Error('fingerprint 1 is too long');
+    throw new Error('fingerprint 1 is too long');
   }
   if (raw2.length + 1 >= offsetMask) {
-    return new Error('fingerprint 2 is too long');
+    throw new Error('fingerprint 2 is too long');
   }
-  const offsets = [];
+  const offsets = new Uint32Array(raw1.length + raw2.length);
   let i, j;
   for (i = 0; i < raw1.length; i++) {
-    offsets.push((alignStrip(raw1[i]) << hashShift) | (i & offsetMask));
+    offsets[i] = (alignStrip(raw1[i]) << hashShift) | (i & offsetMask);
   }
   for (i = 0; i < raw2.length; i++) {
-    offsets.push((alignStrip(raw2[i]) << hashShift) | (i & offsetMask) | sourceMask);
+    offsets[raw1.length + i] = (alignStrip(raw2[i]) << hashShift) | (i & offsetMask) | sourceMask;
   }
   offsets.sort();
-  const histogram = Array.apply(null, { length: raw1.length + raw2.length }).map(() => 0);
+  const histogram = new Uint32Array(raw1.length + raw2.length);
   let hash1, offset1, source1,
       hash2, offset2, source2,
       offsetDiff;
   for (i = 0; i < offsets.length ; i++) {
-    source1 = offset[i] & sourceMask;
+    source1 = offsets[i] & sourceMask;
     if (source1) continue;
     hash1 = offsets[i] & hashMask;
-    offset1 = offset[i] & offsetMask;
+    offset1 = offsets[i] & offsetMask;
     for (j = i; j < offsets.length; j++) {
       hash2 = offsets[j] & hashMask;
       if (hash1 !== hash2) break;
@@ -315,7 +706,7 @@ function match(matchThreshold: number, raw1: number[], raw2: number[]): Error {
       source2 = offsets[j] & sourceMask;
       if (source2) {
         offsetDiff = offset1 + raw2.length - offset2;
-        histogram[offsetDiff]++
+        histogram[offsetDiff]++;
       }
     }
   }
@@ -339,18 +730,15 @@ function match(matchThreshold: number, raw1: number[], raw2: number[]): Error {
   let bitCounts, size;
   for (i = 0; i < bestAlignments.length; i++) {
     offsetDiff = bestAlignments[i].i - raw2.length;
-    offset1 = offsetDiff > 0 ? offsetDiff : 0;
-    offset2 = offsetDiff < 0 ? -offsetDiff : 0;
+    offset1 = (offsetDiff > 0 ? offsetDiff : 0);
+    offset2 = (offsetDiff < 0 ? -offsetDiff : 0);
     size = Math.min(raw1.length - offset1, raw2.length - offset2);
-    bitCounts = Array.apply(null, { length: size }).map(() => 0);
+    bitCounts = new Uint32Array(size);
     for (j = 0; j < size; j++) {
       bitCounts[j] = hammingDistance(raw1[offset1+j], raw2[offset2+j]) + Math.random() / 1000;
     }
-    const smoothedBitCounts = gaussianFilter(bitCounts, 8.0, 3);
-    const g = gradient(smoothedBitCounts);
-    for (i = 0; i < size; i++) {
-      if (gradient[i] < 0) gradient[i] *= -1;
-    }
+    const smoothedBitCounts = gaussianFilter(bitCounts, 3, 8.0);
+    const g = gradient(smoothedBitCounts, size).map(Math.abs);
     const peaks = [];
     for (i = 0; i < size; i++) {
       if (i && i < size - 1 && g[i] > 0.15 && g[i] >= g[i-1] && g[i] >= g[i+1]) {
@@ -368,11 +756,12 @@ function match(matchThreshold: number, raw1: number[], raw2: number[]): Error {
         return result + x;
       }, 0.0) / duration;
       if (score < matchThreshold) {
-        merged = false;
+        added = false;
         if (segments.length) {
           seg = segments.slice(-1)[0];
           if (Math.abs(seg.score - score) < 0.7) {
-            segments[segments.length-1] = seg.merged(new Segment(offset1 + begin, offset2 + begin, duration, score));
+            seg.merge(new Segment(offset1 + begin, offset2 + begin, duration, score));
+            segments[segments.length - 1] = seg;
             added = true;
           }
         }
@@ -384,5 +773,12 @@ function match(matchThreshold: number, raw1: number[], raw2: number[]): Error {
     }
     break;
   }
-  return null;
+  // let matchDuration = 0, matchScore = 0;
+  // for (i = 0; i < segments.length; i++) {
+  //  matchDuration += segments[i].duration;
+  //  matchScore += segments[i].score;
+  // }
+  // matchDuration /= size;
+  // matchScore = 1 - matchScore / i / matchThreshold;
+  return segments;
 }
