@@ -196,7 +196,7 @@ matchBtn.addEventListener('click', () => {
     fp1.decode(fingerprint1.value);
     fp2.decode(fingerprint2.value);
     const match = fp1.match(fp2);
-    console.log(JSON.stringify(match, null, 2));
+    console.log('Match:', JSON.stringify(match, null, 2));
   }
 });
 

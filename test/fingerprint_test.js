@@ -3,7 +3,7 @@ const Fingerprint = require('../lib/fingerprint.js');
 const fp1 = new Fingerprint();
 const fp2 = new Fingerprint();
 
-const promise = fp1.calculate(/* path to an audio file */);
+const promise = fp1.calculate(/* path to audio file */);
 
 promise.then(obj => {
 
