@@ -214,7 +214,6 @@ function _newContract(web3: Object): Function {
       web3.eth.compile.solidity(source, (err, compiled) => {
         if (err) return reject(err);
         const contract = web3.eth.contract(compiled.info.abiDefinition);
-        // console.log(contract, compiled);
         contract.code = compiled.code;
         resolve(contract);
       });

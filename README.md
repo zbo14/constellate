@@ -14,15 +14,17 @@ Clone the repo and `npm install`.
 
 This should bundle dependencies with Browserify.
 
-`npm start` should start the http-server and open a browser window.
+`npm start` should start the express app.
 
-Click on `main.html` and open developer tools to see console logs.
+Then go to `localhost:8888/main.html` in your browser and open developer tools to see console logs.
 
 On window load, we ask [MetaMask](https://metamask.io/) for the current web3 provider.
 
 If you haven't installed/aren't running MetaMask on a network, `web3-eth` functionality won't be available.
 
-TODO: walkthrough
+Also, you'll need to install [chromaprint](https://acoustid.org/chromaprint) if you want to generate audio fingerprints.
+
+If you're on mac, you can `brew install chromaprint`.
 
 #### Tests
 

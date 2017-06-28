@@ -1,5 +1,49 @@
 ## API
 
+### fingerprint
+
+#### new Fingerprint
+```js
+const Fingerprint = require('constellate/lib/fingerprint.js');
+
+const fp = new Fingerprint();
+```
+
+#### fp.calculate
+
+*This function requires [chromaprint](https://acoustid.org/chromaprint).*
+
+##### Parameters
+`string` - path to an audio file.
+
+`number` - [optional] length of audio data to use for fingerprint calculation.
+
+##### Returns
+`Promise<Object>` - a promise with a [DigitalFingerprint](https://github.com/zbo14/constellate/blob/master/doc/schema.md#digitalfingerprint).
+
+#### fp.decode
+
+##### Parameters
+`string` - an [encoded fingerprint](#fpencode).
+
+#### fp.encode
+
+##### Returns
+`string` - the compressed fingerprint encoded as a base64 string.
+
+#### fp.match
+
+##### Parameters
+[`Fingerprint`](#new-fingerprint)
+
+##### Returns
+`Object`
+
+#### fp.raw
+
+##### Returns
+`Uint32Array` - the raw fingerprint.
+
 ### form
 
 #### new Form
@@ -70,7 +114,7 @@ const node = new IpfsNode();
 
 ##### Parameters
 
-`Object` - the instance object to add.
+`Object` - the object to add.
 
 ##### Returns
 
@@ -80,7 +124,7 @@ const node = new IpfsNode();
 
 ##### Parameters
 
-`Buffer|Object|ReadableStream` - file data or an instance object.
+`Buffer|Object|ReadableStream` - file data or an object.
 
 ##### Returns
 
@@ -104,7 +148,7 @@ const node = new IpfsNode();
 
 ##### Returns
 
-`Promise<Object>` - a promise with the instance object.
+`Promise<Object>` - a promise with the object.
 
 #### node.info
 
@@ -235,8 +279,6 @@ schema = new Schema('MusicRecording');
 
 `Error|null` - an error if validation fails, null if validation passes.
 
-TODO: separate doc outlining JSON schema.
-
 ### schema-util
 
 TODO
@@ -261,7 +303,7 @@ window.addEventListener('load', () => {
 #### web3eth.callContract
 
 ##### Parameters
-`Object` - a [contract](#web3ethnewcontract) object.
+`Object` - a [contract object](#web3ethnewcontract).
 
 `string` - the caller's address.
 
@@ -279,7 +321,7 @@ window.addEventListener('load', () => {
 #### web3eth.deployContract
 
 ##### Parameters
-`Object` - the [contract](#web3ethnewcontract) object.
+`Object` - the [contract object](#web3ethnewcontract).
 
 `string` - the deployer's address.
 
@@ -289,7 +331,7 @@ window.addEventListener('load', () => {
 #### web3eth.getAccounts
 
 ##### Returns
-`Promise<Object[]>` - a promise with an array of account objects.
+`Promise<Object[]>` - a promise with an array of [Account](https://github.com/zbo14/constellate/blob/master/doc/schema.md#account)s.
 
 #### web3eth.getAccountStatus
 
@@ -305,7 +347,7 @@ window.addEventListener('load', () => {
 `string` - the block hash.
 
 ##### Returns
-`Promise<Object>` - a promise with the block object.
+`Promise<Object>` - a promise with a [Block](https://github.com/zbo14/constellate/blob/master/doc/schema.md#block).
 
 #### web3eth.getContractAccount
 
@@ -313,7 +355,7 @@ window.addEventListener('load', () => {
 `string` - the address of the contract.
 
 ##### Returns
-`Promise<Object>` - a promise with a contract account object.
+`Promise<Object>` - a promise with a [ContractAccount](https://github.com/zbo14/constellate/blob/master/doc/schema.md#contractaccount).
 
 #### web3eth.getTransaction
 
@@ -321,7 +363,7 @@ window.addEventListener('load', () => {
 `string` - the transaction hash.
 
 ##### Returns
-`Promise<Object>` - a promise with a transaction object.
+`Promise<Object>` - a promise with a [Tx](https://github.com/zbo14/constellate/blob/master/doc/schema.md#tx).
 
 #### web3eth.getTransactionReceipt
 
@@ -354,7 +396,7 @@ window.addEventListener('load', () => {
 #### web3eth.sendTransaction
 
 ##### Parameters
-`Object` - the [contract](#web3ethnewcontract) object.
+`Object` - the [contract object](#web3ethnewcontract).
 
 `string` - the sender's address.
 

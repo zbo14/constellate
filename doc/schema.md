@@ -22,7 +22,10 @@
 
 ```js
 {
-    "@context": ["http://coalaip.org/", "http://schema.org/"],
+    "@context": [
+        "http://coalaip.org/",
+        "http://schema.org/"
+    ],
     "@type": "ReviewAction",
     "asserter": {
         "/": "zdpuAwn3woQJ9B4e14VDYXwWpCGgi8HGtZSEk6AWQtt5vzAcU"
@@ -45,7 +48,10 @@
 
 ```js
 {
-    "@context": ["http://coalaip.org/", "http://schema.org/"],
+    "@context": [
+        "http://coalaip.org/",
+        "http://schema.org/"
+    ],
     "@type": "RightsTransferAction",
     "transferContract": {
         "/": "zdpuAmoUdEBgEJ6aPJBkZMm1qr1cNW3uD9nxJr2j3JU2F6xaN"
@@ -270,7 +276,10 @@
 
 ```js
 {
-    "@context": ["http://coalaip.org/", "http://schema.org/"],
+    "@context": [
+        "http://coalaip.org/",
+        "http://schema.org/"
+    ],
     "@type": "Copyright",
     "rightsOf": {
         "/": "zdpuAtc4Gmk6UGWJZuLPWWoC11W6v8SFzng994H8U9A4q8JS1"
@@ -290,10 +299,23 @@
 ### [DigitalFingerprint](https://github.com/COALAIP/specs/tree/master/schema#fingerprinting)
 ##### Thing > Intangible > DigitalFingerprint
 
-`fingerprint` - string
+`fingerprint` - URL-safe base64
 
 `fingerprintOf` - merkle-link to media blob
 
+```js
+{
+  "@context": [
+    "http://coalaip.org/",
+    "http://schema.org/"
+  ],
+  "@type": "DigitalFingerprint",
+  "fingerprint": "AQAABpI2pdKkwLXxTE3xKNkxZT-0NxoAZYATDA",
+  "fingerprintOf": {
+    "/": "QmcMmTFWToHC9iNqNUS8obreMRRSwWwfkgbXU5WMVN9Xhs"
+  }
+}
+```
 
 ### [Right](https://github.com/COALAIP/specs/tree/master/schema#rrm-right)
 ##### Thing > Intangible > Right
@@ -320,7 +342,10 @@
 
 ```js
 {
-    "@context": ["http://coalaip.org/", "http://schema.org/"],
+    "@context": [
+        "http://coalaip.org/",
+        "http://schema.org/"
+    ],
     "@type": "Right",
     "exclusive": true,
     "license": {
@@ -474,15 +499,51 @@
 
 `number` - number
 
+```js
+{
+  "@context": "http://ethon.consensys.net/",
+  "@type": "Block",
+  "blockCreationTime": "2017-06-27T22:18:55.000Z",
+  "blockDifficulty": "0",
+  "blockGasLimit": 4712388,
+  "blockGasUsed": 71254,
+  "blockHash": "0xecfa150944a020d018e3aa5e182a4c89dfe1088935076a3ea50343f8989268fd",
+  "blockSize": 1000,
+  "containsTx": [
+    {
+      "@type": "Tx",
+      "txHash": "0xfee17508c9767eee7468ec192fcb42f72e9c4078495eb6e0b162a302baa0bc50"
+    }
+  ],
+  "createsPostBlockState": {
+    "@type": "WorldState",
+    "stateRoot": "0x14040f5321c1e517b64f61d89b8a213dbd2d6a0228879580ba4d813f8401dcbf"
+  },
+  "hasBeneficiary": {
+    "@type": "Account",
+    "address": "0x0000000000000000000000000000000000000000"
+  },
+  "hasParentBlock": {
+    "@type": "Block",
+    "blockHash": "0x85240e22192aa73227127ab53f5341ef3970941f63758a602052e96e68333d9f"
+  },
+  "hasTxTrie": {
+    "@type": "TxTrie",
+    "transactionsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
+  },
+  "number": 1
+}
+```
+
 ### [Tx](http://ethon.consensys.net/EthOn_spec.html#class-tx)
 
-`from` - [Account](#account)
+`fromAccount` - [Account](#account)
 
 `msgGasPrice` - number
 
 `msgPayload` - hexadecimal
 
-`to` - [Account](#account)
+`toAccount` - [Account](#account)
 
 `txGasUsed` - number
 
@@ -491,3 +552,19 @@
 `txNonce` - number
 
 `value` - number
+
+```js
+{
+    "@context": "http://ethon.consensys.net/",
+    "@type": "Tx",
+    "fromAccount": {
+      "@type": "Account",
+      "address": "0xc7b0395675becc4e2947b2a287e9dc1ed3133e61"
+    },
+    "msgGasPrice": 20000000000,
+    "msgPayload": "0x6060604052346000575b60408060156000396000f3606060405260e060020a6000350463f8a8fd6d8114601c575b6000565b346000576026603a565b604080519115158252519081900360200190f35b60015b9056",
+    "txGasUsed": 71254,
+    "txHash": "0xc5705187548f5b4bb96fc167708897767444010342f62b3e6b1c6b4bb06ee474",
+    "txNonce": 4
+}
+```

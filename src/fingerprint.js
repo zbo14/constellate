@@ -26,14 +26,13 @@ module.exports = function() {
       });
     });
   }
-  this.compare = (other: Object): number => {
-    if (!this.raw ||!this.raw().length) {
-      throw new Error('could not get this raw fingerprint');
+  this.decode = (encoded: string) => {
+    if (this.raw && this.raw().length) {
+      console.warn('overwriting raw fingerprint');
     }
-    if (!other.raw || !other.raw().length) {
-      throw new Error('could not get other raw fingerprint');
-    }
-    return compare(this.raw(), other.raw());
+    const ui8 = base64Decode(Buffer.from(encoded));
+    const raw = decompress(ui8);
+    this.raw = (): Uint32Array => raw;
   }
   this.encode = (): string => {
     if (!this.raw || !this.raw().length) {
@@ -42,15 +41,7 @@ module.exports = function() {
     const compressed = compress(1, this.raw());
     return base64Encode(compressed).toString();
   }
-  this.decode = (encoded: string) => {
-    if (this.raw && this.raw().length) {
-      console.warn('overwriting raw fingerprint');
-    }
-    const ui8 = base64Decode(Buffer.from(encoded));
-    const raw = decompress(ui8);
-    this.raw = () => raw;
-  }
-  this.match = (other: Object): Object[] => {
+  this.match = (other: Object): Object => {
     if (!this.raw || !this.raw().length) {
       throw new Error('could not get this raw fingerprint');
     }
@@ -82,39 +73,6 @@ function hammingDistance(x1: number, x2: number): number {
     if (bit !== bits2[i]) result++;
     return result;
   }, 0);
-}
-
-// from https://gist.github.com/lalinsky/1132166
-
-function compare(raw1: number[], raw2: number[]): number {
-  if (!raw1.length || !raw2.length) {
-    throw new Error('cannot compare empty fingerprint');
-  }
-  const diff = Math.abs(raw1.length - raw2.length);
-  let err = 0, i;
-  if (!diff) {
-    for (i = 0; i < raw1.length; i++) {
-      err += popcnt(raw1[i] ^ raw2[i]);
-    }
-  } else {
-    let j;
-    const errs = new Uint32Array(diff);
-    if (raw1.length > raw2.length) {
-      for (i = 0; i < errs.length; i++) {
-        for (j = 0; j < raw2.length; j++) {
-          errs[i] += popcnt(raw1[i+j] ^ raw2[j]);
-        }
-      }
-    } else {
-      for (i = 0; i < errs.length; i++) {
-        for (j = 0; j < raw1.length; j++) {
-          errs[i] += popcnt(raw1[j] ^ raw2[i+j]);
-        }
-      }
-    }
-    err = Math.min(...errs);
-  }
-  return 1 - err / 32 / Math.min(raw1.length, raw2.length);
 }
 
 /*
@@ -657,11 +615,8 @@ function Segment(pos1: number, pos2: number, duration: number, score: number, le
         this.pos2 + this.duration !== other.pos2) return;
     const newDuration = this.duration + other.duration;
     const newScore = (this.score * this.duration + other.score * other.duration) / newDuration;
-    Object.assign(this, Segment(this.pos1, this.pos2, newDuration, newScore, score, other.score));
+    Object.assign(this, new Segment(this.pos1, this.pos2, newDuration, newScore, score, other.score));
   }
-  // this.publicScore = (): number => {
-  //  return Math.round(this.score * 100 + 0.5);
-  // }
 }
 
 // from https://github.com/acoustid/chromaprint/blob/master/src/fingerprint_matcher.cpp
@@ -670,7 +625,7 @@ const ALIGN_BITS = 12;
 
 const alignStrip = x => x >>> (32 - ALIGN_BITS);
 
-function match(matchThreshold: number, raw1: Uint32Array, raw2: Uint32Array): Object[] {
+function match(matchThreshold: number, raw1: Uint32Array, raw2: Uint32Array): Object {
   const hashShift = 32 - ALIGN_BITS;
   const hashMask = ((1 << ALIGN_BITS) - 1) << hashShift;
   const offsetMask = (1 << (32 - ALIGN_BITS - 1)) - 1;
@@ -727,7 +682,7 @@ function match(matchThreshold: number, raw1: Uint32Array, raw2: Uint32Array): Ob
     return 0;
   });
   const segments = [];
-  let bitCounts, size;
+  let bitCounts, duration, size = 0, score;
   for (i = 0; i < bestAlignments.length; i++) {
     offsetDiff = bestAlignments[i].i - raw2.length;
     offset1 = (offsetDiff > 0 ? offsetDiff : 0);
@@ -748,7 +703,7 @@ function match(matchThreshold: number, raw1: Uint32Array, raw2: Uint32Array): Ob
       }
     }
     peaks.push(size);
-    let added, begin = 0, duration, end, score, seg;
+    let added, begin = 0, end, seg;
     for (i = 0; i < peaks.length; i++) {
       end = peaks[i];
       duration = end - begin;
@@ -773,12 +728,12 @@ function match(matchThreshold: number, raw1: Uint32Array, raw2: Uint32Array): Ob
     }
     break;
   }
-  // let matchDuration = 0, matchScore = 0;
-  // for (i = 0; i < segments.length; i++) {
-  //  matchDuration += segments[i].duration;
-  //  matchScore += segments[i].score;
-  // }
-  // matchDuration /= size;
-  // matchScore = 1 - matchScore / i / matchThreshold;
-  return segments;
+  duration = 0, score = 0;
+  for (i = 0; i < segments.length; i++) {
+    duration += segments[i].duration;
+    score += segments[i].score;
+  }
+  duration = Math.round(duration / size * 1000) / 10;
+  score = Math.round((1 - score / i / matchThreshold) * 1000) / 10;
+  return { duration, score };
 }

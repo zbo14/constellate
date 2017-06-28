@@ -1,5 +1,6 @@
 'use strict';
 
+const Fingerprint = require('./lib/fingerprint.js')
 const Form = require('./lib/form.js');
 const IpfsNode = require('./lib/ipfs-node.js');
 const ld = require('./lib/linked-data.js');
@@ -10,6 +11,7 @@ require('setimmediate');
 const {
   isAncestor,
   newAnchor,
+  orderStringify,
   readFileInput
 } = require('./lib/gen-util.js');
 
@@ -19,6 +21,8 @@ const contractMethod = document.getElementById('contract-method');
 const contractSource = document.getElementById('contract-source');
 const dataContainer = document.getElementById('data-container');
 const dataHash = document.getElementById('data-hash');
+const fingerprint1 = document.getElementById('fingerprint-1');
+const fingerprint2 = document.getElementById('fingerprint-2');
 const exportData = document.getElementById('export-data');
 const exportHashes = document.getElementById('export-hashes');
 const fileHash = document.getElementById('file-hash');
@@ -46,6 +50,7 @@ const getBlockBtn = document.getElementById('get-block-btn');
 const getDataBtn = document.getElementById('get-data-btn');
 const getFileBtn = document.getElementById('get-file-btn');
 const getTxBtn = document.getElementById('get-tx-btn');
+const matchBtn = document.getElementById('match-btn');
 const saveDataBtn = document.getElementById('save-data-btn');
 const saveFileBtn = document.getElementById('save-file-btn');
 const sendEtherBtn = document.getElementById('send-ether-btn');
@@ -184,6 +189,17 @@ fingerprintBtn.addEventListener('click', () => {
   }
 });
 
+matchBtn.addEventListener('click', () => {
+  if (fingerprint1.value && fingerprint2.value) {
+    const fp1 = new Fingerprint();
+    const fp2 = new Fingerprint();
+    fp1.decode(fingerprint1.value);
+    fp2.decode(fingerprint2.value);
+    const match = fp1.match(fp2);
+    console.log(JSON.stringify(match, null, 2));
+  }
+});
+
 formContainer.addEventListener('submit', evt => {
   evt.preventDefault();
   const form = new Form(formContainer.firstChild);
@@ -215,6 +231,13 @@ getDataBtn.addEventListener('click', () => {
     const form = new Form(expanded);
     dataContainer.innerHTML = null;
     dataContainer.appendChild(form.element());
+    if (expanded.fingerprint) {
+      if (!fingerprint1.value) {
+        fingerprint1.value = expanded.fingerprint;
+      } else if (!fingerprint2.value) {
+        fingerprint2.value = expanded.fingerprint;
+      }
+    }
   });
 });
 
