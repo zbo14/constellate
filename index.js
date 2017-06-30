@@ -61,9 +61,9 @@ let data = {},
     myAccount = {},
     web3eth;
 
-const node = new IpfsNode();
+const ipfs = new IpfsNode();
 
-node.start();
+ipfs.start();
 
 window.addEventListener('load', () => {
   if (!web3) return console.warn('Could not get web3 from MetaMask');
@@ -80,7 +80,7 @@ addFileBtn.addEventListener('click', () => {
   if (fileInput.files.length) {
     readFileInput(fileInput, 'array-buffer').then(ab => {
       const buf = Buffer.from(ab);
-      return node.addFile(buf);
+      return ipfs.addFile(buf);
     }).then(hash => {
       fileHash.value = hash;
       console.log('Added file');
@@ -133,9 +133,9 @@ deployContractBtn.addEventListener('click', () => {
       return web3eth.getContractAccount(deployed.address);
     }).then(_account => {
       account = _account;
-      return ld.validate(account, node);
+      return ld.validate(account, ipfs);
     }).then(() => {
-      return node.addObject(account);
+      return ipfs.addObject(account);
     }).then(cid => {
       dataHash.value = cid.toBaseEncodedString();
       console.log('Deployed contract');
@@ -159,7 +159,7 @@ externalAccountBtn.addEventListener('click', () => {
   const mnemonic = prompt('Please enter your mnemonic', '');
   if (!mnemonic) return;
   const account = web3eth.newExternalAccount(myAccount.address, mnemonic);
-  node.addObject(account).then(cid => {
+  ipfs.addObject(account).then(cid => {
     dataHash.value = cid.toBaseEncodedString();
     console.log('Pushed external account');
   });
@@ -180,7 +180,7 @@ fingerprintBtn.addEventListener('click', () => {
             '/': fileHash.value
           }
         });
-        node.addObject(obj).then(cid => {
+        ipfs.addObject(obj).then(cid => {
           dataHash.value = cid.toBaseEncodedString();
           console.log('Calculated fingerprint');
         });
@@ -204,8 +204,8 @@ formContainer.addEventListener('submit', evt => {
   evt.preventDefault();
   const form = new Form(formContainer.firstChild);
   const instance = form.instance();
-  ld.validate(instance, node).then(() => {
-    return node.addObject(instance);
+  ld.validate(instance, ipfs).then(() => {
+    return ipfs.addObject(instance);
   }).then(cid => {
     dataHash.value = cid.toBaseEncodedString();
     console.log('Added data');
@@ -215,7 +215,7 @@ formContainer.addEventListener('submit', evt => {
 getBlockBtn.addEventListener('click', () => {
   if (blockHash.value) {
     web3eth.getBlock(blockHash.value).then(block => {
-      return ld.validate(block, node);
+      return ld.validate(block, ipfs);
     }).then(expanded => {
       const form = new Form(expanded);
       blockContainer.innerHTML = null;
@@ -225,8 +225,8 @@ getBlockBtn.addEventListener('click', () => {
 });
 
 getDataBtn.addEventListener('click', () => {
-  node.getObject(dataHash.value).then(instance => {
-    return ld.validate(instance, node);
+  ipfs.getObject(dataHash.value).then(instance => {
+    return ld.validate(instance, ipfs);
   }).then(expanded => {
     const form = new Form(expanded);
     dataContainer.innerHTML = null;
@@ -243,7 +243,7 @@ getDataBtn.addEventListener('click', () => {
 
 getFileBtn.addEventListener('click', () => {
   if (fileHash.value) {
-    node.getFile(fileHash.value).then(obj => {
+    ipfs.getFile(fileHash.value).then(obj => {
       files.appendChild(newAnchor(obj.data, obj.type));
     });
   }
@@ -252,7 +252,7 @@ getFileBtn.addEventListener('click', () => {
 getTxBtn.addEventListener('click', () => {
   if (txHash.value) {
     web3eth.getTransaction(txHash.value).then(tx => {
-      return ld.validate(tx, node);
+      return ld.validate(tx, ipfs);
     }).then(expanded => {
       const form = new Form(expanded);
       txContainer.innerHTML = null;
@@ -266,9 +266,9 @@ saveDataBtn.addEventListener('click', () => {
     const name = prompt('Enter a name for the data', '');
     if (name) {
       let instance;
-      node.getObject(dataHash.value).then(_instance => {
+      ipfs.getObject(dataHash.value).then(_instance => {
         instance = _instance;
-        return ld.validate(instance, node);
+        return ld.validate(instance, ipfs);
       }).then(() => {
         data[name] = instance;
         hashes[name] = dataHash.value;
@@ -315,9 +315,9 @@ sendTxBtn.addEventListener('click', () => {
       return web3eth.getTransaction(hash);
     }).then(_tx => {
       tx = _tx;
-      return ld.validate(tx, node);
+      return ld.validate(tx, ipfs);
     }).then(() => {
-      return node.addObject(tx);
+      return ipfs.addObject(tx);
     }).then(cid => {
       dataHash.value = cid.toBaseEncodedString();
       console.log('Sent transaction');

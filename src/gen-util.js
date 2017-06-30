@@ -9,7 +9,7 @@ const fs = require('fs');
  */
 
 function arrayFromObject(obj: Object): any[][] {
-  return Object.keys(obj).map((key) => [key, obj[key]]);
+  return Object.keys(obj).map(key => [key, obj[key]]);
 }
 
 function cloneObject(obj: Object): Object {
@@ -119,7 +119,7 @@ function readFileInput(input: HTMLInputElement, readAs: string): Promise<ArrayBu
 
 function transform(x: any, fn: Function): any {
   if (isArray(x)) {
-    return x.map((y) => transform(fn(y), fn));
+    return x.map(y => transform(fn(y), fn));
   }
   if (isObject(x)) {
     return Object.assign({}, ...arrayFromObject(x).map(([k, v]) => {
@@ -135,7 +135,7 @@ function traverse(val: any, fn: Function, result: ?any) {
 
 function _traverse(path: string, val: any, fn: Function, result: ?any) {
   if (isArray(val)) {
-    val.map((v) => _traverse(path, v, fn, result));
+    val.map(v => _traverse(path, v, fn, result));
   } else if (isObject(val)) {
     arrayFromObject(val).map(([k, v]) => {
       const fullPath = (!path ? k : path + '/' + k);

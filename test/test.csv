@@ -1,0 +1,10 @@
+name,member,type
+org1,"#person,#org2,#org4",Organization
+org2,#org3,Organization
+band,"#drummer,#guitarist,#singer"
+org3,"person,#org4",Organization
+person,,Person
+guitarist,,Person
+drummer,,Person
+org4,,Organization
+singer,,Person

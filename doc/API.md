@@ -95,12 +95,18 @@ TODO
 
 #### new IpfsNode
 ```js
-const IpfsNode = require('constellate/lib/ipfs-node.js');
+const IpfsNode = require('constellate/lib/ipfs-ipfs.js');
 
-const node = new IpfsNode();
+const ipfs = new IpfsNode();
+
+const started = ipfs.start();
+
+started.then(() => {
+  // ...
+});
 ```
 
-#### node.addFile
+#### ipfs.addFile
 
 ##### Parameters
 
@@ -110,7 +116,7 @@ const node = new IpfsNode();
 
 `Promise<string>` - a promise with the file multihash.
 
-#### node.addObject
+#### ipfs.addObject
 
 ##### Parameters
 
@@ -120,7 +126,7 @@ const node = new IpfsNode();
 
 `Promise<string>` - a promise with the object hash (i.e. base-encoded CID).
 
-#### node.calcHash
+#### ipfs.calcHash
 
 ##### Parameters
 
@@ -130,7 +136,7 @@ const node = new IpfsNode();
 
 `string` - the file multihash or object hash.
 
-#### node.getFile
+#### ipfs.getFile
 
 ##### Parameters
 
@@ -140,7 +146,7 @@ const node = new IpfsNode();
 
 `Promise<Object>` - a promise with an object that contains the file data and MIME type.
 
-#### node.getObject
+#### ipfs.getObject
 
 ##### Parameters
 
@@ -150,25 +156,25 @@ const node = new IpfsNode();
 
 `Promise<Object>` - a promise with the object.
 
-#### node.info
+#### ipfs.info
 
 ##### Returns
 
 `Promise<Object>`
 
-#### node.start
+#### ipfs.start
 
 ##### Returns
 
 `Promise`
 
-#### node.stop
+#### ipfs.stop
 
 ##### Returns
 
 `Promise`
 
-#### node.version
+#### ipfs.version
 
 ##### Returns
 
@@ -282,6 +288,47 @@ schema = new Schema('MusicRecording');
 ### schema-util
 
 TODO
+
+### translate
+
+#### new Translate
+```js
+const Translate = require('constellate/lib/translate.js');
+
+const translate = new Translate();
+
+const started = translate.start();
+
+started.then(() => {
+  // ...
+});
+```
+
+#### translate.fromCSV
+
+##### Parameters
+`string` - the contents of a CSV file.
+
+##### Returns
+`Promise<Object[]>` - a promise with an array of IPLD-formatted objects.
+
+#### translate.fromJSON
+
+##### Parameters
+`string` - the contents of a JSON file.
+
+##### Returns
+`Promise<Object[]>` - a promise with an array of IPLD-formatted objects.
+
+#### translate.start
+
+##### Returns
+`Promise`
+
+#### translate.stop
+
+##### Returns
+`Promise`
 
 ### web3-eth
 

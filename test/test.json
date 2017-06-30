@@ -1,0 +1,38 @@
+[
+  {
+    "type": "MusicRecording",
+    "name": "version title",
+    "performingArtist": "#performingArtist",
+    "producer": "#producer",
+    "recordingOf": "#song"
+  },
+  {
+    "type": "MusicComposition",
+    "name": "song",
+    "composer": [
+      "#composer1",
+      "#composer2"
+    ],
+    "lyricist": "#lyricist"
+  },
+  {
+    "type": "Person",
+    "name": "composer1"
+  },
+  {
+    "type": "Person",
+    "name": "producer"
+  },
+  {
+    "type": "Person",
+    "name": "lyricist"
+  },
+  {
+    "type": "Person",
+    "name": "composer2"
+  },
+  {
+    "type": "MusicGroup",
+    "name": "performingArtist"
+  }
+]

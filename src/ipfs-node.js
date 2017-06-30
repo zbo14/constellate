@@ -126,7 +126,7 @@ function _addFile(ipfs: Object): Function {
 }
 
 function _addObject(ipfs: Object): Function {
-  return (obj: Object): Promise<string> => {
+  return (obj: Object): Promise<Object> => {
     if (!ipfs.isOnline()) {
       throw new Error('IPFS Node is offline, cannot add object');
     }

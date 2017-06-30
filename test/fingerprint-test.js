@@ -1,3 +1,5 @@
+'use strict';
+
 const Fingerprint = require('../lib/fingerprint.js');
 
 const fp1 = new Fingerprint();
