@@ -3,63 +3,17 @@
     <title>constellate</title>
   </head>
   <body>
-    <button id='external-account-btn'>create external account</button><br>
-    <button id='get-block-btn'>get block</button><input type='text' id='block-hash' /><br>
-    <button id='clear-block-btn'>clear block</button><br>
-    <div id='block-container'></div><br><br>
-    <button id='get-tx-btn'>get tx</button><input type='text' id='tx-hash' /><br>
-    <button id='clear-tx-btn'>clear tx</button><br>
-    <div id='tx-container'></div><br><br>
-    <label>contract method</label>
-    <input type='text' id='contract-method' /><br>
-    <label>contract source</label>
-    <input type='file' id='contract-source' /><button id='deploy-contract-btn'>deploy contract</button><br>
-    <label>method params</label>
-    <input type='text' id='method-params' /><br>
-    <label>send to</label>
-    <input type='text' id='send-to' /><br>
-    <label>send value</label>
-    <input type='text' id='send-value' /><br>
-    <button id='call-contract-btn'>call contract</button>
-    <button id='send-ether-btn'>send ether</button>
-    <button id='send-tx-btn'>send tx</button><br><br>
-    <button id='get-data-btn'>get data</button><input type='text' id='data-hash' /><button id='save-data-btn'>save data</button><br>
-    <button id='clear-data-btn'>clear data</button><br>
-    <button id='export-btn'>export</button><br>
-    <a id='export-data' download='data.json'>data</a><br>
-    <a id='export-hashes' download='hashes.json'>hashes</a><br>
-    <div id='data-container'></div><br><br>
-    <button id='add-file-btn'>add file</button><input type='file' id='file-input' accept='audio/*,image/*' /><br>
-    <button id='fingerprint-btn'>fingerprint</button><br>
-    <button id='match-btn'>match fingerprints</button><input type='text' id='fingerprint-1'><input type='text' id='fingerprint-2'><br>
-    <button id='get-file-btn'>get file</button><input type='text' id='file-hash' /><button id='save-file-btn'>save file</button><br>
-    <button id='clear-files-btn'>clear files</button><br><br>
-    <div id='files'></div><br><br>
-    <hr>
-    <select id='schema-select'>
-      <option selected disabled value=''>--</option>
-      <optgroup label='party'>
-        <option value='Person'>individual</option>
-        <option value='MusicGroup'>music group</option>
-        <option value='Organization'>organization</option>
-      </optgroup>
-      <optgroup label='meta'>
-        <option value='MusicAlbum'>album</option>
-        <option value='AudioObject'>audio</option>
-        <option value='MusicComposition'>composition</option>
-        <option value='ImageObject'>image</option>
-        <option value='MusicPlaylist'>playlist</option>
-        <option value='MusicRecording'>recording</option>
-        <option value='MusicRelease'>release</option>
-      </optgroup>
-      <optgroup label='coala'>
-        <option value='ReviewAction'>assertion</option>
-        <option value='Copyright'>copyright</option>
-        <option value='Right'>right</option>
-        <option value='RightsTransferAction'>rights assignment</option>
-      </optgroup>
-    </select><br>
-    <div id='form-container'></div><br>
+    <label>Project Name</label><br>
+    <input id='project-name' type='text' /><br><br>
+    <label>Content</label><br>
+    <input id='content' type='file' accept='audio/*|image/*' multiple /><br><br>
+    <label>Metadata</label><br>
+    <input id='metadata' type='file' accept='application/json|text/csv' multiple /><br><br>
+    <label>IPLD</label><br>
+    <input id='ipld' type='file' /><br><br>
+    <button id='generate-btn'>generate</button><br>
+    <button id='upload-btn'>upload</button><br><br>
+    <a id='download-link'></a><br><br>
   </body>
-  <script src='./bundle.js'></script>
+  <script src='../bundle.js'></script>
 </html>

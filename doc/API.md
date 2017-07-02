@@ -44,53 +44,6 @@ const fp = new Fingerprint();
 ##### Returns
 `Uint32Array` - the raw fingerprint.
 
-### form
-
-#### new Form
-
-##### Parameters
-`HTMLElement|Object|string` - an HTML form, instance object, or schema type.
-
-```js
-const Form = require('constellate/lib/form.js');
-
-let form;
-
-const element = document.querySelector('form');
-form = new Form(element);
-
-// OR..
-
-const instance = { /* ... */ };
-form = new Form(instance);
-
-// OR..
-
-const type = 'MusicRecording';
-form = new Form(type);
-```
-#### form.element
-
-##### Returns
-
-`HTMLFormElement`
-
-#### form.instance
-
-##### Returns
-
-`Object`
-
-#### form.schema
-
-##### Returns
-
-[`Schema`](#new-schema)
-
-### gen-util
-
-TODO
-
 ### ipfs-node
 
 #### new IpfsNode
@@ -126,15 +79,15 @@ started.then(() => {
 
 `Promise<string>` - a promise with the object hash (i.e. base-encoded CID).
 
-#### ipfs.calcHash
+#### ipfs.calcMultihash
 
 ##### Parameters
 
-`Buffer|Object|ReadableStream` - file data or an object.
+`Buffer|ReadableStream` - the file data.
 
 ##### Returns
 
-`string` - the file multihash or object hash.
+`string` - the multihash of the file.
 
 #### ipfs.getFile
 
@@ -180,9 +133,7 @@ started.then(() => {
 
 `Promise<?>`
 
-### linked-data
-
-*This module uses the ipfs, ontology, and schema modules to dereference instance objects from merkle-links, check property-type agreement, and validate their structures against the corresponding JSON schema.*
+### ipld
 
 #### dereference
 
@@ -196,11 +147,11 @@ started.then(() => {
 
 `Promise<any>` - a promise containing the dereferenced value.
 
-#### validate
+#### expand
 
 ##### Parameters
 
-`Object` - the instance object to validate.
+`Object` - the object to expand.
 
 [`IpfsNode`](#new-ifpsnode)
 
@@ -208,86 +159,17 @@ started.then(() => {
 
 `Promise<Object>` - a promise containing the expanded object with dereferenced merkle-links.
 
-### ontology
-
-#### getParentType
+#### flatten
 
 ##### Parameters
 
-`string` - the type.
+`Object` - the object to flatten.
+
+[`IpfsNode`](#new-ifpsnode)
 
 ##### Returns
 
-`string` - the parent type.
-
-#### getSubTypes
-
-##### Parameters
-
-`string` - the type.
-
-##### Returns
-
-`Array<string>` - the sub-types.
-
-#### getTypesForProperty
-
-##### Parameters
-
-`string` - the instance property.
-
-##### Returns
-
-`Array<string>` - the expected type(s) for the dereferenced value of the instance property.
-
-#### isAncestorType
-
-##### Parameters
-
-`string` - the ancestor type.
-
-`string` - the descendant type.
-
-##### Returns
-
-`boolean`
-
-### schema
-
-##### Parameters
-
-`Object|string` - a schema object or type.
-
-#### new Schema
-```js
-const Schema = require('constellate/lib/schema.js');
-
-let schema;
-
-schema = new Schema({
-    type: 'object',
-    properties: { /* ... */ },
-    // ...
-});
-
-// OR..
-
-schema = new Schema('MusicRecording');
-```
-
-#### schema.validate
-
-##### Parameters
-
-`Object` - the instance object to validate.
-
-##### Returns
-
-`Error|null` - an error if validation fails, null if validation passes.
-
-### schema-util
-
-TODO
+`Promise<Object>` - a promise containing the flattened object with merkle-links.
 
 ### translate
 
@@ -329,6 +211,10 @@ started.then(() => {
 
 ##### Returns
 `Promise`
+
+### util
+
+TODO
 
 ### web3-eth
 

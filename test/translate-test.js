@@ -1,25 +1,27 @@
 'use strict';
 
 const fs = require('fs');
-const Translate = require('../lib/translate.js');
+const Constellate = require('../lib/constellate.js');
 
-const translate = new Translate();
+const constellate = new Constellate();
 
-const json = fs.readFileSync(__dirname + '/test.json', 'utf8');
+const csv1 = fs.readFileSync(__dirname + '/MusicGroup.csv', 'utf8');
+const csv2 = fs.readFileSync(__dirname + '/Person.csv', 'utf8');
 
-const csv = fs.readFileSync(__dirname + '/test.csv', 'utf8');
+const json1 = fs.readFileSync(__dirname + '/MusicGroup.json', 'utf8');
+const json2 = fs.readFileSync(__dirname + '/Person.json', 'utf8');
 
-const started = translate.start();
+const started = constellate.start();
 
 started.then(() => {
 
-  return translate.fromJSON(json);
+  return constellate.ipldFromJSONs([json1, json2], ['MusicGroup', 'Person']);
 
 }).then(ipld => {
 
   console.log(JSON.stringify(ipld, null, 2));
 
-  return translate.fromCSV(csv);
+  return constellate.ipldFromCSVs([csv1, csv2], ['MusicGroup', 'Person']);
 
 }).then(ipld => {
 
