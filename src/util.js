@@ -133,15 +133,20 @@ function traverse(val: any, fn: Function, result: ?any) {
 }
 
 function _traverse(path: string, val: any, fn: Function, result: ?any) {
+  if (path) fn(path, val, result);
+  let i;
   if (isArray(val)) {
-    val.map(v => _traverse(path, v, fn, result));
+    for (i = 0; i < val.length; i++) {
+      _traverse(path, val[i], fn, result);
+    }
   } else if (isObject(val)) {
-    arrayFromObject(val).map(([k, v]) => {
-      const fullPath = (!path ? k : path + '/' + k);
-      _traverse(fullPath, v, fn, result)
-    });
-  } else {
-    fn(path, val, result);
+    let fullPath, k, v;
+    const arr = arrayFromObject(val);
+    for (i = 0; i < arr.length; i++) {
+      [k, v] = arr[i];
+      fullPath = (!path ? k : path + '/' + k);
+      _traverse(fullPath, v, fn, result);
+    }
   }
 }
 
