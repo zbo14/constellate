@@ -1,6 +1,8 @@
 'use strict';
 
+const CID = require('cids');
 const IpfsNode = require('../lib/ipfs-node.js');
+const Ipld = require('../lib/ipld.js');
 
 const {
     isArray,
@@ -19,12 +21,27 @@ const {
 
 module.exports = function() {
     const ipfs = new IpfsNode();
+    const ipld = new Ipld(ipfs);
     this.generate = (content: FileList, metadata: FileList, name: string): Promise<File> => {
       if (!content || !content.length) throw new Error('no content');
       if (!metadata || !metadata.length) throw new Error('no metadata');
       const format = metadata[0].type.split('/')[1];
       return this.processContent(content, format).then(file => {
         return this.processMetadata([...Array.from(metadata), file], name);
+      });
+    }
+    this.get = (hash: string): Promise<File|Object> => {
+      const cid = new CID(hash);
+      return ipld.dereference(cid).then(obj => {
+        if (cid.codec === 'dag-cbor') {
+          return ipld.expand(obj);
+        }
+        const ext = obj.type.split('/').pop();
+        return new File(
+          [obj.data],
+          hash + '.' + ext,
+          { type: obj.type }
+        );
       });
     }
     this.upload = (content: FileList, ipld: FileList): Promise<File> => {
