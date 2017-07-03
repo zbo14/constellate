@@ -18,3 +18,5 @@ $GOPATH/bin/swarm \
     --maxpeers $MAXPEERS \
     --bzznetworkid $NETWORKID \
     &> $DATADIR/swarm.log < <(cat $DATADIR/peer$PEERID-password) &
+
+echo "peer is running"

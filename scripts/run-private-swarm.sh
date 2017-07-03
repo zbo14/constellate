@@ -7,7 +7,8 @@ DATADIR=$2
 MAXPEERS=$3
 NETWORKID=$4
 
-nohup $GOPATH/bin/geth --datadir $DATADIR \
+nohup $GOPATH/bin/geth \
+    --datadir $DATADIR \
     --unlock 0 \
     --password <(cat $DATADIR/peer0-password) \
     --verbosity 6 \
@@ -25,4 +26,4 @@ $GOPATH/bin/swarm \
     --bzznetworkid $NETWORKID \
     &> $DATADIR/swarm.log < <(cat $DATADIR/peer0-password) &
 
-echo $(geth --exec "console.log(admin.nodeInfo.enode)" attach $DATADIR/bzzd.ipc)
+echo $($GOPATH/bin/geth --exec "console.log(admin.nodeInfo.enode)" attach $DATADIR/bzzd.ipc)
