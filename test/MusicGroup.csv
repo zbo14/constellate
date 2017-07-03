@@ -1,0 +1,4 @@
+name,member
+band1,"@singer1,@guitarist1,@bassist1,@drummer1"
+band2,"@singer2,@guitarist2,@bassist2,@drummer2"
+collab,"@singer1,@guitarist1,@bassist1,@drummer1,@singer2,@guitarist2,@bassist2,@drummer2"

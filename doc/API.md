@@ -44,63 +44,22 @@ const fp = new Fingerprint();
 ##### Returns
 `Uint32Array` - the raw fingerprint.
 
-### form
-
-#### new Form
-
-##### Parameters
-`HTMLElement|Object|string` - an HTML form, instance object, or schema type.
-
-```js
-const Form = require('constellate/lib/form.js');
-
-let form;
-
-const element = document.querySelector('form');
-form = new Form(element);
-
-// OR..
-
-const instance = { /* ... */ };
-form = new Form(instance);
-
-// OR..
-
-const type = 'MusicRecording';
-form = new Form(type);
-```
-#### form.element
-
-##### Returns
-
-`HTMLFormElement`
-
-#### form.instance
-
-##### Returns
-
-`Object`
-
-#### form.schema
-
-##### Returns
-
-[`Schema`](#new-schema)
-
-### gen-util
-
-TODO
-
 ### ipfs-node
 
 #### new IpfsNode
 ```js
-const IpfsNode = require('constellate/lib/ipfs-node.js');
+const IpfsNode = require('constellate/lib/ipfs-ipfs.js');
 
-const node = new IpfsNode();
+const ipfs = new IpfsNode();
+
+const started = ipfs.start();
+
+started.then(() => {
+  // ...
+});
 ```
 
-#### node.addFile
+#### ipfs.addFile
 
 ##### Parameters
 
@@ -110,7 +69,7 @@ const node = new IpfsNode();
 
 `Promise<string>` - a promise with the file multihash.
 
-#### node.addObject
+#### ipfs.addObject
 
 ##### Parameters
 
@@ -120,17 +79,17 @@ const node = new IpfsNode();
 
 `Promise<string>` - a promise with the object hash (i.e. base-encoded CID).
 
-#### node.calcHash
+#### ipfs.calcMultihash
 
 ##### Parameters
 
-`Buffer|Object|ReadableStream` - file data or an object.
+`Buffer|ReadableStream` - the file data.
 
 ##### Returns
 
-`string` - the file multihash or object hash.
+`string` - the multihash of the file.
 
-#### node.getFile
+#### ipfs.getFile
 
 ##### Parameters
 
@@ -140,7 +99,7 @@ const node = new IpfsNode();
 
 `Promise<Object>` - a promise with an object that contains the file data and MIME type.
 
-#### node.getObject
+#### ipfs.getObject
 
 ##### Parameters
 
@@ -150,33 +109,31 @@ const node = new IpfsNode();
 
 `Promise<Object>` - a promise with the object.
 
-#### node.info
+#### ipfs.info
 
 ##### Returns
 
 `Promise<Object>`
 
-#### node.start
+#### ipfs.start
 
 ##### Returns
 
 `Promise`
 
-#### node.stop
+#### ipfs.stop
 
 ##### Returns
 
 `Promise`
 
-#### node.version
+#### ipfs.version
 
 ##### Returns
 
 `Promise<?>`
 
-### linked-data
-
-*This module uses the ipfs, ontology, and schema modules to dereference instance objects from merkle-links, check property-type agreement, and validate their structures against the corresponding JSON schema.*
+### ipld
 
 #### dereference
 
@@ -190,11 +147,11 @@ const node = new IpfsNode();
 
 `Promise<any>` - a promise containing the dereferenced value.
 
-#### validate
+#### expand
 
 ##### Parameters
 
-`Object` - the instance object to validate.
+`Object` - the object to expand.
 
 [`IpfsNode`](#new-ifpsnode)
 
@@ -202,84 +159,60 @@ const node = new IpfsNode();
 
 `Promise<Object>` - a promise containing the expanded object with dereferenced merkle-links.
 
-### ontology
-
-#### getParentType
+#### flatten
 
 ##### Parameters
 
-`string` - the type.
+`Object` - the object to flatten.
+
+[`IpfsNode`](#new-ifpsnode)
 
 ##### Returns
 
-`string` - the parent type.
+`Promise<Object>` - a promise containing the flattened object with merkle-links.
 
-#### getSubTypes
+### translate
 
-##### Parameters
-
-`string` - the type.
-
-##### Returns
-
-`Array<string>` - the sub-types.
-
-#### getTypesForProperty
-
-##### Parameters
-
-`string` - the instance property.
-
-##### Returns
-
-`Array<string>` - the expected type(s) for the dereferenced value of the instance property.
-
-#### isAncestorType
-
-##### Parameters
-
-`string` - the ancestor type.
-
-`string` - the descendant type.
-
-##### Returns
-
-`boolean`
-
-### schema
-
-##### Parameters
-
-`Object|string` - a schema object or type.
-
-#### new Schema
+#### new Translate
 ```js
-const Schema = require('constellate/lib/schema.js');
+const Translate = require('constellate/lib/translate.js');
 
-let schema;
+const translate = new Translate();
 
-schema = new Schema({
-    type: 'object',
-    properties: { /* ... */ },
-    // ...
+const started = translate.start();
+
+started.then(() => {
+  // ...
 });
-
-// OR..
-
-schema = new Schema('MusicRecording');
 ```
 
-#### schema.validate
+#### translate.fromCSV
 
 ##### Parameters
-
-`Object` - the instance object to validate.
+`string` - the contents of a CSV file.
 
 ##### Returns
+`Promise<Object[]>` - a promise with an array of IPLD-formatted objects.
 
-`Error|null` - an error if validation fails, null if validation passes.
+#### translate.fromJSON
 
-### schema-util
+##### Parameters
+`string` - the contents of a JSON file.
+
+##### Returns
+`Promise<Object[]>` - a promise with an array of IPLD-formatted objects.
+
+#### translate.start
+
+##### Returns
+`Promise`
+
+#### translate.stop
+
+##### Returns
+`Promise`
+
+### util
 
 TODO
 

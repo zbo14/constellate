@@ -44,7 +44,7 @@ const {
   isObject,
   orderObject,
   transform
-} = require('../lib/gen-util.js');
+} = require('../lib/util.js');
 
 // @flow
 
@@ -71,10 +71,10 @@ module.exports = function() {
   });
   this.addFile = _addFile(this.ipfs);
   this.addObject = _addObject(this.ipfs);
-  this.calcHash = calcHash;
   this.getFile = _getFile(this.ipfs);
   this.getObject = _getObject(this.ipfs);
   this.info = this.ipfs.id;
+  this.multihash = multihash;
   this.start = () => {
     return new Promise((resolve, _) => {
       this.ipfs.on('start', () => {
@@ -95,19 +95,12 @@ module.exports = function() {
 }
 
 // https://github.com/ipfs/faq/issues/208
-function calcHash(data: Buffer|Object|ReadableStream): Promise<string> {
+function multihash(data: Buffer|ReadableStream): Promise<string> {
    return new Promise((resolve, reject) => {
-     if (isObject(data)) {
-       dagCBOR.util.cid(data, (err, cid) => {
-         if (err) return reject(err);
-         resolve(cid.toBaseEncodedString());
-       });
-     } else {
-       dagPB.DAGNode.create(data, (err, node) => {
-         if (err) return reject(err);
-         resolve(node.multihash);
-       });
-     }
+     dagPB.DAGNode.create(data, (err, node) => {
+       if (err) return reject(err);
+       resolve(node.toJSON().multihash);
+     });
    });
 }
 
@@ -126,7 +119,7 @@ function _addFile(ipfs: Object): Function {
 }
 
 function _addObject(ipfs: Object): Function {
-  return (obj: Object): Promise<string> => {
+  return (obj: Object): Promise<Object> => {
     if (!ipfs.isOnline()) {
       throw new Error('IPFS Node is offline, cannot add object');
     }
@@ -143,20 +136,22 @@ function _getFile(ipfs: Object): Function {
       throw new Error('IPFS Node is offline, cannot get file');
     }
     return new Promise((resolve, reject) => {
-      ipfs.files.get(multihash).then((stream) => {
+      ipfs.files.get(multihash).then(stream => {
         stream.on('data', file => {
           if (!file.content) return reject('no file content');
-          const data = [];
-          let obj;
+          const chunks = [];
+          let type;
           file.content.on('data', chunk => {
-            data.push(chunk)
-            if (!obj) {
-              obj = fileType(chunk);
+            chunks.push(chunk)
+            if (!type) {
+              type = fileType(chunk);
             };
           });
           file.content.once('end', () => {
-            const type = obj.mime.split('/')[0] + '/' + obj.ext;
-            resolve({ data, type });
+            resolve({
+              data: Buffer.concat(chunks),
+              type: type.mime.split('/')[0] + '/' + type.ext
+            });
           });
           file.content.resume();
         });

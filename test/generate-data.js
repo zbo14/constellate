@@ -1,3 +1,5 @@
+'use strict';
+
 const { promiseSequence } = require('../lib/gen-util.js');
 const IpfsNode = require('../lib/ipfs-node');
 

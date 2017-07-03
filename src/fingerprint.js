@@ -1,3 +1,5 @@
+'use strict';
+
 const fpcalc = require('fpcalc');
 
 // @flow
@@ -16,10 +18,7 @@ module.exports = function() {
         const encoded = result.fingerprint;
         this.decode(encoded);
         resolve({
-          '@context': [
-            'http://coalaip.org/',
-            'http://schema.org/'
-          ],
+          '@context': 'http://coalaip.org/',
           '@type': 'DigitalFingerprint',
           fingerprint: encoded
         });

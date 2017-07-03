@@ -5,11 +5,11 @@ const fs = require('fs');
 // @flow
 
 /**
- * @module constellate/src/gen-util
+ * @module constellate/src/util
  */
 
 function arrayFromObject(obj: Object): any[][] {
-  return Object.keys(obj).map((key) => [key, obj[key]]);
+  return Object.keys(obj).map(key => [key, obj[key]]);
 }
 
 function cloneObject(obj: Object): Object {
@@ -36,7 +36,7 @@ function isNumber(num: any): boolean {
 }
 
 function isObject(obj: any): boolean {
-  return obj != null && obj.constructor === Object && Object.keys(obj).length;
+  return obj != null && obj.constructor === Object && !!Object.keys(obj).length;
 }
 
 function isString(str: any): boolean {
@@ -64,7 +64,7 @@ function orderObject(obj: Object): Object {
 
 // adapted from http://stackoverflow.com/questions/16167581/sort-object-properties-and-json-stringify#comment73545624_40646557
 
-function orderStringify(obj: Object, space?: number): Object {
+function orderStringify(obj: Object, space?: number): string {
   const keys = [];
   JSON.stringify(obj, (k, v) => {
     keys.push(k);
@@ -102,11 +102,10 @@ function promiseSequence(...fns: Function[]): Promise<any> {
     }, Promise.resolve());
 }
 
-function readFileInput(input: HTMLInputElement, readAs: string): Promise<ArrayBuffer|string> {
+function readFileAs(file: File, readAs: string): Promise<ArrayBuffer|string> {
   const reader = new FileReader();
   return new Promise((resolve, reject) => {
     reader.onload = () => resolve(reader.result);
-    const file = input.files[0];
     if (readAs === 'array-buffer') {
       reader.readAsArrayBuffer(file);
     } else if (readAs === 'text') {
@@ -119,7 +118,7 @@ function readFileInput(input: HTMLInputElement, readAs: string): Promise<ArrayBu
 
 function transform(x: any, fn: Function): any {
   if (isArray(x)) {
-    return x.map((y) => transform(fn(y), fn));
+    return x.map(y => transform(fn(y), fn));
   }
   if (isObject(x)) {
     return Object.assign({}, ...arrayFromObject(x).map(([k, v]) => {
@@ -135,7 +134,7 @@ function traverse(val: any, fn: Function, result: ?any) {
 
 function _traverse(path: string, val: any, fn: Function, result: ?any) {
   if (isArray(val)) {
-    val.map((v) => _traverse(path, v, fn, result));
+    val.map(v => _traverse(path, v, fn, result));
   } else if (isObject(val)) {
     arrayFromObject(val).map(([k, v]) => {
       const fullPath = (!path ? k : path + '/' + k);
@@ -146,7 +145,7 @@ function _traverse(path: string, val: any, fn: Function, result: ?any) {
   }
 }
 
-function withoutIndex(arr: Array, idx: number): Array {
+function withoutIndex(arr: any[], idx: number): any[] {
   return arr.slice(0, idx).concat(arr.slice(idx+1));
 }
 
@@ -163,7 +162,7 @@ exports.objectFromArray = objectFromArray;
 exports.orderObject = orderObject;
 exports.orderStringify = orderStringify;
 exports.promiseSequence = promiseSequence;
-exports.readFileInput = readFileInput;
+exports.readFileAs = readFileAs;
 exports.transform = transform;
 exports.traverse = traverse;
 exports.withoutIndex = withoutIndex;
