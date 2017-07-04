@@ -2,7 +2,6 @@
 
 const CID = require('cids');
 const IpfsNode = require('../lib/ipfs-node.js');
-const Ipld = require('../lib/ipld.js');
 
 const {
     isArray,
@@ -21,7 +20,8 @@ const {
 
 module.exports = function() {
     const ipfs = new IpfsNode();
-    const ipld = new Ipld(ipfs);
+    const processContent = _processContent(ipfs);
+    const processMetadata = _processMetadata(ipfs);
     this.generate = (content: FileList, metadata: FileList, name: string): Promise<File> => {
       if (!content || !content.length) throw new Error('no content');
       if (!metadata || !metadata.length) throw new Error('no metadata');
@@ -32,9 +32,9 @@ module.exports = function() {
     }
     this.get = (hash: string): Promise<File|Object> => {
       const cid = new CID(hash);
-      return ipld.dereference(cid).then(obj => {
+      return ipfs.dereference(cid).then(obj => {
         if (cid.codec === 'dag-cbor') {
-          return ipld.expand(obj);
+          return ipfs.expand(obj);
         }
         const ext = obj.type.split('/').pop();
         return new File(
@@ -56,7 +56,6 @@ module.exports = function() {
       }
       let hashes, name;
       return Promise.all(promises).then(multihashes => {
-        console.log(JSON.stringify(multihashes, null, 2));
         hashes = multihashes.reduce((result, multihash, idx) => {
           if (!(name = content[idx].name)) throw new Error('no name');
           return Object.assign(result, { [name]: multihash });
@@ -83,18 +82,17 @@ module.exports = function() {
         );
       });
     }
-    this.processContent = _processContent(ipfs);
-    this.processMetadata = _processMetadata(ipfs);
     this.start = (): Promise<*> => ipfs.start();
     this.stop = (): Promise<*> => ipfs.stop();
     // for testing..
+    const ipldFromObjects = _ipldFromObjects(ipfs);
     this.ipldFromCSVs = (csvs: string[], types: string[]): Promise<Object[]> => {
       const objs = parseCSVs(csvs, types);
-      return ipldFromObjects(ipfs, objs);
+      return ipldFromObjects(objs);
     }
     this.ipldFromJSONs = (jsons: string[], types: string[]): Promise<Object[]> => {
       const objs = parseJSONs(jsons, types);
-      return ipldFromObjects(ipfs, objs);
+      return ipldFromObjects(objs);
     }
 }
 
@@ -159,6 +157,7 @@ function _processMetadata(ipfs: Object) {
     const datas = new Array(files.length);
     const types = new Array(files.length);
     let filetype;
+    const ipldFromObjects = _ipldFromObjects(ipfs);
     return files.reduce((result, file, i) => {
       return result.then(() => {
         if (!filetype) {
@@ -181,7 +180,7 @@ function _processMetadata(ipfs: Object) {
       }
       return parseJSONs(datas, types);
     }).then(objs => {
-      return ipldFromObjects(ipfs, objs);
+      return ipldFromObjects(objs);
     }).then(ipld => {
       return new File(
         [JSON.stringify(ipld, null, 2)],
@@ -192,12 +191,21 @@ function _processMetadata(ipfs: Object) {
   }
 }
 
-function ipldFromObjects(ipfs: Object, objs: Object[]): Promise<Object[]> {
+function _ipldFromObjects(ipfs: Object): Function {
+  return (objs: Object[]): Promise<Object[]> => {
     return new Promise((resolve, _) => {
         const hashes = {};
         const ipld = [];
+        let cid;
         orderObjects(objs).reduce((result, obj) => {
             return result.then(() => {
+                if (obj.type === 'Hash' && isString(obj['#'])) {
+                  cid = new CID(obj['#']);
+                  return ipfs.getObject(cid).then(_obj => {
+                    obj = _obj;
+                    return cid;
+                  });
+                }
                 obj = transform(obj, x => {
                     if (isString(x)) {
                       if (x[0] === '@') {
@@ -208,7 +216,7 @@ function ipldFromObjects(ipfs: Object, objs: Object[]): Promise<Object[]> {
                       if (x[0] === '#') {
                         return {
                           '/': x.slice(1)
-                        }
+                        };
                       }
                     }
                     return x;
@@ -225,6 +233,7 @@ function ipldFromObjects(ipfs: Object, objs: Object[]): Promise<Object[]> {
             resolve(ipld);
         });
     });
+  }
 }
 
 function orderObjects(objs: Object[]): Object[] {
@@ -360,10 +369,8 @@ function parseJSONs(jsons: string[], types: string[]): Object[] {
     if (!isArray(arr = JSON.parse(json))) {
       throw new Error('expected array');
     }
-    if (types) {
-      for (i = 0; i < arr.length; i++) {
-        arr[i].type = types[idx];
-      }
+    for (i = 0; i < arr.length; i++) {
+      arr[i].type = types[idx];
     }
     return result.concat(arr);
   }, []);

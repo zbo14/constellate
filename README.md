@@ -16,7 +16,7 @@ This should bundle dependencies with Browserify.
 
 `npm start` should start the express app.
 
-Then go to `localhost:8888/main.html` in your browser and open developer tools to see console logs.
+Then go to `localhost:8888/main.html` in your browser.
 
 #### Tests
 

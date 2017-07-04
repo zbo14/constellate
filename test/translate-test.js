@@ -13,18 +13,27 @@ const json2 = fs.readFileSync(__dirname + '/Person.json', 'utf8');
 
 const started = constellate.start();
 
+let str1, str2;
+
 started.then(() => {
 
   return constellate.ipldFromJSONs([json1, json2], ['MusicGroup', 'Person']);
 
 }).then(ipld => {
 
-  console.log(JSON.stringify(ipld, null, 2));
+  str1 = JSON.stringify(ipld);
 
   return constellate.ipldFromCSVs([csv1, csv2], ['MusicGroup', 'Person']);
 
 }).then(ipld => {
 
-  console.log(JSON.stringify(ipld, null, 2));
+  str2 = JSON.stringify(ipld);
+
+  if (str1 !== str2) {
+    throw new Error(`got different outputs, ${str1} and ${str2}`);
+  }
+
+  console.log('Done');
+  process.exit();
 
 });
