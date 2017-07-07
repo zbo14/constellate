@@ -1,5 +1,6 @@
 'use strict';
 
+const fileType = require('file-type');
 const fs = require('fs');
 
 // @flow
@@ -12,8 +13,28 @@ function arrayFromObject(obj: Object): any[][] {
   return Object.keys(obj).map(key => [key, obj[key]]);
 }
 
+function bufferToArrayBuffer(buf: Buffer): ArrayBuffer {
+  // from https://stackoverflow.com/a/31394257
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length);
+}
+
+function bufferToFile(buf: Buffer, name: string): File {
+  const ab = bufferToArrayBuffer(buf);
+  const { ext, mime } = fileType(buf.slice(0, 4100));
+  const type = mime.split('/')[0] + '/' + ext;
+  return new File([ab], name + '.' + ext, { type });
+}
+
 function cloneObject(obj: Object): Object {
   return JSON.parse(JSON.stringify(obj));
+}
+
+function fileToAnchor(file: File, type: string): HTMLAnchorElement {
+  const a = document.createElement('a');
+  a.setAttribute('href', URL.createObjectURL(file));
+  a.setAttribute('download', file.name);
+  a.innerText = file.name;
+  return a;
 }
 
 function isArray(arr: any): boolean {
@@ -41,17 +62,6 @@ function isObject(obj: any): boolean {
 
 function isString(str: any): boolean {
   return str != null && typeof str === 'string' && str.length;
-}
-
-function newAnchor(data: Buffer[], type: string): HTMLAnchorElement {
-  const a = document.createElement('a');
-  const blob = new Blob(data, { type });
-  const filename = blob.type.replace('/', '.');
-  const url = URL.createObjectURL(blob);
-  a.setAttribute('href', url);
-  a.setAttribute('download', filename);
-  a.innerText = filename;
-  return a;
 }
 
 function objectFromArray(arr: any[][]): Object {
@@ -155,14 +165,16 @@ function withoutIndex(arr: any[], idx: number): any[] {
 }
 
 exports.arrayFromObject = arrayFromObject;
+exports.bufferToArrayBuffer = bufferToArrayBuffer;
+exports.bufferToFile = bufferToFile;
 exports.cloneObject = cloneObject;
+exports.fileToAnchor = fileToAnchor;
 exports.isAncestor = isAncestor;
 exports.isArray = isArray;
 exports.isBoolean = isBoolean;
 exports.isNumber = isNumber;
 exports.isObject = isObject;
 exports.isString = isString;
-exports.newAnchor = newAnchor;
 exports.objectFromArray = objectFromArray;
 exports.orderObject = orderObject;
 exports.orderStringify = orderStringify;

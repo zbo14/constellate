@@ -3,20 +3,29 @@
     <title>constellate</title>
   </head>
   <body>
+    <label>Select content module</label><br>
+    <select id='select-module'>
+      <option value='' selected disabled>--</option>
+      <option value='ipfs'>ipfs</option>
+      <option value='swarm'>swarm</option>
+    </select><br><br>
     <label>Project Name</label><br>
     <input id='project-name' type='text' /><br><br>
     <label>Content</label><br>
-    <input id='content' type='file' accept='audio/*|image/*' multiple /><br><br>
+    <input id='content' type='file' accept='audio/*|image/*' multiple />
+    <input type='checkbox' id='encrypt' /><label> encrypt</label><br><br>
     <label>Metadata</label><br>
     <input id='metadata' type='file' accept='application/json|text/csv' multiple /><br><br>
     <label>IPLD</label><br>
     <input id='ipld' type='file' /><br><br>
-    <button id='generate-btn'>generate</button><br>
+    <button id='generate-btn'>generate</button>
     <button id='upload-btn'>upload</button><br><br>
-    <a id='download-link'></a><br><br>
+    <input id='get' type='text' placeholder='hash' />
+    <button id='get-btn'>get</button>
+    <input type='checkbox' id='decrypt' /><label> decrypt</label><br><br>
     <hr>
-    <input id='get' type='text' placeholder='hash' /><br>
-    <button id='get-btn'>get</button><br><br>
+    <div id='downloads'></div>
+    <textarea id='object'></textarea>
   </body>
-  <script src='../bundle.js'></script>
+  <script src='./bundle.js'></script>
 </html>

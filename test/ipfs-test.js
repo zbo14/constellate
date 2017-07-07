@@ -1,36 +1,39 @@
-const IpfsNode = require('../lib/ipfs-node.js');
+const Ipfs = require('../lib/ipfs.js');
 
-const ipfs = new IpfsNode();
+const ipfs = new Ipfs();
 
-const composer = {
-  '@context': 'http://schema.org',
+const composer1 = {
+  '@context': 'http://schema.org/',
   '@type': 'Person',
-  name: 'composer name'
+  name: 'composer1'
+}
+
+const composer2 = {
+  '@context': 'http://schema.org/',
+  '@type': 'Person',
+  name: 'composer2'
 }
 
 const publisher = {
-  '@context': 'http://schema.org',
+  '@context': 'http://schema.org/',
   '@type': 'Organization',
-  name: 'publisher name'
+  name: 'publisher'
 }
 
 const composition = {
-  '@context': 'http://schema.org',
+  '@context': 'http://schema.org/',
   '@type': 'MusicComposition',
-  name: 'composition title'
+  name: 'song'
 }
 
 const expanded = {
-  '@context': 'http://schema.org',
+  '@context': 'http://schema.org/',
   '@type': 'MusicComposition',
-  composer,
-  name: 'composition title',
-  publisher: {
-    '@context': 'http://schema.org',
-    '@type': 'Organization',
-    member: composer,
-    name: 'publisher name'
-  }
+  composer: [
+    composer2
+  ],
+  name: 'song',
+  publisher
 }
 
 let flattened, str1, str2;
@@ -39,29 +42,29 @@ const started = ipfs.start();
 
 started.then(() => {
 
-  return ipfs.addObject(composer);
+  return ipfs.addObject(composer1);
 
-}).then(cid => {
+}).then(hash => {
 
-  publisher.member = {
-    '/': cid.toBaseEncodedString()
-  }
+  composition.composer = [{ '/': hash }];
+
+  return ipfs.addObject(composer2);
+
+}).then(hash => {
+
+  composition.composer.push({ '/': hash });
 
   return ipfs.addObject(publisher);
 
-}).then(cid => {
+}).then(hash => {
 
-  composition.composer = publisher.member;
-
-  composition.publisher = {
-    '/': cid.toBaseEncodedString()
-  }
+  composition.publisher = { '/': hash };
 
   return ipfs.addObject(composition);
 
-}).then(cid => {
+}).then(hash => {
 
-  return ipfs.getObject(cid);
+  return ipfs.getObject(hash);
 
 }).then(obj => {
 
@@ -71,25 +74,30 @@ started.then(() => {
 
 }).then(_expanded => {
 
-  str1 = JSON.stringify(expanded);
-  str2 = JSON.stringify(_expanded);
+  str1 = JSON.stringify(expanded, null, 2);
+  str2 = JSON.stringify(_expanded, null, 2);
 
   if (str1 !== str2) {
-    throw new Error('expected ' + str1 + ', got ' + str2);
+    throw new Error('EXPECTED ' + str1 + '\nGOT ' + str2);
   }
 
   return ipfs.flatten(expanded);
 
 }).then(obj => {
 
-  str1 = JSON.stringify(flattened);
-  str2 = JSON.stringify(obj.flattened);
+  str1 = JSON.stringify(flattened, null, 2);
+  str2 = JSON.stringify(obj.flattened, null, 2);
 
   if (str1 !== str2) {
-    throw new Error('expected ' + str1 + ', got ' + str2);
+    throw new Error('EXPECTED ' + str1 + '\nGOT ' + str2);
   }
 
   console.log('Done');
   process.exit();
 
-}).catch(console.error);
+}).catch(err => {
+
+  console.error(err);
+  process.exit();
+
+});

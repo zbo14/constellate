@@ -1,9 +1,15 @@
 'use strict';
 
-const CID = require('cids');
-const IpfsNode = require('../lib/ipfs-node.js');
+
+const aes = require('aes-js');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+
+const Ipfs = require('../lib/ipfs.js');
+const Swarm = require('../lib/swarm.js');
 
 const {
+    bufferToFile,
     isArray,
     isString,
     orderObject,
@@ -18,48 +24,78 @@ const {
  * @module constellate/src/constellate
  */
 
-module.exports = function() {
-    const ipfs = new IpfsNode();
-    const processContent = _processContent(ipfs);
+module.exports = function(modName?: string) {
+    const ipfs = new Ipfs();
+    let mod;
+    if (!modName || modName === 'ipfs') {
+      mod = ipfs;
+      console.log('Content module: ipfs');
+    } else if (modName === 'swarm') {
+      mod = new Swarm();
+      console.log('Content module: swarm');
+    } else {
+      throw new Error('unexpected module name: ' + modName);
+    }
+    const processContent = _processContent(mod);
     const processMetadata = _processMetadata(ipfs);
-    this.generate = (content: FileList, metadata: FileList, name: string): Promise<File> => {
+    this.generate = (content: File[], metadata: File[], name: string, password?: string): Promise<File|Object> => {
       if (!content || !content.length) throw new Error('no content');
       if (!metadata || !metadata.length) throw new Error('no metadata');
       const format = metadata[0].type.split('/')[1];
-      return this.processContent(content, format).then(file => {
-        return this.processMetadata([...Array.from(metadata), file], name);
-      });
-    }
-    this.get = (hash: string): Promise<File|Object> => {
-      const cid = new CID(hash);
-      return ipfs.dereference(cid).then(obj => {
-        if (cid.codec === 'dag-cbor') {
-          return ipfs.expand(obj);
+      if (!password) {
+        return processContent(content, format).then(file => {
+          return processMetadata(metadata.concat(file), name);
+        });
+      } else {
+        const encrypted = new Array(content.length);
+        const keysObj = {};
+        const promises = new Array(content.length);
+        let i;
+        for (i = 0; i < content.length; i++) {
+          promises[i] = encrypt(content[i], password);
         }
-        const ext = obj.type.split('/').pop();
-        return new File(
-          [obj.data],
-          hash + '.' + ext,
-          { type: obj.type }
-        );
-      });
+        return Promise.all(promises).then(objs => {
+          for (i = 0; i < objs.length; i++) {
+            const { file, key } = objs[i];
+            encrypted[i] = file;
+            keysObj[file.name] = key;
+          }
+          const keys = new File([JSON.stringify(keysObj, null, 2)], name + '_keys.json', { type: 'application/json' });
+          return processContent(encrypted, format).then(file => {
+            return processMetadata(metadata.concat(file), name);
+          }).then(ipld => {
+            return { encrypted, ipld, keys };
+          })
+        });
+      }
     }
-    this.upload = (content: FileList, ipld: FileList): Promise<File> => {
+    this.get = (hash: string, key?: string): Promise<File|Object> => {
+      if (mod.isFileHash(hash)) {
+        return mod.getFile(hash).then(data => {
+          if (!key) return data;
+          const aesCtr = new aes.ModeOfOperation.ctr(Buffer.from(key, 'hex'));
+          return aesCtr.decrypt(data);
+        }).then(data => {
+          return bufferToFile(data, hash);
+        });
+      }
+      if (ipfs.isObjectHash(hash)) {
+        return ipfs.getObject(hash).then(ipfs.expand);
+      }
+      throw new Error('Invalid hash: ' + hash);
+    }
+    this.upload = (content: File[], ipld: File[]): Promise<File> => {
       if (!content || !content.length) throw new Error('no content');
       if (!ipld || !ipld.length) throw new Error('no ipld');
       const promises = new Array(content.length);
       for (let i = 0; i < content.length; i++) {
         promises[i] = readFileAs(content[i], 'array-buffer').then(ab => {
-          const buf = Buffer.from(ab);
-          return ipfs.addFile(buf);
+          return mod.addFile(Buffer.from(ab));
         });
       }
-      let hashes, name;
-      return Promise.all(promises).then(multihashes => {
-        hashes = multihashes.reduce((result, multihash, idx) => {
-          if (!(name = content[idx].name)) throw new Error('no name');
-          return Object.assign(result, { [name]: multihash });
-        }, {});
+      const hashes = {};
+      let name;
+      return Promise.all(promises).then(() => {
         return readFileAs(ipld[0], 'text');
       }).then(data => {
         const arr = JSON.parse(data);
@@ -70,8 +106,8 @@ module.exports = function() {
           return result.then(() => {
             if (!(name = obj.name)) throw new Error('no name');
             return ipfs.addObject(obj);
-          }).then(cid => {
-            hashes[name] = cid.toBaseEncodedString();
+          }).then(hash => {
+            hashes[name] = hash;
           });
         }, Promise.resolve());
       }).then(() => {
@@ -96,8 +132,31 @@ module.exports = function() {
     }
 }
 
-function _processContent(ipfs: Object) {
-  return (files: FileList, format: string): Promise<File> => {
+function encrypt(file: File, password: string): Promise<Object> {
+  return new Promise((resolve, reject) => {
+    bcrypt.genSalt(10, (err, salt) => {
+      if (err) return reject(err);
+      bcrypt.hash(password, salt, (err, hash) => {
+        if (err) return reject(err);
+        let key = Buffer.concat([
+          Buffer.from(hash.substr(-31), 'base64'),
+          crypto.randomBytes(2)
+        ]).slice(0, 24);
+        const aesCtr = new aes.ModeOfOperation.ctr(key);
+        const [name, ext] = file.name.split('.');
+        readFileAs(file, 'array-buffer').then(ab => {
+          const data = aesCtr.encrypt(Buffer.from(ab));
+          file = new File([data], file.name, { type: file.type });
+          key = key.toString('hex');
+          resolve({ file, key });
+        });
+      });
+    });
+  });
+}
+
+function _processContent(mod: Object) {
+  return (files: File[], format: string): Promise<File> => {
     if (format !== 'csv' && format !== 'json') {
       throw new Error('expected csv or json, got format=' + format);
     }
@@ -113,34 +172,33 @@ function _processContent(ipfs: Object) {
         if (filetype !== 'audio' && filetype !== 'image') {
           throw new Error('expected audio or image, got ' + filetype);
         }
-        filename = filetype.charAt(0).toUpperCase() + filetype.slice(1) + '.' + format;
+        filename = filetype.charAt(0).toUpperCase() + filetype.slice(1) + 'Object.' + format;
       }
       if (filetype !== file.type.split('/')[0]) {
         throw new Error(`expected ${filetype}, got ` + file.type.split('/')[0]);
       }
       promises[i] = readFileAs(file, 'array-buffer').then(ab => {
-        const buf = Buffer.from(ab);
-        return ipfs.multihash(buf);
+        return mod.hash(Buffer.from(ab));
       });
     }
-    return Promise.all(promises).then(multihashes => {
+    return Promise.all(promises).then(hashes => {
       let data, type;
       if (format === 'csv') {
-        const file = new Array(files.length);
-        const name = new Array(files.length);
-        file[0] = 'file';
+        const contentUrl = new Array(files.length + 1);
+        const name = new Array(files.length + 1);
+        contentUrl[0] = 'contentUrl';
         name[0] = 'name';
-        for (i = 0; i < multihashes.length; i++) {
-          file[i+1] = '#' + multihashes[i];
+        for (i = 0; i < hashes.length; i++) {
+          contentUrl[i+1] = mod.contentUrl(hashes[i]);
           name[i+1] = files[i].name;
         }
-        data = toCSV([file, name]);
+        data = toCSV([contentUrl, name]);
         type = 'text/csv';
       }
       if (format === 'json') {
-        data = JSON.stringify(multihashes.reduce((result, multihash, idx) => {
+        data = JSON.stringify(hashes.reduce((result, hash, idx) => {
           return result.concat({
-            file: '#' + multihash,
+            contentUrl: mod.contentUrl(hash),
             name: files[idx].name
           });
         }, []), null, 2);
@@ -156,8 +214,8 @@ function _processMetadata(ipfs: Object) {
     if (!files.length) throw new Error('no files');
     const datas = new Array(files.length);
     const types = new Array(files.length);
-    let filetype;
     const ipldFromObjects = _ipldFromObjects(ipfs);
+    let filetype;
     return files.reduce((result, file, i) => {
       return result.then(() => {
         if (!filetype) {
@@ -193,45 +251,53 @@ function _processMetadata(ipfs: Object) {
 
 function _ipldFromObjects(ipfs: Object): Function {
   return (objs: Object[]): Promise<Object[]> => {
-    return new Promise((resolve, _) => {
-        const hashes = {};
-        const ipld = [];
-        let cid;
-        orderObjects(objs).reduce((result, obj) => {
-            return result.then(() => {
-                if (obj.type === 'Hash' && isString(obj['#'])) {
-                  cid = new CID(obj['#']);
-                  return ipfs.getObject(cid).then(_obj => {
-                    obj = _obj;
-                    return cid;
-                  });
+      for (let i = 0; i < objs.length; i++) {
+        const hash = objs[i]['#'];
+        if (objs[i].type === 'Hash' && isString(hash)) {
+          objs[i] = ipfs.getObject(hash).then(obj => {
+            return {
+              '#': hash,
+              name: obj.name,
+              type: obj['@type']
+            };
+          });
+        }
+      }
+      const hashes = {};
+      const ipld = [];
+      return Promise.all(objs).then(objs => {
+        return orderObjects(objs).reduce((result, obj) => {
+          if (obj['#']) {
+            hashes[obj.name] = obj['#'];
+            return result;
+          }
+          return result.then(() => {
+            obj = transform(obj, x => {
+                if (isString(x)) {
+                  if (x[0] === '@') {
+                    return {
+                      '/': hashes[x.slice(1)]
+                    };
+                  }
+                  if (x[0] === '#') {
+                    return {
+                      '/': x.slice(1)
+                    };
+                  }
                 }
-                obj = transform(obj, x => {
-                    if (isString(x)) {
-                      if (x[0] === '@') {
-                        return {
-                          '/': hashes[x.slice(1)]
-                        };
-                      }
-                      if (x[0] === '#') {
-                        return {
-                          '/': x.slice(1)
-                        };
-                      }
-                    }
-                    return x;
-                });
-                obj['@context'] = 'http://coalaip.org';
-                obj['@type'] = obj.type;
-                delete obj.type;
-                return ipfs.addObject(obj);
-            }).then(cid => {
-                hashes[obj.name] = cid.toBaseEncodedString();
-                ipld.push(orderObject(obj));
+                return x;
             });
-        }, Promise.resolve()).then(() => {
-            resolve(ipld);
-        });
+            obj['@context'] = 'http://coalaip.org';
+            obj['@type'] = obj.type;
+            delete obj.type;
+            return ipfs.addObject(obj);
+          }).then(hash => {
+            hashes[obj.name] = hash;
+            ipld.push(orderObject(obj));
+          });
+      }, Promise.resolve());
+    }).then(() => {
+      return ipld;
     });
   }
 }

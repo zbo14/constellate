@@ -30,7 +30,7 @@ started.then(() => {
   str2 = JSON.stringify(ipld);
 
   if (str1 !== str2) {
-    throw new Error(`got different outputs, ${str1} and ${str2}`);
+    throw new Error('got different outputs, ' + str1 + ' and ' + str2);
   }
 
   console.log('Done');

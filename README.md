@@ -10,9 +10,7 @@ Clone the repo and `npm install`.
 
 #### Browser
 
-`npm run gulp` if it's the first time or there's no `bundle.js` file in the project directory.
-
-This should bundle dependencies with Browserify.
+`npm run bundle` if it's the first time.. this should bundle dependencies with Browserify.
 
 `npm start` should start the express app.
 
