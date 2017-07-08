@@ -14,6 +14,7 @@ const object = document.getElementById('object');
 const projectName = document.getElementById('project-name');
 const selectModule = document.getElementById('select-module');
 
+const fingerprintBtn = document.getElementById('fingerprint-btn');
 const generateBtn = document.getElementById('generate-btn');
 const getBtn = document.getElementById('get-btn');
 const uploadBtn = document.getElementById('upload-btn');
@@ -22,8 +23,25 @@ let constellate;
 
 selectModule.addEventListener('change', evt => {
   if (constellate) constellate.stop();
-  constellate = new Constellate(evt.target.value);
+  constellate = new Constellate(evt.target.value, 'http://127.0.0.1:8888');
   constellate.start();
+});
+
+fingerprintBtn.addEventListener('click', () => {
+  const files = content.files;
+  if (!files.length) return;
+  const promises = new Array(files.length);
+  for (let i = 0; i < files.length; i++) {
+    promises[i] = constellate.fingerprint(files[i]);
+  }
+  Promise.all(promises).then(fingerprints => {
+    const data = JSON.stringify(fingerprints.reduce((result, fingerprint, idx) => {
+      result[files[idx].name] = fingerprint;
+      return result
+    }, {}), null, 2);
+    console.log(data);
+    // downloads.appendChild(new File([data], 'fingerprints.json', { type: 'application/json'} ));
+  });
 });
 
 generateBtn.addEventListener('click', () => {

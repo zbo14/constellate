@@ -1,61 +1,26 @@
 'use strict';
 
-const fpcalc = require('fpcalc');
-
 // @flow
 
 /**
  * @module constellate/src/fingerprint.js
  */
 
-module.exports = function() {
-  this.calculate = (filepath: string, length: number): Promise<Object> => {
-    const options : Object = {};
-    if (length) Object.assign(options, { length });
-    return new Promise((resolve, reject) => {
-      fpcalc(filepath, options, (err, result) => {
-        if (err) return reject(err);
-        const encoded = result.fingerprint;
-        this.decode(encoded);
-        resolve({
-          '@context': 'http://coalaip.org/',
-          '@type': 'DigitalFingerprint',
-          fingerprint: encoded
-        });
-      });
-    });
-  }
-  this.decode = (encoded: string) => {
-    if (this.raw && this.raw().length) {
-      console.warn('overwriting raw fingerprint');
-    }
-    const ui8 = base64Decode(Buffer.from(encoded));
-    const raw = decompress(ui8);
-    this.raw = (): Uint32Array => raw;
-  }
-  this.encode = (): string => {
-    if (!this.raw || !this.raw().length) {
-      throw new Error('could not get raw fingerprint');
-    }
-    const compressed = compress(1, this.raw());
-    return base64Encode(compressed).toString();
-  }
+module.exports = function(encoded: string) {
+  const ui8 = base64Decode(Buffer.from(encoded));
+  const raw = decompress(ui8);
+  this.encode = (): string => encoded;
   this.match = (other: Object): Object => {
-    if (!this.raw || !this.raw().length) {
-      throw new Error('could not get this raw fingerprint');
-    }
-    if (!other.raw || !other.raw().length) {
-      throw new Error('could not get other raw fingerprint');
-    }
-    return match(10.0, this.raw(), other.raw());
+    return match(10.0, raw, other.raw());
   }
+  this.raw = (): Uint32Array => raw;
 }
 
 function popcnt(x: number): number {
   return ((x >>> 0).toString(2).match(/1/g) || []).length;
 }
 
-function add(arr: any[], i: number, x: number) {
+function addToArray(arr: any[], i: number, x: number) {
   if (i < arr.length) arr[i] = x;
   arr.push(x);
 }
@@ -219,17 +184,17 @@ function compress(algorithm: number, input: Uint32Array): Uint8Array {
       while (!!x) {
         if (x & 1) {
           if ((value = bit - lastBit) >= kMaxNormalValue) {
-            add(normalBits, j++, kMaxNormalValue);
-            add(exceptionalBits, k++, value - kMaxNormalValue);
+            addToArray(normalBits, j++, kMaxNormalValue);
+            addToArray(exceptionalBits, k++, value - kMaxNormalValue);
           } else {
-            add(normalBits, j++, value);
+            addToArray(normalBits, j++, value);
           }
           lastBit = bit;
         }
         x >>>= 1;
         bit++;
       }
-      add(normalBits, j++ , 0);
+      addToArray(normalBits, j++ , 0);
     }
     normalBits = normalBits.slice(0, j);
     exceptionalBits = exceptionalBits.slice(0, k);
@@ -295,8 +260,7 @@ function unpackBits(bits: Uint8Array, size: number): Uint32Array {
   for (j = 0; j < bits.length; j++) {
     if (!bits[j]) {
       output[i] = (!i ? value : output[i-1] ^ value);
-      bit = 0;
-      value = 0;
+      bit = 0, value = 0;
       i++;
       continue;
     }

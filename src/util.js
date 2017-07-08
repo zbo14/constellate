@@ -38,11 +38,11 @@ function fileToAnchor(file: File, type: string): HTMLAnchorElement {
 }
 
 function isArray(arr: any): boolean {
-  return arr != null && Array.isArray(arr) && arr.length;
+  return Array.isArray(arr) && arr.length;
 }
 
 function isBoolean(bool: any): boolean {
-  return bool != null && typeof bool === 'boolean';
+  return typeof bool === 'boolean';
 }
 
 function isAncestor(ancestor: HTMLElement, elem: HTMLElement): boolean {
@@ -53,15 +53,15 @@ function isAncestor(ancestor: HTMLElement, elem: HTMLElement): boolean {
 }
 
 function isNumber(num: any): boolean {
-  return num != null && typeof num === 'number' &&  num !== NaN;
+  return typeof num === 'number' &&  num !== NaN;
 }
 
 function isObject(obj: any): boolean {
-  return obj != null && obj.constructor === Object && !!Object.keys(obj).length;
+  return obj.constructor === Object && Object.keys(obj).length;
 }
 
 function isString(str: any): boolean {
-  return str != null && typeof str === 'string' && str.length;
+  return typeof str === 'string' && str.length;
 }
 
 function objectFromArray(arr: any[][]): Object {
@@ -116,7 +116,7 @@ function readFileAs(file: File, readAs: string): Promise<ArrayBuffer|string> {
   const reader = new FileReader();
   return new Promise((resolve, reject) => {
     reader.onload = () => resolve(reader.result);
-    if (readAs === 'array-buffer') {
+    if (readAs === 'arraybuffer') {
       reader.readAsArrayBuffer(file);
     } else if (readAs === 'text') {
       reader.readAsText(file);

@@ -1,10 +1,11 @@
 'use strict';
 
-
 const aes = require('aes-js');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const request = require('xhr-request');
 
+const Fingerprint = require('../lib/fingerprint.js');
 const Ipfs = require('../lib/ipfs.js');
 const Swarm = require('../lib/swarm.js');
 
@@ -24,20 +25,40 @@ const {
  * @module constellate/src/constellate
  */
 
-module.exports = function(modName?: string) {
+module.exports = function(modName: string, serverUrl?: string) {
     const ipfs = new Ipfs();
     let mod;
     if (!modName || modName === 'ipfs') {
       mod = ipfs;
-      console.log('Content module: ipfs');
     } else if (modName === 'swarm') {
       mod = new Swarm();
-      console.log('Content module: swarm');
     } else {
       throw new Error('unexpected module name: ' + modName);
     }
     const processContent = _processContent(mod);
     const processMetadata = _processMetadata(ipfs);
+    this.fingerprint = (file: File): Promise<string> => {
+      if (!serverUrl) {
+        throw new Error('no url for fingerprint server');
+      }
+      let data;
+      return readFileAs(file, 'arraybuffer').then(ab => {
+        const body = Buffer.from(ab).toString('binary');
+        return new Promise((resolve, reject) => {
+          request(
+            serverUrl + '/fingerprint',
+            { body, method: 'POST' },
+            (err, data, res) => {
+              if (err) return reject(err);
+              if (res.statusCode !== 200) {
+                return reject(new Error(data));
+              }
+              resolve(data);
+            }
+          );
+        });
+      });
+    }
     this.generate = (content: File[], metadata: File[], name: string, password?: string): Promise<File|Object> => {
       if (!content || !content.length) throw new Error('no content');
       if (!metadata || !metadata.length) throw new Error('no metadata');
@@ -83,6 +104,11 @@ module.exports = function(modName?: string) {
         return ipfs.getObject(hash).then(ipfs.expand);
       }
       throw new Error('Invalid hash: ' + hash);
+    }
+    this.match = (encoded1: Object, encoded2: Object): Object => {
+      const fp1 = new Fingerprint(encoded1);
+      const fp2 = new Fingerprint(encoded2);
+      return fp1.match(fp2);
     }
     this.upload = (content: File[], ipld: File[]): Promise<File> => {
       if (!content || !content.length) throw new Error('no content');
@@ -140,8 +166,8 @@ function encrypt(file: File, password: string): Promise<Object> {
         if (err) return reject(err);
         let key = Buffer.concat([
           Buffer.from(hash.substr(-31), 'base64'),
-          crypto.randomBytes(2)
-        ]).slice(0, 24);
+          crypto.randomBytes(9)
+        ]).slice(0, 32);
         const aesCtr = new aes.ModeOfOperation.ctr(key);
         const [name, ext] = file.name.split('.');
         readFileAs(file, 'array-buffer').then(ab => {
@@ -471,3 +497,5 @@ function toCSV(arr: Array<Array<string|string[]>>): string {
   }
   return csv;
 }
+
+//---------------------------------------------------------------------------
