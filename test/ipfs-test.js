@@ -1,5 +1,6 @@
 'use strict';
 
+const dagCBOR = require('ipld-dag-cbor');
 const Ipfs = require('../lib/ipfs.js');
 
 const ipfs = new Ipfs();
@@ -26,6 +27,12 @@ const composition = {
   '@context': 'http://schema.org/',
   '@type': 'MusicComposition',
   name: 'song'
+}
+
+const recording = {
+  '@context': 'http://schema.org/',
+  '@type': 'MusicRecording',
+  name: 'version title'
 }
 
 const expanded = {
@@ -67,6 +74,8 @@ started.then(() => {
 
 }).then(hash => {
 
+  recording.recordingOf = { '/': hash };
+
   return ipfs.getObject(hash);
 
 }).then(obj => {
@@ -94,6 +103,20 @@ started.then(() => {
   if (str1 !== str2) {
     throw new Error('EXPECTED ' + str1 + '\nGOT ' + str2);
   }
+
+  return ipfs.addObject(recording);
+
+}).then(hash => {
+
+  return new Promise((resolve, reject) => {
+    dagCBOR.util.cid(recording, (err, cid) => {
+      if (err) return reject(err);
+      console.log(cid.toBaseEncodedString());
+      resolve();
+    });
+  });
+
+}).then(() => {
 
   console.log('Done');
   process.exit();

@@ -75,7 +75,7 @@ module.exports = function(url: string) {
     });
   }
   this.contentUrl = (hash: string): string => url + 'bzzr://' + hash;
-  this.hash = swarmHash;
+  this.hashFile = swarmHash;
   this.isFileHash = (hash: string): boolean => {
     return /^[a-f0-9]{64}$/.test(hash);
   }

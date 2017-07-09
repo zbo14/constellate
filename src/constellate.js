@@ -119,7 +119,7 @@ module.exports = function(modName: string, serverAddr: string) {
       if (!ipld || !ipld.length) throw new Error('no ipld');
       const promises = new Array(content.length);
       for (let i = 0; i < content.length; i++) {
-        promises[i] = readFileAs(content[i], 'array-buffer').then(ab => {
+        promises[i] = readFileAs(content[i], 'arraybuffer').then(ab => {
           return mod.addFile(Buffer.from(ab));
         });
       }
@@ -174,7 +174,7 @@ function encrypt(file: File, password: string): Promise<Object> {
         ]).slice(0, 32);
         const aesCtr = new aes.ModeOfOperation.ctr(key);
         const [name, ext] = file.name.split('.');
-        readFileAs(file, 'array-buffer').then(ab => {
+        readFileAs(file, 'arraybuffer').then(ab => {
           const data = aesCtr.encrypt(Buffer.from(ab));
           file = new File([data], file.name, { type: file.type });
           key = key.toString('hex');
@@ -207,8 +207,8 @@ function _processContent(mod: Object) {
       if (filetype !== file.type.split('/')[0]) {
         throw new Error(`expected ${filetype}, got ` + file.type.split('/')[0]);
       }
-      promises[i] = readFileAs(file, 'array-buffer').then(ab => {
-        return mod.hash(Buffer.from(ab));
+      promises[i] = readFileAs(file, 'arraybuffer').then(ab => {
+        return mod.hashFile(Buffer.from(ab));
       });
     }
     return Promise.all(promises).then(hashes => {
@@ -320,7 +320,7 @@ function _ipldFromObjects(ipfs: Object): Function {
             obj['@context'] = 'http://coalaip.org';
             obj['@type'] = obj.type;
             delete obj.type;
-            return ipfs.addObject(obj);
+            return ipfs.hashObject(obj);
           }).then(hash => {
             hashes[obj.name] = hash;
             ipld.push(orderObject(obj));
