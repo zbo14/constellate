@@ -37,8 +37,8 @@ function fileToAnchor(file: File, type: string): HTMLAnchorElement {
   return a;
 }
 
-function isArray(arr: any): boolean {
-  return Array.isArray(arr) && arr.length;
+function isArray(arr: any, isType?: Function): boolean {
+  return Array.isArray(arr) && arr.length && (!isType || arr.every(isType));
 }
 
 function isBoolean(bool: any): boolean {
@@ -57,7 +57,7 @@ function isNumber(num: any): boolean {
 }
 
 function isObject(obj: any): boolean {
-  return obj.constructor === Object && Object.keys(obj).length;
+  return obj.constructor === Object && !!Object.keys(obj).length;
 }
 
 function isString(str: any): boolean {

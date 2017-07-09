@@ -1,3 +1,5 @@
+'use strict';
+
 const Ipfs = require('../lib/ipfs.js');
 
 const ipfs = new Ipfs();
@@ -30,6 +32,7 @@ const expanded = {
   '@context': 'http://schema.org/',
   '@type': 'MusicComposition',
   composer: [
+    composer1,
     composer2
   ],
   name: 'song',
