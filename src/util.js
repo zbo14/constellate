@@ -57,26 +57,30 @@ function isNumber(num: any): boolean {
 }
 
 function isObject(obj: any): boolean {
-  return obj.constructor === Object && !!Object.keys(obj).length;
+  return obj && obj.constructor === Object && !!Object.keys(obj).length;
 }
 
 function isString(str: any): boolean {
   return typeof str === 'string' && str.length;
 }
 
+function newArray(_default: any, length: number): any[] {
+  return (Array : any).apply(null, { length }).map(() => _default);
+}
+
 function objectFromArray(arr: any[][]): Object {
   return arr.reduce((result, [key, val]) => Object.assign({}, result, {[key]: val}), {});
 }
 
-function orderObject(obj: Object): Object {
-  return JSON.parse(orderStringify(obj));
+function order(x: any[]|Object): Object {
+  return JSON.parse(orderStringify(x));
 }
 
 // adapted from http://stackoverflow.com/questions/16167581/sort-object-properties-and-json-stringify#comment73545624_40646557
 
-function orderStringify(obj: Object, space?: number): string {
+function orderStringify(x: any[]|Object, space?: number): string {
   const keys = [];
-  JSON.stringify(obj, (k, v) => {
+  JSON.stringify(x, (k, v) => {
     keys.push(k);
     if (isArray(v)) {
       v.sort((x, y) => {
@@ -103,7 +107,7 @@ function orderStringify(obj: Object, space?: number): string {
     }
     return v;
   });
-  return JSON.stringify(obj, keys.sort(), space);
+  return JSON.stringify(x, keys.sort(), space);
 }
 
 function promiseSequence(...fns: Function[]): Promise<any> {
@@ -175,8 +179,9 @@ exports.isBoolean = isBoolean;
 exports.isNumber = isNumber;
 exports.isObject = isObject;
 exports.isString = isString;
+exports.newArray = newArray;
 exports.objectFromArray = objectFromArray;
-exports.orderObject = orderObject;
+exports.order = order;
 exports.orderStringify = orderStringify;
 exports.promiseSequence = promiseSequence;
 exports.readFileAs = readFileAs;

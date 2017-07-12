@@ -104,14 +104,14 @@ along with the go-ethereum library. If not, see <http:www.gnu.org/licenses/>.
 
 */
 
-function swarmHash(data) {
+function swarmHash(data: Buffer): string {
     const size = data.length;
     let depth = 0, treeSize;
     for (treeSize = 4096; treeSize < size; treeSize *= 128) depth++;
     return split(data, depth, size, treeSize/128).toString('hex');
 }
 
-function split(chunk, depth, size, treeSize) {
+function split(chunk: Buffer, depth: number, size: number, treeSize: number): Buffer {
   while (depth && size < treeSize) {
       treeSize /= 128;
       depth--;

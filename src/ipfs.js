@@ -5,9 +5,9 @@ const dagCBOR = require('ipld-dag-cbor');
 const dagPB = require('ipld-dag-pb');
 const IPFS = require('ipfs');
 const isIPFS = require('is-ipfs');
-const os = require('os');
-const path = require('path');
 const Unixfs = require('ipfs-unixfs');
+const wrtc = require('wrtc');
+const WStar = require('libp2p-webrtc-star');
 require('setimmediate');
 
 const {
@@ -15,7 +15,7 @@ const {
   isArray,
   isObject,
   isString,
-  orderObject,
+  order,
   transform,
   traverse
 } = require('../lib/util.js');
@@ -26,15 +26,15 @@ const {
  * @module constellate/src/ipfs
  */
 
- function _expand(getObject: Function): Function {
+ function _expand(get: Function): Function {
    return (obj: Object): Promise<Object> => {
      return new Promise((resolve, reject) => {
        const promises = [];
        traverse(obj, (path, val) => {
          if (path.substr(-1) !== '/' || !isObjectHash(val)) return;
          promises.push(
-           getObject(val).then(obj => {
-             return _expand(getObject)(obj);
+           get(val).then(obj => {
+             return _expand(get)(obj);
            }).then(v => {
              return [path, v];
            })
@@ -60,7 +60,7 @@ const {
             inner[lastKey] = results[i][1];
            }
          }
-         resolve(orderObject(expanded));
+         resolve(order(expanded));
        });
      });
    }
@@ -89,8 +89,8 @@ const {
        });
        let flattened = cloneObject(obj);
        if (!promises.length) {
-         return addObject(orderObject(obj)).then(hash => {
-           flattened = orderObject(flattened);
+         return addObject(order(obj)).then(hash => {
+           flattened = order(flattened);
            resolve({ flattened, hash });
          });
        }
@@ -117,7 +117,7 @@ const {
             };
            }
          }
-         flattened = orderObject(flattened);
+         flattened = order(flattened);
          addObject(flattened).then(hash => {
            resolve({ flattened, hash });
          });
@@ -129,6 +129,7 @@ const {
  /*
 
  The following code is adapted from..
+   > https://github.com/ipfs/js-ipfs/blob/master/README.md
    > https://github.com/ipfs/js-ipfs/blob/master/examples/basics/index.js
    > https://github.com/ipfs/js-ipfs/blob/master/examples/transfer-files/public/js/app.js
 
@@ -158,8 +159,18 @@ const {
 
  */
 
+const wstar = new WStar({ wrtc });
+
 module.exports = function() {
    const ipfs = new IPFS({
+     init: true,
+     repo: '/tmp/' + new Date().toString(),
+     start: true,
+     EXPERIMENTAL: {
+       pubsub: true,
+       sharding: true,
+       dht: true
+     },
      config: {
        Addresses: {
          Swarm: [
@@ -167,23 +178,22 @@ module.exports = function() {
          ]
        }
      },
-     init: true,
-     repo: path.join(os.tmpdir() + '/' + new Date().toString()),
-     start: true,
-     EXPERIMENTAL: {
-       pubsub: true,
-       sharding: true
-     }
+     libp2p: {
+        modules: {
+          transport: [wstar],
+          discovery: [wstar.discovery]
+        }
+      }
    });
    const addObject = _addObject(ipfs);
-   const getObject = _getObject(ipfs);
+   const get = _get(ipfs);
    this.addFile = _addFile(ipfs);
    this.addObject = addObject;
    this.contentUrl = (hash: string): string => '/ipfs/' + hash;
-   this.expand = _expand(getObject);
+   this.expand = _expand(get);
    this.flatten = _flatten(addObject);
+   this.get = get;
    this.getFile = _getFile(ipfs);
-   this.getObject = getObject;
    this.info = ipfs.id;
    this.hashObject = (obj: Object): Promise<string> => {
      return new Promise((resolve, reject) => {
@@ -255,7 +265,7 @@ function _addObject(ipfs: Object): Function {
     if (!ipfs.isOnline()) {
       throw new Error('IPFS Node is offline, cannot add object');
     }
-    return ipfs.dag.put(orderObject(obj), {
+    return ipfs.dag.put(order(obj), {
       format: 'dag-cbor',
       hashAlg: 'sha2-256'
     }).then(cid => {
@@ -288,28 +298,27 @@ function _getFile(ipfs: Object): Function {
   }
 }
 
-function _getObject(ipfs: Object): Function {
-  return (hash: string): Promise<Object> => {
+function _get(ipfs: Object): Function {
+  return (path: string): Promise<Object> => {
     if (!ipfs.isOnline()) {
-      throw new Error('IPFS Node is offline, cannot get object');
-    }
-    const cid = new CID(hash);
-    if (cid.codec !== 'dag-cbor' || cid.version !== 1) {
-      throw new Error(`expected CID(codec="dag-cbor",version=1), got CID(codec="${cid.codec}",version=${cid.version})`);
+      throw new Error('IPFS Node is offline, cannot get');
     }
     return new Promise((resolve, reject) => {
-      ipfs.dag.get(cid, (err, dagNode) => {
+      ipfs.dag.get(path, (err, node) => {
         if (err) return reject(err);
-        const obj = transform(dagNode.value, (val, key) => {
-          if (key === '/') {
-            return new CID(val).toBaseEncodedString();
-          }
-          if (isObject(val) && val['/']) {
-            return { '/': new CID(val['/']).toBaseEncodedString() };
-          }
-          return val;
-        });
-        resolve(orderObject(obj));
+        let result = node.value;
+        if (isArray(result) || isObject(result)) {
+          result = order(transform(result, (val, key) => {
+            if (key === '/') {
+              return new CID(val).toBaseEncodedString();
+            }
+            if (isObject(val) && val['/']) {
+              return { '/': new CID(val['/']).toBaseEncodedString() };
+            }
+            return val;
+          }));
+        }
+        resolve(result);
       });
     });
   }
@@ -320,8 +329,8 @@ function _refreshPeers(ipfs: Object): Function {
     if (!ipfs.isOnline()) {
       throw new Error('IPFS Node is offline, cannot refresh peers');
     }
-    ipfs.swarm.peers().then(() => {
-      // console.log('Refreshed peers');
+    ipfs.swarm.peers().then(peers => {
+      console.log('Refreshed peers:', peers);
     });
   }
 }

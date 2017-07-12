@@ -8,15 +8,14 @@ const decrypt = document.getElementById('decrypt');
 const downloads = document.getElementById('downloads');
 const encrypt = document.getElementById('encrypt');
 const get = document.getElementById('get');
-const ipld = document.getElementById('ipld');
-const metadata = document.getElementById('metadata');
-const object = document.getElementById('object');
-const projectName = document.getElementById('project-name');
+const json = document.getElementById('json');
+const meta = document.getElementById('meta');
 const selectModule = document.getElementById('select-module');
 
-const fingerprintBtn = document.getElementById('fingerprint-btn');
+const exportBtn = document.getElementById('export-btn');
 const generateBtn = document.getElementById('generate-btn');
 const getBtn = document.getElementById('get-btn');
+const importBtn = document.getElementById('import-btn');
 const uploadBtn = document.getElementById('upload-btn');
 
 let constellate;
@@ -27,49 +26,31 @@ selectModule.addEventListener('change', evt => {
   constellate.start();
 });
 
-fingerprintBtn.addEventListener('click', () => {
-  const files = content.files;
-  if (!files.length) return;
-  const promises = new Array(files.length);
-  for (let i = 0; i < files.length; i++) {
-    promises[i] = constellate.fingerprint(files[i]);
+exportBtn.addEventListener('click', () => {
+  const hashes = constellate.exportHashes();
+  const keys = constellate.exportKeys();
+  json.value = JSON.stringify(hashes, null, 2);
+  if (keys) {
+    const file = new File(
+      [JSON.stringify(keys, null, 2)],
+      'keys.json', { type: 'application/json' }
+    );
+    downloads.innerHTML = null;
+    downloads.appendChild(fileToAnchor(file));
+    downloads.innerHTML += '<br>';
   }
-  Promise.all(promises).then(fingerprints => {
-    const data = JSON.stringify(fingerprints.reduce((result, fingerprint, idx) => {
-      result[files[idx].name] = fingerprint;
-      return result
-    }, {}), null, 2);
-    console.log(data);
-    // downloads.appendChild(new File([data], 'fingerprints.json', { type: 'application/json'} ));
-  });
 });
 
 generateBtn.addEventListener('click', () => {
-  if (!content.files.length || !metadata.files.length || !projectName.value) return;
-  downloads.innerHTML = null;
-  let password;
-  if (encrypt.checked) {
-    password = prompt('Please enter password to encrypt files', '');
-    if (!password) return;
-  }
-  constellate.generate(
-    Array.from(content.files),
-    Array.from(metadata.files),
-    projectName.value, password
-  ).then(result => {
-    if (result instanceof File) {
-      downloads.appendChild(fileToAnchor(result));
-    } else {
-      for (let i = 0; i < result.encrypted.length; i++) {
-        downloads.appendChild(fileToAnchor(result.encrypted[i]));
-        downloads.innerHTML += '<br>';
-      }
-      downloads.appendChild(fileToAnchor(result.ipld));
-      downloads.innerHTML += '<br>';
-      downloads.appendChild(fileToAnchor(result.keys));
+  let files, password;
+  if (content.files.length) {
+    files = Array.from(content.files);
+    if (encrypt.checked) {
+      password = prompt('Please enter password to encrypt files', '');
+      if (!password) return;
     }
-    downloads.innerHTML += '<br>';
-  });
+  }
+  constellate.generate(files, password);
 });
 
 getBtn.addEventListener('click', () => {
@@ -85,19 +66,17 @@ getBtn.addEventListener('click', () => {
       downloads.appendChild(fileToAnchor(result));
       downloads.innerHTML += '<br>';
     } else {
-      object.value = JSON.stringify(result, null, 2);
+      json.value = JSON.stringify(result, null, 2);
     }
   });
 });
 
+importBtn.addEventListener('click', () => {
+  if (!meta.files.length) return;
+  const files = Array.from(meta.files);
+  constellate.import(files);
+});
+
 uploadBtn.addEventListener('click', () => {
-  if (!content.files.length || !ipld.files.length) return;
-  constellate.upload(
-    Array.from(content.files),
-    Array.from(ipld.files)
-  ).then(file => {
-    downloads.innerHTML = null;
-    downloads.appendChild(fileToAnchor(file));
-    downloads.innerHTML += '<br>';
-  });
+  constellate.upload();
 });

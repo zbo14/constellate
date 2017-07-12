@@ -9,22 +9,20 @@
       <option value='ipfs'>ipfs</option>
       <option value='swarm'>swarm</option>
     </select><br><br>
-    <label>Project Name</label><br>
-    <input id='project-name' type='text' /><br><br>
-    <label>Content</label><br>
-    <input id='content' type='file' accept='audio/*|image/*' multiple /><input type='checkbox' id='encrypt' /><label> encrypt</label> <button id='fingerprint-btn'>fingerprint</button><br><br>
     <label>Metadata</label><br>
-    <input id='metadata' type='file' accept='application/json|text/csv' multiple /><br><br>
-    <label>IPLD</label><br>
-    <input id='ipld' type='file' /><br><br>
-    <button id='generate-btn'>generate</button>
-    <button id='upload-btn'>upload</button><br><br>
+    <input id='meta' type='file' accept='application/json|text/csv' multiple />
+    <button id='import-btn'>import</button><br><br>
+    <label>Content</label><br>
+    <input id='content' type='file' accept='audio/*|image/*|video/*' multiple />
+    <input type='checkbox' id='encrypt' /> <label>encrypt</label><br><br>
+    <button id='generate-btn'>generate</button> |
+    <button id='upload-btn'>upload</button> |
+    <button id='export-btn'>export</button><br><br>
     <input id='get' type='text' placeholder='hash' />
     <button id='get-btn'>get</button>
     <input type='checkbox' id='decrypt' /><label> decrypt</label><br><br>
-    <hr>
     <div id='downloads'></div>
-    <textarea id='object'></textarea>
+    <textarea id='json'></textarea>
   </body>
   <script src='./bundle.js'></script>
 </html>

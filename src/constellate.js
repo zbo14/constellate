@@ -14,7 +14,7 @@ const {
     isArray,
     isObject,
     isString,
-    orderObject,
+    order,
     readFileAs,
     transform,
     traverse
@@ -28,7 +28,7 @@ const {
 
 module.exports = function(modName: string, serverAddr: string) {
     const ipfs = new Ipfs();
-    let mod, proj;
+    let files, hashes, ipld, keys, meta, mod;
     if (!modName || modName === 'ipfs') {
       mod = ipfs;
     } else if (modName === 'swarm') {
@@ -36,13 +36,126 @@ module.exports = function(modName: string, serverAddr: string) {
     } else {
       throw new Error('unexpected module name: ' + modName);
     }
-    const processContent = _processContent(mod);
-    const processMetadata = _processMetadata(ipfs);
-    this.fingerprint = (file: File): Promise<string> => {
+
+    //-----------------------------------------------------------------------
+
+    this.import = (files: File[]): Promise<*> => {
+      if (!files || !files.length) throw new Error('no files');
+      let file = files[0];
+      const type = file.type;
+      if (type !== 'application/json' && type !== 'text/csv') {
+        throw new Error(`expected "application/json" or "text/csv", got "${type}"`);
+      }
+      const names = new Array(files.length);
+      const promises = new Array(files.length);
+      names[0] = file.name.split('.')[0];
+      promises[0] = readFileAs(file, 'text');
+      for (let i = 1; i < files.length; i++) {
+        file = files[i];
+        if (file.type !== type) {
+          throw new Error(`expected type=${type}, got ` + file.type);
+        }
+        names[i] = file.name.split('.')[0];
+        promises[i] = readFileAs(file, 'text');
+      }
+      return Promise.all(promises).then(texts => {
+        if (type === 'application/json') {
+          meta = parseJSONs(texts, names);
+        }
+        if (type === 'text/csv') {
+          meta = parseCSVs(texts, names);
+        }
+      }).then(() => {
+        console.log('Imported metadata');
+      });
+    }
+    this.generate = (files?: File[], password?: string): Promise<*> => {
+      let promise = Promise.resolve();
+      if (files && files.length) {
+        promise = this.processFiles(files, password);
+      }
+      return promise.then(this.metaToIPLD).then(() => {
+        console.log('Generated ipld');
+      });
+    }
+    this.upload = (): Promise<*> => {
+      return this.pushIPLD().then(() => {
+        if (files && files.length) {
+          return this.uploadFiles();
+        }
+      });
+    }
+
+    this.metaToIPLD = (): Promise<*> => {
+      if (!meta || !meta.length) throw new Error('no meta');
+      for (let i = 0; i < meta.length; i++) {
+        const hash = meta[i]['#'];
+        if (meta[i].type === 'Hash' && isString(hash)) {
+          meta[i] = ipfs.get(hash).then(obj => {
+            return {
+              '#': hash,
+              name: obj.name,
+              type: obj['@type']
+            };
+          });
+        }
+      }
+      hashes = {}, ipld = [];
+      return Promise.all(meta).then(meta => {
+        return orderObjects(meta).reduce((result, obj) => {
+          if (obj['#']) {
+            hashes[obj.name] = obj['#'];
+            return result;
+          }
+          return result.then(() => {
+            obj = transform(obj, x => {
+                if (isString(x)) {
+                  if (x[0] === '@') {
+                    return {
+                      '/': hashes[x.slice(1)]
+                    };
+                  }
+                  if (x[0] === '#') {
+                    return {
+                      '/': x.slice(1)
+                    };
+                  }
+                }
+                return x;
+            });
+            // obj['@context'] = 'http://coalaip.org';
+            obj['@type'] = obj.type;
+            delete obj.type;
+            obj = order(obj);
+            return ipfs.hashObject(obj);
+          }).then(hash => {
+            hashes[obj.name] = hash;
+            ipld.push(obj);
+            return;
+          });
+        }, Promise.resolve());
+      });
+    }
+    this.encryptFiles = (_files: File[], password: string): Promise<*> => {
+      const promises = _files.map(file => encrypt(file, password));
+      files = new Array(_files.length);
+      keys = {};
+      return Promise.all(promises).then(objs => {
+        for (let i = 0; i < objs.length; i++) {
+          const { file, key } = objs[i];
+          files[i] = file;
+          keys[file.name] = key;
+        }
+      });
+    }
+    this.fingerprint = (file: File): Promise<Object> => {
       if (!serverAddr) {
         throw new Error('no server address');
       }
-      let data;
+      const type = file.type.split('/')[0];
+      if (type !== 'audio') {
+        throw new Error('expected audio, got ' + type);
+      }
       return readFileAs(file, 'arraybuffer').then(ab => {
         const body = Buffer.from(ab).toString('binary');
         return new Promise((resolve, reject) => {
@@ -54,112 +167,104 @@ module.exports = function(modName: string, serverAddr: string) {
               if (res.statusCode !== 200) {
                 return reject(new Error(data));
               }
-              resolve(data);
+              const fp = new Fingerprint(data);
+              resolve(fp);
             }
           );
         });
       });
     }
-    this.generate = (content: File[], metadata: File[], name: string, password?: string): Promise<File|Object> => {
-      if (!content || !content.length) throw new Error('no content');
-      if (!metadata || !metadata.length) throw new Error('no metadata');
-      const format = metadata[0].type.split('/')[1];
+    this.processFiles = (_files: File[], password?: string): Promise<*> => {
+      if (!files || !files.length) throw new Error('no content');
+      let promise;
       if (!password) {
-        return processContent(content, format).then(file => {
-          return processMetadata(metadata.concat(file), name);
-        });
+        promise = Promise.resolve(files = _files);
       } else {
-        const encrypted = new Array(content.length);
-        const keysObj = {};
-        const promises = new Array(content.length);
-        let i;
-        for (i = 0; i < content.length; i++) {
-          promises[i] = encrypt(content[i], password);
-        }
-        return Promise.all(promises).then(objs => {
-          for (i = 0; i < objs.length; i++) {
-            const { file, key } = objs[i];
-            encrypted[i] = file;
-            keysObj[file.name] = key;
-          }
-          const keys = new File([JSON.stringify(keysObj, null, 2)], name + '_keys.json', { type: 'application/json' });
-          return processContent(encrypted, format).then(file => {
-            return processMetadata(metadata.concat(file), name);
-          }).then(ipld => {
-            return { encrypted, ipld, keys };
-          })
-        });
+        promise = this.encryptFiles(_files, password);
       }
+      return promise.then(() => {
+        return Promise.all(files.map(file => {
+          return readFileAs(file, 'arraybuffer').then(ab => {
+            return mod.hashFile(Buffer.from(ab));
+          });
+        }));
+      }).then(hashes => {
+        hashes.forEach((hash, i) => {
+          meta.push({
+            contentUrl: mod.contentUrl(hash),
+            name: files[i].name
+          });
+        });
+      });
     }
-    this.get = (hash: string, key?: string): Promise<File|Object> => {
-      if (mod.isFileHash(hash)) {
-        return mod.getFile(hash).then(data => {
+    this.get = (str: string, key?: string): Promise<File|Object> => {
+      if (mod.isFileHash(str)) {
+        return mod.getFile(str).then(data => {
           if (!key) return data;
           const aesCtr = new aes.ModeOfOperation.ctr(Buffer.from(key, 'hex'));
           return aesCtr.decrypt(data);
         }).then(data => {
-          return bufferToFile(data, hash);
+          return bufferToFile(data, str);
         });
       }
-      if (ipfs.isObjectHash(hash)) {
-        return ipfs.getObject(hash).then(ipfs.expand);
-      }
-      throw new Error('Invalid hash: ' + hash);
+      return ipfs.get(str).then(ipfs.expand);
     }
-    this.match = (encoded1: Object, encoded2: Object): Object => {
+    this.pushIPLD = (): Promise<*> => {
+      if (!ipld || !ipld.length) throw new Error('no ipld');
+      return ipld.reduce((result, obj) => {
+        const hash = hashes[obj.name];
+        return result.then(() => {
+          return ipfs.addObject(obj);
+        }).then(h => {
+          if (hash !== h) {
+            throw new Error(`expected hash=${hash}, got ` + h);
+          }
+        });
+      }, Promise.resolve()).then(() => {
+        console.log('Pushed IPLD');
+      });
+    }
+    this.uploadFiles = (): Promise<*> => {
+      if (!files || !files.length) throw new Error('no files');
+      return Promise.all(files.map(file => {
+        return readFileAs(file, 'arraybuffer').then(ab => {
+          const hash = hashes[file.name];
+          return mod.addFile(Buffer.from(ab)).then(h => {
+            if (hash !== h) {
+              throw new Error(`expected hash=${hash}, got ` + h);
+            }
+          });
+        });
+      })).then(() => {
+        console.log('Uploaded files');
+      });
+    }
+    this.exportHashes = (): ?Object => {
+      return !hashes ? null: hashes;
+    }
+    this.exportKeys = (): ?Object => {
+      return !keys ? null : keys;
+    }
+    /*
+
+    this.matchFingerprints = (encoded1: Object, encoded2: Object): Object => {
       const fp1 = new Fingerprint(encoded1);
       const fp2 = new Fingerprint(encoded2);
       return fp1.match(fp2);
     }
-    this.newProject = (title: string): Object => {
-      return (proj = new Project(title));
+    this.exportFiles = (): ?File[] => {
+      return !files ? null : files;
     }
-    this.upload = (content: File[], ipld: File[]): Promise<File> => {
-      if (!content || !content.length) throw new Error('no content');
-      if (!ipld || !ipld.length) throw new Error('no ipld');
-      const promises = new Array(content.length);
-      for (let i = 0; i < content.length; i++) {
-        promises[i] = readFileAs(content[i], 'arraybuffer').then(ab => {
-          return mod.addFile(Buffer.from(ab));
-        });
-      }
-      const hashes = {};
-      let name;
-      return Promise.all(promises).then(() => {
-        return readFileAs(ipld[0], 'text');
-      }).then(data => {
-        const arr = JSON.parse(data);
-        if (!isArray(arr, isObject)) {
-          throw new Error('expected array of objects');
-        }
-        return arr.reduce((result, obj) => {
-          return result.then(() => {
-            if (!(name = obj.name)) throw new Error('no name');
-            return ipfs.addObject(obj);
-          }).then(hash => {
-            hashes[name] = hash;
-          });
-        }, Promise.resolve());
-      }).then(() => {
-        name = ipld[0].name.split('.')[0] + '_hashes.json';
-        return new File(
-          [JSON.stringify(hashes, null, 2)],
-          name, { type: 'application/json' }
-        );
-      });
+    this.exportIPLD = (): ?Object[] => {
+      return !ipld ? null : ipld;
     }
+    this.exportMeta = (): ?Object[] => {
+      return !meta ? null : meta;
+    }
+
+    */
     this.start = (): Promise<*> => ipfs.start();
     this.stop = (): Promise<*> => ipfs.stop();
-    // for testing..
-    const ipldFromObjects = _ipldFromObjects(ipfs);
-    this.ipldFromCSVs = (csvs: string[], types: string[]): Promise<Object[]> => {
-      const objs = parseCSVs(csvs, types);
-      return ipldFromObjects(objs);
-    }
-    this.ipldFromJSONs = (jsons: string[], types: string[]): Promise<Object[]> => {
-      const objs = parseJSONs(jsons, types);
-      return ipldFromObjects(objs);
-    }
 }
 
 function encrypt(file: File, password: string): Promise<Object> {
@@ -183,153 +288,6 @@ function encrypt(file: File, password: string): Promise<Object> {
       });
     });
   });
-}
-
-function _processContent(mod: Object) {
-  return (files: File[], format: string): Promise<File> => {
-    if (format !== 'csv' && format !== 'json') {
-      throw new Error('expected csv or json, got format=' + format);
-    }
-    const promises = new Array(files.length);
-    let i, file, filename, filetype;
-    for (i = 0; i < files.length; i++) {
-      file = files[i];
-      if (!filetype) {
-        filetype = file.type.split('/')[0];
-        if (!filetype) {
-          throw new Error('could not get file type');
-        }
-        if (filetype !== 'audio' && filetype !== 'image') {
-          throw new Error('expected audio or image, got ' + filetype);
-        }
-        filename = filetype.charAt(0).toUpperCase() + filetype.slice(1) + 'Object.' + format;
-      }
-      if (filetype !== file.type.split('/')[0]) {
-        throw new Error(`expected ${filetype}, got ` + file.type.split('/')[0]);
-      }
-      promises[i] = readFileAs(file, 'arraybuffer').then(ab => {
-        return mod.hashFile(Buffer.from(ab));
-      });
-    }
-    return Promise.all(promises).then(hashes => {
-      let data, type;
-      if (format === 'csv') {
-        const contentUrl = new Array(files.length + 1);
-        const name = new Array(files.length + 1);
-        contentUrl[0] = 'contentUrl';
-        name[0] = 'name';
-        for (i = 0; i < hashes.length; i++) {
-          contentUrl[i+1] = mod.contentUrl(hashes[i]);
-          name[i+1] = files[i].name;
-        }
-        data = toCSV([contentUrl, name]);
-        type = 'text/csv';
-      }
-      if (format === 'json') {
-        data = JSON.stringify(hashes.reduce((result, hash, idx) => {
-          return result.concat({
-            contentUrl: mod.contentUrl(hash),
-            name: files[idx].name
-          });
-        }, []), null, 2);
-        type = 'application/json';
-      }
-      return new File([data], filename, { type });
-    });
-  }
-}
-
-function _processMetadata(ipfs: Object) {
-  return (files: File[], name: string): Promise<File> => {
-    if (!files.length) throw new Error('no files');
-    const datas = new Array(files.length);
-    const types = new Array(files.length);
-    const ipldFromObjects = _ipldFromObjects(ipfs);
-    let filetype;
-    return files.reduce((result, file, i) => {
-      return result.then(() => {
-        if (!filetype) {
-          if (file.type !== 'text/csv' && file.type !== 'application/json') {
-            throw new Error(`expected "text/csv" or "application/json", got "${file.type}"`);
-          }
-          filetype = file.type;
-        }
-        if (file.type !== filetype) {
-          throw new Error(`expected "${filetype}", got "${file.type}"`);
-        }
-        return readFileAs(file, 'text');
-      }).then(data => {
-        datas[i] = data;
-        types[i] = file.name.split('.')[0];
-      });
-    }, Promise.resolve()).then(() => {
-      if (filetype === 'text/csv') {
-        return parseCSVs(datas, types);
-      }
-      return parseJSONs(datas, types);
-    }).then(objs => {
-      return ipldFromObjects(objs);
-    }).then(ipld => {
-      return new File(
-        [JSON.stringify(ipld, null, 2)],
-        name + '.ipld',
-        { type: 'application/json' }
-      );
-    });
-  }
-}
-
-function _ipldFromObjects(ipfs: Object): Function {
-  return (objs: Object[]): Promise<Object[]> => {
-      for (let i = 0; i < objs.length; i++) {
-        const hash = objs[i]['#'];
-        if (objs[i].type === 'Hash' && isString(hash)) {
-          objs[i] = ipfs.getObject(hash).then(obj => {
-            return {
-              '#': hash,
-              name: obj.name,
-              type: obj['@type']
-            };
-          });
-        }
-      }
-      const hashes = {};
-      const ipld = [];
-      return Promise.all(objs).then(objs => {
-        return orderObjects(objs).reduce((result, obj) => {
-          if (obj['#']) {
-            hashes[obj.name] = obj['#'];
-            return result;
-          }
-          return result.then(() => {
-            obj = transform(obj, x => {
-                if (isString(x)) {
-                  if (x[0] === '@') {
-                    return {
-                      '/': hashes[x.slice(1)]
-                    };
-                  }
-                  if (x[0] === '#') {
-                    return {
-                      '/': x.slice(1)
-                    };
-                  }
-                }
-                return x;
-            });
-            obj['@context'] = 'http://coalaip.org';
-            obj['@type'] = obj.type;
-            delete obj.type;
-            return ipfs.hashObject(obj);
-          }).then(hash => {
-            hashes[obj.name] = hash;
-            ipld.push(orderObject(obj));
-          });
-      }, Promise.resolve());
-    }).then(() => {
-      return ipld;
-    });
-  }
 }
 
 function orderObjects(objs: Object[]): Object[] {
@@ -498,7 +456,7 @@ function toCSV(arr: Array<Array<string|string[]>>): string {
   return csv;
 }
 
-//---------------------------------------------------------------------------
+/*
 
 function Project(title: string) {
   let sheets = [];
@@ -552,6 +510,10 @@ function Project(title: string) {
     return sheets.reduce((result, sheet) => {
       return result.concat(sheet.toObjects());
     }, []);
+  }
+  this.fromCSVs = (csvs: string[], types: string[]) => {
+    const objs = parseCSVs(csvs, types);
+    this.fromObjects(objs);
   }
   this.getSheet = (type: string): Object => {
     for (let i = 0; i < sheets.length; i++) {
@@ -696,3 +658,5 @@ function getSubMatches(regex: RegExp, str: string): string[] {
   }
   return subMatches;
 }
+
+*/

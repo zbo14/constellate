@@ -1,6 +1,5 @@
 'use strict';
 
-const dagCBOR = require('ipld-dag-cbor');
 const Ipfs = require('../lib/ipfs.js');
 
 const ipfs = new Ipfs();
@@ -108,13 +107,17 @@ started.then(() => {
 
 }).then(hash => {
 
-  return new Promise((resolve, reject) => {
-    dagCBOR.util.cid(recording, (err, cid) => {
-      if (err) return reject(err);
-      console.log(cid.toBaseEncodedString());
-      resolve();
-    });
-  });
+  str1 = hash;
+
+  ipfs.hashObject(recording);
+
+})then(hash => {
+
+  str2 = hash;
+
+  if (str1 !== str2) {
+    throw new Error('EXPECTED ' + str1 + '\nGOT ' + str2);
+  }
 
 }).then(() => {
 

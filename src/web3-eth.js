@@ -5,7 +5,7 @@ const HDKey = require('ethereumjs-wallet/HDKey');
 const Web3 = require('web3');
 
 const {
-  orderObject
+  order
 } = require('../lib/util.js');
 
 // @flow
@@ -139,7 +139,7 @@ function _getBlock(web3: Object): Function {
             return { '@type': 'Block', blockHash };
           });
         }
-        resolve(orderObject(instance));
+        resolve(order(instance));
       });
     });
   }
@@ -191,7 +191,7 @@ function _getTransaction(web3: Object): Function {
         if (value) {
           instance.value = value;
         }
-        resolve(orderObject(instance));
+        resolve(order(instance));
       });
     });
   }

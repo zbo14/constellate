@@ -10,7 +10,7 @@ Clone the repo and `npm install`.
 
 #### Browser
 
-`npm run bundle` if it's the first time.. this should bundle dependencies with Browserify.
+`npm run bundle` if it's the first time, this should bundle dependencies with Browserify.
 
 `npm start` should start the express app.
 

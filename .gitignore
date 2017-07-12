@@ -1,4 +1,6 @@
+/app
 bundle.*
+/demo
 .DS_Store
 *.log
 node_modules
