@@ -28,7 +28,7 @@ const {
 
 module.exports = function(modName: string, serverAddr: string) {
     const ipfs = new Ipfs();
-    let files, hashes, ipld, keys, meta, mod;
+    let files, hashes, ipld, keys, meta, names, mod;
     if (!modName || modName === 'ipfs') {
       mod = ipfs;
     } else if (modName === 'swarm') {
@@ -100,7 +100,7 @@ module.exports = function(modName: string, serverAddr: string) {
           });
         }
       }
-      hashes = {}, ipld = [];
+      hashes = {}, ipld = [], names = [];
       return Promise.all(meta).then(meta => {
         return orderObjects(meta).reduce((result, obj) => {
           const name = obj.name;
@@ -133,6 +133,7 @@ module.exports = function(modName: string, serverAddr: string) {
           }).then(hash => {
             hashes[name] = hash;
             ipld.push(obj);
+            names.push(name);
             return;
           });
         }, Promise.resolve());
@@ -213,12 +214,13 @@ module.exports = function(modName: string, serverAddr: string) {
     }
     this.pushIPLD = (): Promise<*> => {
       if (!ipld || !ipld.length) throw new Error('no ipld');
-      return ipld.reduce((result, obj) => {
-        const hash = hashes[obj.name];
+      return ipld.reduce((result, obj, i) => {
+        const hash = hashes[names[i]];
         return result.then(() => {
           return ipfs.addObject(obj);
         }).then(h => {
           if (hash !== h) {
+            console.log(JSON.stringify(hashes, null, 2));
             throw new Error(`expected hash=${hash}, got ` + h);
           }
         });

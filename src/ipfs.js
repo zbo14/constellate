@@ -11,6 +11,12 @@ const WStar = require('libp2p-webrtc-star');
 require('setimmediate');
 
 const {
+  Emitter,
+  Tasks,
+  StateMachine
+} = require('../lib/event.js');
+
+const {
   cloneObject,
   isArray,
   isObject,
@@ -26,48 +32,8 @@ const {
  * @module constellate/src/ipfs
  */
 
- function _expand(get: Function): Function {
-   return (obj: Object): Promise<Object> => {
-     return new Promise((resolve, reject) => {
-       const promises = [];
-       traverse(obj, (path, val) => {
-         if (path.substr(-1) !== '/' || !isObjectHash(val)) return;
-         promises.push(
-           get(val).then(obj => {
-             return _expand(get)(obj);
-           }).then(v => {
-             return [path, v];
-           })
-         );
-       });
-       const expanded = cloneObject(obj);
-       let inner, keys, lastKey, x;
-       Promise.all(promises).then(results => {
-         for (let i = 0; i < results.length; i++) {
-           keys = results[i][0].split('/').filter(key => !!key);
-           lastKey = keys.pop();
-           if (!lastKey) {
-             keys.pop();
-             lastKey = '/';
-           }
-           inner = keys.reduce((result, key) => {
-             return result[key];
-           }, expanded);
-           x = inner[lastKey];
-           if ((isObject(x) && !x['/']) || (isArray(x) && !x[0]['/'])) {
-            inner[lastKey] = [].concat(x, results[i][1]);
-           } else {
-            inner[lastKey] = results[i][1];
-           }
-         }
-         resolve(order(expanded));
-       });
-     });
-   }
- }
-
  function _flatten(addObject: Function): Function {
-   return (obj: Object): Promise<Object> => {
+   return (obj: Object) => {
      return new Promise((resolve, _) => {
        const paths = [];
        const promises = [];
@@ -161,7 +127,7 @@ const {
 
 const wstar = new WStar({ wrtc });
 
-module.exports = function() {
+module.exports = function(out?: Object) {
    const ipfs = new IPFS({
      init: true,
      repo: '/tmp/' + new Date().toString(),
@@ -185,27 +151,167 @@ module.exports = function() {
         }
       }
    });
-   const addObject = _addObject(ipfs);
-   const get = _get(ipfs);
-   this.addFile = _addFile(ipfs);
-   this.addObject = addObject;
-   this.contentUrl = (hash: string): string => '/ipfs/' + hash;
-   this.expand = _expand(get);
-   this.flatten = _flatten(addObject);
-   this.get = get;
-   this.getFile = _getFile(ipfs);
-   this.info = ipfs.id;
-   this.hashObject = (obj: Object): Promise<string> => {
-     return new Promise((resolve, reject) => {
-       dagCBOR.util.cid(obj, (err, cid) => {
-         if (err) return reject(err);
-         resolve(cid.toBaseEncodedString());
-       });
+   this.addFile = (data: Buffer|ReadableStream, out: Object = out) => {
+     if (!ipfs.isOnline()) {
+       return out.error(new Error('IPFS Node is offline, cannot add file'));
+     }
+     ipfs.files.add({
+       content: data,
+       path: ''
+     }, (err, result) => {
+       if (err) {
+         return out.error(err);
+       }
+       out.next(result[0].hash);
      });
    }
-   this.hashFile = multihash;
+   this.addObject = (obj: Object, out: Object = out) => {
+     if (!ipfs.isOnline()) {
+       return out.error(new Error('IPFS Node is offline, cannot add object'));
+     }
+     ipfs.dag.put(order(obj), {
+       format: 'dag-cbor',
+       hashAlg: 'sha2-256'
+     }, (err, cid) => {
+       if (err) {
+         return out.error(err);
+       }
+       out.next(cid.toBaseEncodedString());
+     });
+   }
+   this.get = (path: string, out: Object = out) => {
+     if (!ipfs.isOnline()) {
+       return out.error(new Error('IPFS Node is offline, cannot get'));
+     }
+     ipfs.dag.get(path, (err, node) => {
+       if (err) {
+         return out.error(err);
+       }
+       let result = node.value;
+       if (isArray(result) || isObject(result)) {
+         result = order(transform(result, (val, key) => {
+           if (key === '/') {
+             return new CID(val).toBaseEncodedString();
+           }
+           if (isObject(val) && val['/']) {
+             return { '/': new CID(val['/']).toBaseEncodedString() };
+           }
+           return val;
+         }));
+       }
+       out.next(result);
+     });
+   }
+   this.getFile = (multihash: string) => {
+     if (!ipfs.isOnline()) {
+       return out.error(new Error('IPFS Node is offline, cannot get file'));
+     }
+     ipfs.files.get(multihash, (err, stream) => {
+       if (err) {
+         return out.error(err);
+       }
+       stream.on('data', file => {
+         if (!file.content) {
+           return out.error(new Error('No file content'));
+         }
+         const chunks = [];
+         file.content.on('data', chunk => {
+           chunks.push(chunk)
+         });
+         file.content.once('end', () => {
+           out.next(Buffer.concat(chunks));
+         });
+         file.content.resume();
+       });
+       stream.resume();
+     });
+   }
+   this.hashObject = (obj: Object) => {
+     dagCBOR.util.cid(obj, (err, cid) => {
+       if (err) {
+         return out.error(err);
+       }
+       out.next(cid.toBaseEncodedString());
+     });
+   }
+   this.contentUrl = (hash: string): string => '/ipfs/' + hash;
+   // https://github.com/ipfs/faq/issues/208
+   this.hashFile = (data: Buffer) => {
+      const file = new Unixfs('file', data);
+      dagPB.DAGNode.create(file.marshal(), (err, node) => {
+        if (err) return ee.emit('error', err);
+        out.next(node.toJSON().multihash);
+      });
+   }
    this.isFileHash = isIPFS.multihash;
-   this.isObjectHash = isObjectHash;
+   this.isObjectHash = (hash: string): boolean => {
+     try {
+       const cid = new CID(hash);
+       return cid.codec === 'dag-cbor' && cid.version === 1;
+     } catch(err) {
+       return false;
+     }
+   };
+
+   // Traverse Object
+   //
+
+   const resolveLinks = (obj: Object, out: Object = out) => {
+     const fns = [];
+     const paths = [];
+     traverse(obj, (path, val) => {
+       if (path.substr(-1) !== '/' || !isObjectHash(val)) return;
+       fns.push(task => this.get(val, task));
+       paths.push(path);
+     });
+     const tasks = new Tasks(results => {
+       out.next()
+     });
+   }
+
+   this.expand = (obj: Object, out: Object = out) => {
+     const fns = [];
+     const paths = [];
+     traverse(obj, (path, val) => {
+       if (path.substr(-1) !== '/' || !isObjectHash(val)) return;
+       fns.push(task => this.get(val, task));
+       paths.push(path);
+     });
+     let onEnd, task, tasks;
+     task = new Task()
+     onEnd = results => {
+
+     }
+     tasks = new Tasks(onEnd);
+     tasks.run(fns);
+
+     const expanded = assign(obj);
+     let inner, keys, lastKey, x;
+     Promise.all(promises).then(results => {
+       for (let i = 0; i < results.length; i++) {
+         keys = results[i][0].split('/').filter(key => !!key);
+         lastKey = keys.pop();
+         if (!lastKey) {
+           keys.pop();
+           lastKey = '/';
+         }
+         inner = keys.reduce((result, key) => {
+           return result[key];
+         }, expanded);
+         x = inner[lastKey];
+         if ((isObject(x) && !x['/']) || (isArray(x) && !x[0]['/'])) {
+          inner[lastKey] = [].concat(x, results[i][1]);
+         } else {
+          inner[lastKey] = results[i][1];
+         }
+       }
+       resolve(order(expanded));
+     });
+   }
+
+   this.flatten = _flatten(addObject);
+
+
    let intervalId;
    this.start = () => {
      return new Promise((resolve, _) => {
@@ -226,103 +332,6 @@ module.exports = function() {
    this.version = ipfs.version;
 }
 
-function isObjectHash(hash: string): boolean {
-  try {
-    const cid = new CID(hash);
-    return cid.codec === 'dag-cbor' && cid.version === 1;
-  } catch(err) {
-    return false;
-  }
-}
-
-// https://github.com/ipfs/faq/issues/208
-function multihash(data: Buffer): Promise<string> {
-   return new Promise((resolve, reject) => {
-     const file = new Unixfs('file', data);
-     dagPB.DAGNode.create(file.marshal(), (err, node) => {
-       if (err) return reject(err);
-       resolve(node.toJSON().multihash);
-     });
-   });
-}
-
-function _addFile(ipfs: Object): Function {
-  return (data: Buffer|ReadableStream): Promise<string> => {
-    if (!ipfs.isOnline()) {
-      throw new Error('IPFS Node is offline, cannot add file');
-    }
-    return ipfs.files.add({
-      content: data,
-      path: ''
-    }).then(result => {
-      return result[0].hash;
-    });
-  }
-}
-
-function _addObject(ipfs: Object): Function {
-  return (obj: Object): Promise<string> => {
-    if (!ipfs.isOnline()) {
-      throw new Error('IPFS Node is offline, cannot add object');
-    }
-    return ipfs.dag.put(order(obj), {
-      format: 'dag-cbor',
-      hashAlg: 'sha2-256'
-    }).then(cid => {
-      return cid.toBaseEncodedString()
-    });
-  }
-}
-
-function _getFile(ipfs: Object): Function {
-  return (multihash: string): Promise<Buffer> => {
-    if (!ipfs.isOnline()) {
-      throw new Error('IPFS Node is offline, cannot get file');
-    }
-    return new Promise((resolve, reject) => {
-      ipfs.files.get(multihash).then(stream => {
-        stream.on('data', file => {
-          if (!file.content) return reject('no file content');
-          const chunks = [];
-          file.content.on('data', chunk => {
-            chunks.push(chunk)
-          });
-          file.content.once('end', () => {
-            resolve(Buffer.concat(chunks));
-          });
-          file.content.resume();
-        });
-        stream.resume();
-      });
-    });
-  }
-}
-
-function _get(ipfs: Object): Function {
-  return (path: string): Promise<Object> => {
-    if (!ipfs.isOnline()) {
-      throw new Error('IPFS Node is offline, cannot get');
-    }
-    return new Promise((resolve, reject) => {
-      ipfs.dag.get(path, (err, node) => {
-        if (err) return reject(err);
-        let result = node.value;
-        if (isArray(result) || isObject(result)) {
-          result = order(transform(result, (val, key) => {
-            if (key === '/') {
-              return new CID(val).toBaseEncodedString();
-            }
-            if (isObject(val) && val['/']) {
-              return { '/': new CID(val['/']).toBaseEncodedString() };
-            }
-            return val;
-          }));
-        }
-        resolve(result);
-      });
-    });
-  }
-}
 
 function _refreshPeers(ipfs: Object): Function {
   return () => {
