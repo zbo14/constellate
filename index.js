@@ -27,9 +27,27 @@ selectModule.addEventListener('change', evt => {
 });
 
 exportBtn.addEventListener('click', () => {
-  const hashes = constellate.exportHashes();
+  const type = 'application/json';
+  downloads.innerHTML = null;
+  downloads.appendChild(fileToAnchor(
+    new File(
+      [JSON.stringify(constellate.exportHashes(), null, 2)], 'hash.json', { type }
+    )
+  ));
+  downloads.innerHTML += '<br>';
+  downloads.appendChild(fileToAnchor(
+    new File(
+      [JSON.stringify(constellate.exportIPLD(), null, 2)], 'ipld.json', { type }
+    )
+  ));
+  downloads.innerHTML += '<br>';
+  downloads.appendChild(fileToAnchor(
+    new File(
+      [JSON.stringify(constellate.exportMeta(), null, 2)], 'meta.json', { type }
+    )
+  ));
+  /*
   const keys = constellate.exportKeys();
-  json.value = JSON.stringify(hashes, null, 2);
   if (keys) {
     const file = new File(
       [JSON.stringify(keys, null, 2)],
@@ -39,6 +57,8 @@ exportBtn.addEventListener('click', () => {
     downloads.appendChild(fileToAnchor(file));
     downloads.innerHTML += '<br>';
   }
+  */
+
 });
 
 generateBtn.addEventListener('click', () => {

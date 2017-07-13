@@ -13,6 +13,10 @@ function arrayFromObject(obj: Object): any[][] {
   return Object.keys(obj).map(key => [key, obj[key]]);
 }
 
+function assign(...objs: Object[]): Object {
+  return Object.assign({}, ...objs);
+}
+
 function bufferToArrayBuffer(buf: Buffer): ArrayBuffer {
   // from https://stackoverflow.com/a/31394257
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length);
@@ -69,7 +73,7 @@ function newArray(_default: any, length: number): any[] {
 }
 
 function objectFromArray(arr: any[][]): Object {
-  return arr.reduce((result, [key, val]) => Object.assign({}, result, {[key]: val}), {});
+  return arr.reduce((result, [key, val]) => assign(result, {[key]: val}), {});
 }
 
 function order(x: any[]|Object): Object {
@@ -130,12 +134,16 @@ function readFileAs(file: File, readAs: string): Promise<ArrayBuffer|string> {
   });
 }
 
+function splice(arr: any[], start: number, deleteCount: number, ...items: any[]): any[] {
+  return arr.slice(0, start).concat(items).concat(arr.slice(start+1+deleteCount));
+}
+
 function transform(x: any, fn: Function): any {
   if (isArray(x)) {
     return x.map(y => transform(fn(y), fn));
   }
   if (isObject(x)) {
-    return Object.assign({}, ...arrayFromObject(x).map(([k, v]) => {
+    return assign(...arrayFromObject(x).map(([k, v]) => {
       return objectFromArray([[k, transform(fn(v), fn)]]);
     }));
   }
@@ -169,6 +177,7 @@ function withoutIndex(arr: any[], idx: number): any[] {
 }
 
 exports.arrayFromObject = arrayFromObject;
+exports.assign = assign;
 exports.bufferToArrayBuffer = bufferToArrayBuffer;
 exports.bufferToFile = bufferToFile;
 exports.cloneObject = cloneObject;
@@ -185,6 +194,7 @@ exports.order = order;
 exports.orderStringify = orderStringify;
 exports.promiseSequence = promiseSequence;
 exports.readFileAs = readFileAs;
+exports.splice = splice;
 exports.transform = transform;
 exports.traverse = traverse;
 exports.withoutIndex = withoutIndex;

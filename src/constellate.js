@@ -103,8 +103,9 @@ module.exports = function(modName: string, serverAddr: string) {
       hashes = {}, ipld = [];
       return Promise.all(meta).then(meta => {
         return orderObjects(meta).reduce((result, obj) => {
+          const name = obj.name;
           if (obj['#']) {
-            hashes[obj.name] = obj['#'];
+            hashes[name] = obj['#'];
             return result;
           }
           return result.then(() => {
@@ -123,13 +124,14 @@ module.exports = function(modName: string, serverAddr: string) {
                 }
                 return x;
             });
-            // obj['@context'] = 'http://coalaip.org';
-            obj['@type'] = obj.type;
-            delete obj.type;
+            // obj['@context'] = 'http://schema.org/';
+            // obj['@type'] = obj.type;
+            // delete obj.type;
+            obj.name = obj.name.match(/^(.+?)(?:\s*?\(.*?\))?$/)[1];
             obj = order(obj);
             return ipfs.hashObject(obj);
           }).then(hash => {
-            hashes[obj.name] = hash;
+            hashes[name] = hash;
             ipld.push(obj);
             return;
           });
@@ -242,8 +244,14 @@ module.exports = function(modName: string, serverAddr: string) {
     this.exportHashes = (): ?Object => {
       return !hashes ? null: hashes;
     }
+    this.exportIPLD = (): ?Object[] => {
+      return !ipld ? null : ipld;
+    }
     this.exportKeys = (): ?Object => {
       return !keys ? null : keys;
+    }
+    this.exportMeta = (): ?Object[] => {
+      return !meta ? null : meta;
     }
     /*
 
@@ -254,12 +262,6 @@ module.exports = function(modName: string, serverAddr: string) {
     }
     this.exportFiles = (): ?File[] => {
       return !files ? null : files;
-    }
-    this.exportIPLD = (): ?Object[] => {
-      return !ipld ? null : ipld;
-    }
-    this.exportMeta = (): ?Object[] => {
-      return !meta ? null : meta;
     }
 
     */
