@@ -11,13 +11,8 @@ const WStar = require('libp2p-webrtc-star');
 require('setimmediate');
 
 const {
-  Emitter,
-  Tasks,
-  StateMachine
-} = require('../lib/event.js');
-
-const {
-  cloneObject,
+  Task,
+  assign,
   isArray,
   isObject,
   isString,
@@ -31,66 +26,6 @@ const {
 /**
  * @module constellate/src/ipfs
  */
-
- function _flatten(addObject: Function): Function {
-   return (obj: Object) => {
-     return new Promise((resolve, _) => {
-       const paths = [];
-       const promises = [];
-       let hash;
-       traverse(obj, (path, val) => {
-         if (isObject(val) &&
-             isString(val['@context']) &&
-             isString(val['@type']) &&
-             !paths.some(p => {
-               return path !== p && path.includes(p);
-             })) {
-           paths.push(path);
-           promises.push(
-             _flatten(addObject)(val).then(v => {
-               return [path, v];
-             })
-           );
-         }
-       });
-       let flattened = cloneObject(obj);
-       if (!promises.length) {
-         return addObject(order(obj)).then(hash => {
-           flattened = order(flattened);
-           resolve({ flattened, hash });
-         });
-       }
-       Promise.all(promises).then(results => {
-         let inner, keys, lastKey, x;
-         for (let i = 0; i < results.length; i++) {
-           keys = results[i][0].split('/');
-           lastKey = keys.pop();
-           if (!lastKey) {
-             keys.pop();
-             lastKey = '/';
-           }
-           inner = keys.reduce((result, key) => {
-             return result[key];
-           }, flattened);
-           x = inner[lastKey];
-           if ((isObject(x) && x['/']) || (isArray(x) && x[0]['/'])) {
-            inner[lastKey] = [].concat(x, {
-              '/': results[i][1].hash
-            });
-           } else {
-            inner[lastKey] = {
-              '/': results[i][1].hash
-            };
-           }
-         }
-         flattened = order(flattened);
-         addObject(flattened).then(hash => {
-           resolve({ flattened, hash });
-         });
-       });
-     });
-   }
- }
 
  /*
 
@@ -107,7 +42,7 @@ const {
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
+ in the Software withtask restriction, including withtask limitation the rights
  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  copies of the Software, and to permit persons to whom the Software is
  furnished to do so, subject to the following conditions:
@@ -127,7 +62,7 @@ const {
 
 const wstar = new WStar({ wrtc });
 
-module.exports = function(out?: Object) {
+module.exports = function() {
    const ipfs = new IPFS({
      init: true,
      repo: '/tmp/' + new Date().toString(),
@@ -151,41 +86,41 @@ module.exports = function(out?: Object) {
         }
       }
    });
-   this.addFile = (data: Buffer|ReadableStream, out: Object = out) => {
+   this.addFile = (data: Buffer|ReadableStream, t: Object, id: number) => {
      if (!ipfs.isOnline()) {
-       return out.error(new Error('IPFS Node is offline, cannot add file'));
+       return t.error(new Error('IPFS Node is offline, cannot add file'));
      }
      ipfs.files.add({
        content: data,
        path: ''
      }, (err, result) => {
        if (err) {
-         return out.error(err);
+         return t.error(err);
        }
-       out.next(result[0].hash);
+       t.run(result[0].hash, id);
      });
    }
-   this.addObject = (obj: Object, out: Object = out) => {
+   this.addObject = (obj: Object, t: Object, id: number) => {
      if (!ipfs.isOnline()) {
-       return out.error(new Error('IPFS Node is offline, cannot add object'));
+       return t.error(new Error('IPFS Node is offline, cannot add object'));
      }
      ipfs.dag.put(order(obj), {
        format: 'dag-cbor',
        hashAlg: 'sha2-256'
      }, (err, cid) => {
        if (err) {
-         return out.error(err);
+         return t.error(err);
        }
-       out.next(cid.toBaseEncodedString());
+       t.run(cid.toBaseEncodedString(), id);
      });
    }
-   this.get = (path: string, out: Object = out) => {
+   this.get = (path: string, t: Object, id: number) => {
      if (!ipfs.isOnline()) {
-       return out.error(new Error('IPFS Node is offline, cannot get'));
+       return t.error(new Error('IPFS Node is offline, cannot get'));
      }
      ipfs.dag.get(path, (err, node) => {
        if (err) {
-         return out.error(err);
+         return t.error(err);
        }
        let result = node.value;
        if (isArray(result) || isObject(result)) {
@@ -199,48 +134,48 @@ module.exports = function(out?: Object) {
            return val;
          }));
        }
-       out.next(result);
+       t.run(result, id);
      });
    }
-   this.getFile = (multihash: string) => {
+   this.getFile = (multihash: string, t: Object, id: number) => {
      if (!ipfs.isOnline()) {
-       return out.error(new Error('IPFS Node is offline, cannot get file'));
+       return t.error(new Error('IPFS Node is offline, cannot get file'));
      }
      ipfs.files.get(multihash, (err, stream) => {
        if (err) {
-         return out.error(err);
+         return t.error(err);
        }
        stream.on('data', file => {
          if (!file.content) {
-           return out.error(new Error('No file content'));
+           return t.error(new Error('No file content'));
          }
          const chunks = [];
          file.content.on('data', chunk => {
            chunks.push(chunk)
          });
          file.content.once('end', () => {
-           out.next(Buffer.concat(chunks));
+           t.run(Buffer.concat(chunks), id);
          });
          file.content.resume();
        });
        stream.resume();
      });
    }
-   this.hashObject = (obj: Object) => {
+   this.hashObject = (obj: Object, t: Object, id: number) => {
      dagCBOR.util.cid(obj, (err, cid) => {
        if (err) {
-         return out.error(err);
+         return t.error(err);
        }
-       out.next(cid.toBaseEncodedString());
+       t.run(cid.toBaseEncodedString(), id);
      });
    }
    this.contentUrl = (hash: string): string => '/ipfs/' + hash;
    // https://github.com/ipfs/faq/issues/208
-   this.hashFile = (data: Buffer) => {
+   this.hashFile = (data: Buffer, t: Object, id: number) => {
       const file = new Unixfs('file', data);
       dagPB.DAGNode.create(file.marshal(), (err, node) => {
-        if (err) return ee.emit('error', err);
-        out.next(node.toJSON().multihash);
+        if (err) return t.error(err);
+        t.run(node.toJSON().multihash, id);
       });
    }
    this.isFileHash = isIPFS.multihash;
@@ -253,43 +188,36 @@ module.exports = function(out?: Object) {
      }
    };
 
-   // Traverse Object
-   //
-
-   const resolveLinks = (obj: Object, out: Object = out) => {
-     const fns = [];
-     const paths = [];
-     traverse(obj, (path, val) => {
-       if (path.substr(-1) !== '/' || !isObjectHash(val)) return;
-       fns.push(task => this.get(val, task));
-       paths.push(path);
-     });
-     const tasks = new Tasks(results => {
-       out.next()
-     });
-   }
-
-   this.expand = (obj: Object, out: Object = out) => {
-     const fns = [];
-     const paths = [];
-     traverse(obj, (path, val) => {
-       if (path.substr(-1) !== '/' || !isObjectHash(val)) return;
-       fns.push(task => this.get(val, task));
-       paths.push(path);
-     });
-     let onEnd, task, tasks;
-     task = new Task()
-     onEnd = results => {
-
-     }
-     tasks = new Tasks(onEnd);
-     tasks.run(fns);
-
+   this.expand = (obj: Object, t: Object, id?: number) => {
      const expanded = assign(obj);
-     let inner, keys, lastKey, x;
-     Promise.all(promises).then(results => {
-       for (let i = 0; i < results.length; i++) {
-         keys = results[i][0].split('/').filter(key => !!key);
+     const results : Object[] = [];
+     const t1 = new Task();
+     const t2 = new Task();
+     const t3 = new Task();
+     const t4 = new Task();
+     let count = 0, i, inner, keys, lastKey, x;
+     t1.onRun((obj, i) => {
+       results[i].obj = obj;
+       if (++count === results.length) {
+         count = 0;
+         t2.run();
+       }
+     });
+     t2.onRun(obj => {
+       for (i = 0; i < results.length; i++) {
+         this.expand(results[i].obj, t3, i);
+       }
+     });
+     t3.onRun((obj, i) => {
+       results[i].obj = obj;
+       if (++count === results.length) {
+         count = 0;
+         t4.run();
+       }
+     });
+     t4.onRun(() => {
+       for (i = 0; i < results.length; i++) {
+         keys = results[i].path.split('/').filter(key => !!key);
          lastKey = keys.pop();
          if (!lastKey) {
            keys.pop();
@@ -300,46 +228,98 @@ module.exports = function(out?: Object) {
          }, expanded);
          x = inner[lastKey];
          if ((isObject(x) && !x['/']) || (isArray(x) && !x[0]['/'])) {
-          inner[lastKey] = [].concat(x, results[i][1]);
+          inner[lastKey] = [].concat(x, results[i].obj);
          } else {
-          inner[lastKey] = results[i][1];
+          inner[lastKey] = results[i].obj;
          }
        }
-       resolve(order(expanded));
+       t.run(expanded, id);
+     });
+     traverse(obj, (path, val) => {
+       if (path.substr(-1) === '/' && this.isObjectHash(val)) {
+          results.push({ path, val });
+       }
+     });
+     if (!results.length) {
+       return t.run(obj, id);
+     }
+     for (i = 0; i < results.length; i++) {
+       this.get(results[i].val, t1, i);
+     }
+   }
+   this.flatten = (obj: Object, t: Object, id: number) => {
+     const results : Object[] = [];
+     const t1 = new Task();
+     const t2 = new Task();
+     const t3 = new Task();
+     let count = 0, flattened = order(obj), i, inner, keys, lastKey, x;
+     t1.onRun((obj, i) => {
+       results[i].obj = obj;
+       if (++count === results.length) {
+         count = 0;
+         t2.run();
+       }
+     });
+     t2.onRun(() => {
+        for (i = 0; i < results.length; i++) {
+          keys = results[i].path.split('/');
+          lastKey = keys.pop();
+          if (!lastKey) {
+            keys.pop();
+            lastKey = '/';
+          }
+          inner = keys.reduce((result, key) => {
+            return result[key];
+          }, flattened);
+          x = inner[lastKey];
+          if ((isObject(x) && x['/']) || (isArray(x) && x[0]['/'])) {
+            inner[lastKey] = [].concat(x, {
+              '/': results[i].obj.hash
+            });
+          } else {
+            inner[lastKey] = {
+              '/': results[i].obj.hash
+            };
+          }
+        }
+        flattened = order(flattened);
+        this.hashObject(flattened, t3);
+     })
+     t3.onRun(hash => {
+       t.run({ flattened, hash }, id);
+     });
+     traverse(obj, (path, val) => {
+       if (isObject(val) &&
+           !results.some(result => path !== result.path && path.includes(result.path))) {
+         results.push({ path, val });
+       }
+     });
+     if (!results.length) {
+       return this.hashObject(flattened, t3);
+     }
+     for (i = 0; i < results.length; i++) {
+       this.flatten(results[i].val, t1, i);
+     }
+   }
+   const refreshPeers = () => {
+     if (!ipfs.isOnline()) {
+       throw new Error('IPFS Node is offline, cannot refresh peers');
+     }
+     ipfs.swarm.peers().then(peers => {
+       console.log('Refreshed peers:', peers);
      });
    }
-
-   this.flatten = _flatten(addObject);
-
-
    let intervalId;
-   this.start = () => {
-     return new Promise((resolve, _) => {
-       ipfs.on('start', () => {
-         intervalId = setInterval(_refreshPeers(ipfs), 1000);
-         resolve(console.log('Started IPFS Node'));
-       });
+   this.start = (t: Object) => {
+     ipfs.on('start', () => {
+       intervalId = setInterval(refreshPeers, 3000);
+       t.run(console.log('Started IPFS Node'));
      });
    }
-   this.stop = () => {
-     return new Promise((resolve, _) => {
-       return ipfs.stop(() => {
-         clearInterval(intervalId);
-         resolve(console.log('Stopped IPFS Node'));
-       });
+   this.stop = (t: Object) => {
+     ipfs.stop(() => {
+       clearInterval(intervalId);
+       t.run(console.log('Stopped IPFS Node'));
      });
    }
-   this.version = ipfs.version;
-}
-
-
-function _refreshPeers(ipfs: Object): Function {
-  return () => {
-    if (!ipfs.isOnline()) {
-      throw new Error('IPFS Node is offline, cannot refresh peers');
-    }
-    ipfs.swarm.peers().then(peers => {
-      console.log('Refreshed peers:', peers);
-    });
-  }
 }

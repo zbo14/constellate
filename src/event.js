@@ -9,11 +9,28 @@ const { assign } = require('../lib/util.js');
  * @module constellate/src/event.js
  */
 
+const RUN = 'run';
 const START = 'start';
 const NEXT = 'next';
 const END = 'end';
 const QUEUE = 'queue';
 const ERROR = 'error';
+
+function Task() {
+  const ee = new EventEmitter();
+  this.run = (...args: any[]) => {
+    ee.emit(RUN, ...args);
+  }
+  this.error = (err: Error) => {
+    ee.emit(ERROR, err);
+  }
+  this.onRun = (fn: Function) => {
+    ee.on(RUN, fn);
+  }
+  ee.on(ERROR, err => {
+    throw err;
+  });
+}
 
 function Emitter() {
   const ee = new EventEmitter();
@@ -133,5 +150,6 @@ function StateMachine(initial: Object, out: Function) {
 }
 
 exports.Emitter = Emitter;
+exports.Task = Task;
 exports.Tasks = Tasks;
 exports.StateMachine = StateMachine;
