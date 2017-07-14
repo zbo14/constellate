@@ -29,7 +29,7 @@ function bufferToFile(buf: Buffer, name: string): File {
   return new File([ab], name + '.' + ext, { type });
 }
 
-function cloneObject(obj: Object): Object {
+function clone(obj: Object): Object {
   return JSON.parse(JSON.stringify(obj));
 }
 
@@ -122,7 +122,7 @@ function promiseSequence(...fns: Function[]): Promise<any> {
 
 function readFileAs(file: File, readAs: string): Promise<ArrayBuffer|string> {
   const reader = new FileReader();
-  return new Promise((resolve, reject) => {
+  return new Promise(resolve => {
     reader.onload = () => resolve(reader.result);
     if (readAs === 'arraybuffer') {
       reader.readAsArrayBuffer(file);
@@ -176,25 +176,27 @@ function withoutIndex(arr: any[], idx: number): any[] {
   return arr.slice(0, idx).concat(arr.slice(idx+1));
 }
 
-exports.arrayFromObject = arrayFromObject;
-exports.assign = assign;
-exports.bufferToArrayBuffer = bufferToArrayBuffer;
-exports.bufferToFile = bufferToFile;
-exports.cloneObject = cloneObject;
-exports.fileToAnchor = fileToAnchor;
-exports.isAncestor = isAncestor;
-exports.isArray = isArray;
-exports.isBoolean = isBoolean;
-exports.isNumber = isNumber;
-exports.isObject = isObject;
-exports.isString = isString;
-exports.newArray = newArray;
-exports.objectFromArray = objectFromArray;
-exports.order = order;
-exports.orderStringify = orderStringify;
-exports.promiseSequence = promiseSequence;
-exports.readFileAs = readFileAs;
-exports.splice = splice;
-exports.transform = transform;
-exports.traverse = traverse;
-exports.withoutIndex = withoutIndex;
+module.exports = {
+  arrayFromObject,
+  assign,
+  bufferToArrayBuffer,
+  bufferToFile,
+  clone,
+  fileToAnchor,
+  isAncestor,
+  isArray,
+  isBoolean,
+  isNumber,
+  isObject,
+  isString,
+  newArray,
+  objectFromArray,
+  order,
+  orderStringify,
+  promiseSequence,
+  readFileAs,
+  splice,
+  transform,
+  traverse,
+  withoutIndex
+}

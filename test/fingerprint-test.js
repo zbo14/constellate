@@ -1,15 +1,14 @@
 'use strict';
 
+const fpcalc = require('fpcalc');
 const Fingerprint = require('../lib/fingerprint.js');
 
 const fp1 = new Fingerprint();
 const fp2 = new Fingerprint();
 
-const promise = fp1.calculate(/* path to audio file */);
+const promise = fp1.calc('/Users/zach/Desktop/music/moon.mp3');
 
-promise.then(obj => {
-
-  // console.log('Fingerprint 1:', JSON.stringify(obj, null, 2));
+promise.then(() => {
 
   const encoded = fp1.encode();
   if (!encoded) throw new Error('could not get encoded fingerprint');
@@ -29,11 +28,9 @@ promise.then(obj => {
     if (raw[i] !== _raw[i]) throw new Error('different raw fingerprint after decoding');
   }
 
-  return fp2.calculate(/* path to another audio file */);
+  return fp2.calc('/Users/zach/Desktop/music/moon_official.mp3');
 
-}).then(obj => {
-
-  // console.log('Fingerprint 2:', JSON.stringify(obj, null, 2));
+}).then(() => {
 
   const match = fp1.match(fp2);
 

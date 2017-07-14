@@ -23,42 +23,34 @@ let constellate;
 selectModule.addEventListener('change', evt => {
   if (constellate) constellate.stop();
   constellate = new Constellate(evt.target.value, 'http://127.0.0.1:8888');
-  constellate.start();
 });
 
 exportBtn.addEventListener('click', () => {
   const type = 'application/json';
+  const hashes = constellate.exportHashes();
+  const ipld = constellate.exportIPLD();
+  const keys = constellate.exportKeys();
   downloads.innerHTML = null;
   downloads.appendChild(fileToAnchor(
     new File(
-      [JSON.stringify(constellate.exportHashes(), null, 2)], 'hash.json', { type }
+      [JSON.stringify(hashes, null, 2)], 'hash.json', { type }
     )
   ));
   downloads.innerHTML += '<br>';
   downloads.appendChild(fileToAnchor(
     new File(
-      [JSON.stringify(constellate.exportIPLD(), null, 2)], 'ipld.json', { type }
+      [JSON.stringify(ipld, null, 2)], 'meta.json', { type }
     )
   ));
   downloads.innerHTML += '<br>';
-  downloads.appendChild(fileToAnchor(
-    new File(
-      [JSON.stringify(constellate.exportMeta(), null, 2)], 'meta.json', { type }
-    )
-  ));
-  /*
-  const keys = constellate.exportKeys();
   if (keys) {
-    const file = new File(
-      [JSON.stringify(keys, null, 2)],
-      'keys.json', { type: 'application/json' }
-    );
-    downloads.innerHTML = null;
-    downloads.appendChild(fileToAnchor(file));
+    downloads.appendChild(fileToAnchor(
+      new File(
+        [JSON.stringify(keys, null, 2)], 'keys.json', { type }
+      )
+    ));
     downloads.innerHTML += '<br>';
   }
-  */
-
 });
 
 generateBtn.addEventListener('click', () => {

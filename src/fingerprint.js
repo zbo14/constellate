@@ -1,14 +1,29 @@
 'use strict';
 
+const fpcalc = require('fpcalc');
+
 // @flow
 
 /**
  * @module constellate/src/fingerprint.js
  */
 
-module.exports = function(encoded: string) {
-  const ui8 = base64Decode(Buffer.from(encoded));
-  const raw = decompress(ui8);
+module.exports = function() {
+  let encoded, raw;
+  this.calc = (filepath: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      fpcalc(filepath, (err, result) => {
+        if (err) return reject(err);
+        this.decode(result.fingerprint);
+        resolve(encoded);
+      });
+    });
+  }
+  this.decode = (_encoded: string) => {
+    const ui8 = base64Decode(Buffer.from(_encoded));
+    raw = decompress(ui8);
+    encoded = _encoded;
+  }
   this.encode = (): string => encoded;
   this.match = (other: Object): Object => {
     return match(10.0, raw, other.raw());

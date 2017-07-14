@@ -2,11 +2,13 @@
 
 const bodyParser = require('body-parser');
 const express = require('express');
-const fpcalc = require('fpcalc');
 const fs = require('fs');
 const fileType = require('file-type');
 
+const Fingerprint = require('./lib/fingerprint.js');
+
 const app = express();
+const fp = new Fingerprint();
 
 app.use(bodyParser.text());
 
@@ -22,13 +24,12 @@ app.post('/fingerprint', (req, res) => {
       res.writeHead(500);
       return res.end(JSON.stringify(err));
     }
-    fpcalc(filepath, (err, result) => {
-      if (err) {
-        res.writeHead(500);
-        return res.end(JSON.stringify(err));
-      }
+    fp.calc(filepath).then(encoded => {
       res.writeHead(200);
-      res.end(result.fingerprint);
+      res.end(encoded);
+    }).catch(err => {
+      res.writeHead(500);
+      res.end(JSON.stringify(err));
     });
   });
 });

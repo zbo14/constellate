@@ -75,7 +75,7 @@ started.then(() => {
 
   recording.recordingOf = { '/': hash };
 
-  return ipfs.getObject(hash);
+  return ipfs.get(hash);
 
 }).then(obj => {
 
@@ -109,9 +109,9 @@ started.then(() => {
 
   str1 = hash;
 
-  ipfs.hashObject(recording);
+  return ipfs.hashObject(recording);
 
-})then(hash => {
+}).then(hash => {
 
   str2 = hash;
 
