@@ -10,46 +10,50 @@ const fs = require('fs');
  * @module constellate/src/util
  */
 
-function Tasks() {
-    const tasks = [];
-    let i = 0;
-    this.run = (...args: any[]) => {
-        args.push(this);
-        tasks[i].run(...args);
-    }
-    this.move = (j: number) => {
-        if (i + j < tasks.length) i += j;
-    }
-    this.next = (...args: any[]) => {
-        this.move(1, ...args);
-    }
-    this.error = (err: Error) => {
-        tasks[i].error(err);
-    }
-    this.add = (fn: Function) => {
-        const task = new Task();
-        task.onRun(fn);
-        tasks.push(task);
-    }
-}
-
 const RUN = 'run';
 const ERROR = 'error';
 
-function Task() {
-   const ee = new EventEmitter();
-   this.run = (...args: any[]) => {
-     ee.emit(RUN, ...args);
-   }
-   this.error = (err: Error) => {
-     ee.emit(ERROR, err);
-   }
-   this.onRun = (fn: Function) => {
-     ee.on(RUN, fn);
-   }
-   ee.on(ERROR, err => {
-     throw err;
-   });
+function Tasks() { // cb?: Function
+    const tasks = [];
+    let e, i = 0;
+    this.append = (fn: Function) => {
+        e = newEmitter();
+        e.on(RUN, fn);
+        tasks.push(e);
+    }
+    this.prepend = (fn: Function) => {
+        e = newEmitter();
+        e.on(RUN, fn);
+        tasks.unshift(e);
+    }
+    this.run = (...args: any[]) => {
+        tasks[i].emit(RUN, ...args);
+    }
+    this.next = () => {
+      if (i + 1 === tasks.length) {
+        throw new Error('no more tasks');
+      }
+      i++;
+    }
+    this.move = (j: number) => {
+      if (i + j >= tasks.length) {
+        throw new Error('move exceeds number of tasks');
+      }
+      if (i + j < 0) {
+        throw new Error('cannot move to negative index');
+      }
+      i += j;
+    }
+    this.error = (err: Error) => {
+      // if (cb) return cb(err);
+      tasks[i].emit(ERROR, err);
+    }
+}
+
+function newEmitter() {
+  const e = new EventEmitter();
+  e.on(ERROR, err => { throw err });
+  return e;
 }
 
 function arrayFromObject(obj: Object): any[][] {
@@ -157,24 +161,16 @@ function orderStringify(x: any[]|Object, space?: number): string {
   return JSON.stringify(x, keys.sort(), space);
 }
 
-function promiseSequence(...fns: Function[]): Promise<any> {
-    return fns.reduce((result, fn) => {
-        return result.then(fn);
-    }, Promise.resolve());
-}
-
-function readFileAs(file: File, readAs: string): Promise<ArrayBuffer|string> {
+function readFileAs(file: File, readAs: string, t: Object, id: number|string) {
   const reader = new FileReader();
-  return new Promise(resolve => {
-    reader.onload = () => resolve(reader.result);
-    if (readAs === 'arraybuffer') {
-      reader.readAsArrayBuffer(file);
-    } else if (readAs === 'text') {
-      reader.readAsText(file);
-    } else {
-      throw new Error('unexpected readAs: ' + readAs);
-    }
-  });
+  reader.onload = () => t.run(reader.result, id);
+  if (readAs === 'arraybuffer') {
+    reader.readAsArrayBuffer(file);
+  } else if (readAs === 'text') {
+    reader.readAsText(file);
+  } else {
+    t.error(new Error('unexpected readAs: ' + readAs));
+  }
 }
 
 function splice(arr: any[], start: number, deleteCount: number, ...items: any[]): any[] {
@@ -220,7 +216,10 @@ function withoutIndex(arr: any[], idx: number): any[] {
 }
 
 module.exports = {
-  Task, Tasks,
+  RUN,
+  ERROR,
+  Tasks,
+  newEmitter,
   arrayFromObject,
   assign,
   bufferToArrayBuffer,
@@ -237,7 +236,6 @@ module.exports = {
   objectFromArray,
   order,
   orderStringify,
-  promiseSequence,
   readFileAs,
   splice,
   transform,

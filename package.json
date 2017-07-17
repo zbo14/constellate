@@ -29,7 +29,8 @@
     "express": "^4.15.3",
     "file-type": "^5.1.1",
     "fpcalc": "^1.2.1",
-    "ipfs": "^0.24.1",
+    "ipfs": "^0.25.0",
+    "ipfs-repo": "^0.15.0",
     "ipld-dag-cbor": "^0.11.1",
     "ipld-dag-pb": "^0.11.0",
     "is-buffer": "^1.1.5",
@@ -56,6 +57,7 @@
     "babel-preset-react": "^6.24.1",
     "babelify": "^7.3.0",
     "browserify": "^14.4.0",
+    "flow-bin": "^0.50.0",
     "flow-remove-types": "^1.2.1"
   }
 }

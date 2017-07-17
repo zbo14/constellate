@@ -82,24 +82,25 @@ const removeSheet = sheet => {
   }
 }
 
-exports.ADD_COLUMN = ADD_COLUMN;
-exports.ADD_ROW = ADD_ROW;
-exports.ADD_SHEET = ADD_SHEET;
-exports.CHANGE_CELL = CHANGE_CELL;
-exports.CHANGE_COLUMN = CHANGE_COLUMN;
-exports.CHANGE_SUBJECT = CHANGE_SUBJECT;
-exports.CHANGE_TITLE = CHANGE_TITLE;
-exports.REMOVE_COLUMN = REMOVE_COLUMN;
-exports.REMOVE_ROW = REMOVE_ROW;
-exports.REMOVE_SHEET = REMOVE_SHEET;
-
-exports.addColumn = addColumn;
-exports.addRow = addRow;
-exports.addSheet = addSheet;
-exports.changeCell = changeCell;
-exports.changeColumn = addColumn;
-exports.changeSubject = changeSubject;
-exports.changeTitle = changeTitle;
-exorts.removeColumn = removeColumn;
-exports.removeRow = removeRow;
-exports.removeSheet = removeSheet;
+module.exports = {
+  ADD_COLUMN,
+  ADD_ROW,
+  ADD_SHEET,
+  CHANGE_CELL,
+  CHANGE_COLUMN,
+  CHANGE_SUBJECT,
+  CHANGE_TITLE,
+  REMOVE_COLUMN,
+  REMOVE_ROW,
+  REMOVE_SHEET,
+  addColumn,
+  addRow,
+  addSheet,
+  changeCell,
+  changeColumn,
+  changeSubject,
+  changeTitle,
+  removeColumn,
+  removeRow,
+  removeSheet
+}
