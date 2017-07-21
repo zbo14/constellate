@@ -39,25 +39,24 @@ SOFTWARE.
 
 */
 
-module.exports = function(url: string) {
-  if (!url) url = 'http://swarm-gateways.net/';
-  this.addFile = (buf: Buffer, t: Object, id: number|string) => {
+module.exports = function(url: string = 'http://swarm-gateways.net/') {
+  this.addFile = (buf: Buffer, t: Object, id?: number|string) => {
     request(
       url + 'bzzr:/',
       { method: 'POST' },
       (err, data, res) => {
         if (err) return t.error(err);
         if (res.statusCode !== 200) {
-          return t.error(new Error(data));
+          return t.error(data);
         }
         if (!this.isFileHash(data)) {
-          return t.error(new Error('Invalid hash: ' + data));
+          return t.error('invalid hash: ' + data);
         }
         t.run(data, id);
       }
     );
   }
-  this.getFile = (hash: string, t: Object, id: number|string) => {
+  this.getFile = (hash: string, t: Object, id?: number|string) => {
     request(
       url + 'bzzr://' + hash,
       { responseType: 'arraybuffer' },

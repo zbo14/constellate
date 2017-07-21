@@ -4,7 +4,7 @@ const Cell = require('../Cell');
 const Column = require('../Column');
 const Row = require('../Row');
 
-const Sheet = (props) => {
+function Sheet(props) {
   const cols = props.cols.map((c, i) =>
     <Column val={c} key={i} change={props.changeColumn(i)} remove={props.removeColumn(i)} />
   );

@@ -108,7 +108,7 @@ const removeSheet = (state, action) => {
   return assign(state, { sheets });
 }
 
-module.exports = function(state={sheets:[]}, action) {
+module.exports = function(state={sheets:[],title:''}, action) {
   switch(action.type) {
     case ADD_COLUMN:
       return addColumn(state, action);

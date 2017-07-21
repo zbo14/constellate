@@ -3,18 +3,13 @@
     <title>constellate</title>
   </head>
   <body>
-    <label>Select content module</label><br>
-    <select id='select-module'>
-      <option value='' selected disabled>--</option>
-      <option value='ipfs'>ipfs</option>
-      <option value='swarm'>swarm</option>
-    </select><br><br>
     <label>Metadata</label><br>
     <input id='meta' type='file' accept='application/json|text/csv' multiple />
-    <button id='import-btn'>import</button><br><br>
+    <button id='import-meta-btn'>import</button><br><br>
     <label>Content</label><br>
     <input id='content' type='file' accept='audio/*|image/*|video/*' multiple />
-    <input type='checkbox' id='encrypt' /> <label>encrypt</label><br><br>
+    <input type='checkbox' id='encrypt' /> <label>encrypt</label>
+    <button id='import-content-btn'>import</button><br><br>
     <button id='generate-btn'>generate</button> |
     <button id='upload-btn'>upload</button> |
     <button id='export-btn'>export</button><br><br>

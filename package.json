@@ -22,6 +22,7 @@
     "bcryptjs": "^2.4.3",
     "bip39": "^2.3.1",
     "body-parser": "^1.17.2",
+    "borc": "^2.0.2",
     "bs58": "^4.0.0",
     "cids": "^0.5.0",
     "ethereumjs-util": "^5.1.1",
@@ -33,12 +34,14 @@
     "ipfs-repo": "^0.15.0",
     "ipld-dag-cbor": "^0.11.1",
     "ipld-dag-pb": "^0.11.0",
+    "ipld-resolver": "^0.12.1",
     "is-buffer": "^1.1.5",
     "is-ipfs": "^0.3.0",
     "keccakjs": "^0.2.1",
     "libp2p-webrtc-star": "^0.11.0",
     "multibase": "^0.3.4",
     "prop-types": "^15.5.10",
+    "protocol-buffers": "^3.2.1",
     "react": "^15.6.1",
     "react-dom": "^15.6.1",
     "react-redux": "^5.0.5",
@@ -57,7 +60,8 @@
     "babel-preset-react": "^6.24.1",
     "babelify": "^7.3.0",
     "browserify": "^14.4.0",
-    "flow-bin": "^0.50.0",
-    "flow-remove-types": "^1.2.1"
+    "flow-bin": "^0.44.0",
+    "flow-remove-types": "^1.2.1",
+    "js-beautify": "^1.6.14"
   }
 }

@@ -2,7 +2,7 @@ const PropTypes = require('prop-types');
 const React = require('react');
 const Cell = require('../Cell');
 
-const Row = ({ vals, changeCell, remove }) => {
+function Row({ vals, changeCell, remove }) {
   const cells = vals.map((v, i) =>
     <Cell val={v} key={i} change={changeCell(i)} />
   );
