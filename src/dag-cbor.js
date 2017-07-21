@@ -99,7 +99,7 @@ function DagCBOR () {
     })
     try {
       const data = cbor.encode(tagged)
-      t.run(cbor.encode(tagged), id)
+      t.run(data, id)
     } catch(err) {
       t.error(err)
     }

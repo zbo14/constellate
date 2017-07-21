@@ -121,14 +121,13 @@ module.exports = function(blockService: Object) {
   this.expand = (node: Object, t: Object, id?: number|string) => {
       const expanded = order(node)
       const trails = []
-      const vals = []
-      let cid, count = 0, i, inner, keys, lastKey, parts, x
+      let cid, i = 0, inner, keys, lastKey, parts, vals = [], x
       traverse(node, (trail, val) => {
           if (!isMerkleLink(val)) return
           try {
-            cid = new CID(val['/'])
-          } catch(err) {
-            return
+              cid = new CID(val['/'])
+          } catch (err) {
+              return
           }
           trails.push(trail)
           vals.push(cid)
@@ -136,10 +135,12 @@ module.exports = function(blockService: Object) {
       if (!vals.length) {
           return t.run(expanded, id)
       }
-      t.task((obj, i) => {
-          vals[i] = obj
-          if (++count !== vals.length) return
-          count = 0
+      t.task(result => {
+          if (!i) vals = result
+          else vals[i-1] = result
+          if (i !== vals.length) {
+            return this.expand(vals[i++], t, i)
+          }
           for (i = 0; i < vals.length; i++) {
               keys = trails[i].split('.')
               lastKey = keys.pop()
@@ -156,13 +157,7 @@ module.exports = function(blockService: Object) {
           t.next()
           t.run(expanded, id)
       })
-      t.task(results => {
-          t.next()
-          for (i = 0; i < results.length; i++) {
-              this.expand(results[i], t, i)
-          }
-      })
-      this.get(vals, [], t, i)
+      this.get(vals, [], t)
   }
 }
 

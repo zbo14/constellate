@@ -20,24 +20,14 @@ constellate.start(err => {})
 
 #### constellate.importContent
 
-##### Description
-
-Import media files
-
 ##### Parameters
 
-`File[]` - audio, image, or video files
-
-`string` - [optional] password to generate keys for encryption
+`File[]` - audio, image, and/or video files
 
 `Function` - callback with the signature `function (err)`
 
 
-#### constellate.importMeta
-
-##### Description
-
-Import metadata files
+#### constellate.importMetadata
 
 ##### Parameters
 
@@ -45,11 +35,7 @@ Import metadata files
 
 `Function` - callback with the signature `function (err)`
 
-#### constellate.generate
-
-##### Description
-
-Generate IPLD from metadata and content
+#### constellate.generateIPLD
 
 ##### Parameters
 
@@ -57,19 +43,37 @@ Generate IPLD from metadata and content
 
 #### constellate.upload
 
-Push IPLD and upload content
+##### Parameters
+
+`Function` - callback with the signature `function (err)`
+
+#### constellate.getContent
 
 ##### Parameters
 
-#### constellate.get
+`string` - the hash and/or path to query
+
+`Function` - callback with the signature `function (err, file)`
+
+#### constellate.getMetadata
 
 ##### Parameters
 
-`string` - hash or path to query
+`string[]` - the hashes and/or paths to query
 
-`string` - [optional] hexadecimal key for decryption
+`Function` - callback with the signature `function (err, objects)`
 
-`Function` - callback with the signature `function (err, result)`
+#### constellate.exportHashes
+
+##### Returns
+
+`Object` - an object with file and metadata hashes
+
+#### constellate.exportIPLD
+
+##### Returns
+
+`Object[]` - an array of IPLD objects
 
 #### constellate.stop
 

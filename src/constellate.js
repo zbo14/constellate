@@ -30,77 +30,6 @@ const {
  * @module constellate/src/constellate
  */
 
-const encrypt = (file: File, password: string, t: Object, id?: number|string) => {
-    bcrypt.genSalt(10, (err, salt) => {
-        if (err) return t.error(err)
-        bcrypt.hash(password, salt, (err, hash) => {
-            if (err) return t.error(err)
-            let key = Buffer.concat([
-                Buffer.from(hash.substr(-31), 'base64'),
-                crypto.randomBytes(9)
-            ]).slice(0, 32)
-            const aesCtr = new aes.ModeOfOperation.ctr(key)
-            const [name, ext] = file.name.split('.')
-            readFileAs(file, 'arraybuffer').then(ab => {
-                const data = aesCtr.encrypt(Buffer.from(ab))
-                file = new File([data], file.name, {
-                    type: file.type
-                })
-                key = key.toString('hex')
-                t.run({
-                    file,
-                    key
-                })
-            })
-        })
-    })
-}
-
-const orderObjects = (objs: Object[], t: Object, id?: number|string) => {
-    const length = objs.length
-    if (!length) {
-      return t.error('no objects')
-    }
-    const ordered = []
-    let queue = []
-    let obj, name, next
-    while (ordered.length !== length) {
-        if (next) {
-            const idx = objs.findIndex(obj => obj.name === next)
-            if (idx < 0) {
-              return t.error(`could not find "${next}"`)
-            }
-            obj = objs.splice(idx, 1)[0]
-        } else {
-            obj = objs.shift()
-        }
-        if (!obj.name) {
-          return t.error('no name specified')
-        }
-        if (!obj.type) {
-          return t.error('no type specified')
-        }
-        next = ''
-        traverse(obj, (_, val) => {
-            if (isString(val) && val[0] === '@') {
-                name = val.slice(1)
-                if (!next && ordered.every(obj => obj.name !== name)) {
-                    if (queue.includes(name)) {
-                        return t.error(`circular reference between "${name}" and "${obj.name}"`)
-                    }
-                    objs.push(obj)
-                    next = name
-                    queue.push(obj.name)
-                }
-            }
-        })
-        if (next) continue
-        ordered.push(obj)
-        queue = []
-    }
-    t.run(ordered, id)
-}
-
 const parseCSVs = (csvs: string[], types: string[]): Object[] => {
     if (!csvs || !csvs.length) throw new Error('no csvs')
     if (!types || !types.length) throw new Error('no types')
@@ -250,9 +179,52 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
 
     const ipfs = new Ipfs(repoPath)
 
-    let expand = true, fileHashes, files, ipld, keys, meta, metaHashes, names
+    let fileHashes, files, ipld, keys, meta, metaHashes, names
 
     //-----------------------------------------------------------------------
+
+    const orderMetadata = (t: Object, id?: number|string) => {
+        const length = meta.length
+        const ordered = []
+        let queue = []
+        let obj, name, next
+        while (ordered.length !== length) {
+            if (next) {
+                const idx = meta.findIndex(obj => obj.name === next)
+                if (idx < 0) {
+                  return t.error(`could not find "${next}"`)
+                }
+                obj = meta.splice(idx, 1)[0]
+            } else {
+                obj = meta.shift()
+            }
+            if (!obj.name) {
+              return t.error('no name specified')
+            }
+            if (!obj.type) {
+              return t.error('no type specified')
+            }
+            next = ''
+            traverse(obj, (_, val) => {
+                if (isString(val) && val[0] === '@') {
+                    name = val.slice(1)
+                    if (!next && ordered.every(obj => obj.name !== name)) {
+                        if (queue.includes(name)) {
+                            return t.error(`circular reference between "${name}" and "${obj.name}"`)
+                        }
+                        meta.push(obj)
+                        next = name
+                        queue.push(obj.name)
+                    }
+                }
+            })
+            if (next) continue
+            ordered.push(obj)
+            queue = []
+        }
+        meta = ordered
+        t.run(id)
+    }
 
     const pushIPLD = (t: Object, id?: number|string) => {
         if (!ipld || !ipld.length) {
@@ -332,52 +304,87 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
         return readFileAs(file, 'arraybuffer', t)
     }
 
+    const encrypt = (password: string, t: Object, id?: number|string) => {
+        const datas = new Array(files.length)
+        let count = 0
+        t.task(() => {
+          if (++count !== datas.length) return
+          t.next()
+          t.run(id)
+        })
+        t.task((ab, i) => {
+          datas[i] = Buffer.from(ab)
+          if (++count !== datas.length) return
+          count = 0, keys = {}
+          t.next()
+          datas.forEach((data, i) => {
+            bcrypt.genSalt(10, (err, salt) => {
+              if (err) return t.error(err)
+              bcrypt.hash(password, salt, (err, hash) => {
+                if (err) return t.error(err)
+                try {
+                  keys[files[i].name] = Buffer.concat([
+                      Buffer.from(hash.substr(-31), 'base64'),
+                      crypto.randomBytes(9)
+                  ]).slice(0, 32)
+                  data = new aes.ModeOfOperation.ctr(keys[files[i].name]).encrypt(data)
+                  files[i] = new File([data], files[i].name, { type: files[i].type })
+                  keys[files[i].name] = keys[files[i].name].toString('hex')
+                  t.run()
+                } catch(err) {
+                  t.error(err)
+                }
+              })
+            })
+          })
+        })
+        files.forEach((file, i) => {
+          readFileAs(file, 'arraybuffer', t, i)
+        })
+    }
+
     const generateIPLD = (t: Object, id?: number|string) => {
         if (!meta || !meta.length) return t.error('no metadata')
         const hashes = []
-        names = []
-        let count = 0, i
-        t.task((hash, i) => {
-            metaHashes[names[i]] = hash
-            if (++count !== ipld.length) return
-            t.next()
-            t.run(id)
-        })
-        t.task(objs => {
-            ipld = [], metaHashes = {}
-            for (i = 0; i < objs.length; i++) {
-                if (objs[i]['#']) {
-                    metaHashes[objs[i].name] = objs[i]['#']
-                    continue
+        let count = 0, i;
+        t.task(hash => {
+            if (i === meta.length) {
+              t.next()
+              console.log('Generated IPLD')
+              return t.run(id)
+            }
+            if (isString(hash)) {
+                metaHashes[meta[i++].name] = hash
+                return t.run()
+            }
+            if (meta[i]['#']) {
+                metaHashes[meta[i].name] = meta[i++]['#']
+                return t.run()
+            }
+            meta[i] = order(transform(meta[i], val => {
+                if (isString(val)) {
+                  if (val[0] === '@') {
+                      return {
+                          '/': metaHashes[val.slice(1)]
+                      }
+                  }
+                  if (val[0] === '#') {
+                      return {
+                          '/': val.slice(1)
+                      }
+                  }
                 }
-                objs[i] = transform(objs[i], val => {
-                    if (isString(val)) {
-                      if (val[0] === '@') {
-                          return {
-                              '/': metaHashes[val.slice(1)]
-                          }
-                      }
-                      if (val[0] === '#') {
-                          return {
-                              '/': val.slice(1)
-                          }
-                      }
-                    }
-                    return val
-                })
-                names.push(objs[i].name)
-                objs[i].name = objs[i].name.match(/^(.+?)(?:\s*?\(.*?\))?$/)[1]
-                objs[i] = order(objs[i])
-                ipld.push(objs[i])
-            }
-            t.next()
-            for (i = 0; i < ipld.length; i++) {
-                ipfs.hashObject(ipld[i], t, i)
-            }
+                return val
+            }))
+            names.push(meta[i].name)
+            meta[i].name = meta[i].name.match(/^(.+?)(?:\s*?\(.*?\))?$/)[1]
+            ipld.push(meta[i])
+            ipfs.hashObject(meta[i], t)
         })
         t.task(() => {
           t.next();
-          orderObjects(meta, t)
+          i = 0, ipld = [], metaHashes = {}, names = []
+          orderMetadata(t)
         })
         for (i = 0; i < meta.length; i++) {
             if (meta[i].type === 'Hash' && isString(meta[i]['#'])) {
@@ -392,7 +399,6 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
                 type: obj.type
             })
             if (++count !== hashes.length) return
-            count = 0
             t.next()
             t.run()
         })
@@ -401,14 +407,14 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
         }
     }
 
-    const get = (query: string, key: string, t: Object, id?: number|string) => {
-        if (!ipfs.isFileHash(query)) {
-            return ipfs.get(query, expand, t, id)
-        }
+    const getContent = (query: string, key: string, t: Object, id?: number|string) => {
         t.task(data => {
             if (key) {
-                const aesCtr = new aes.ModeOfOperation.ctr(Buffer.from(key, 'hex'))
-                data = aesCtr.decrypt(data)
+              try {
+                data = new aes.ModeOfOperation.ctr(Buffer.from(key, 'hex')).decrypt(data)
+              } catch(err) {
+                t.error(err)
+              }
             }
             t.next()
             bufferToFile(data, query, t, id)
@@ -422,7 +428,7 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
         }
         files = _files
         const datas = new Array(files.length)
-        let count = 0, data, i
+        let count = 0
         t.task((hash, i) => {
             fileHashes[files[i].name] = hash
             meta.push({
@@ -436,11 +442,9 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
             t.run(id)
         })
         t.task((ab, i) => {
-            data = Buffer.from(ab)
-            datas[i] = data
+            datas[i] = Buffer.from(ab)
             if (++count !== datas.length) return
-            count = 0
-            fileHashes = {}
+            count = 0, fileHashes = {}, meta = meta || []
             t.next()
             for (i = 0; i < datas.length; i++) {
                 ipfs.hashFile(datas[i], t, i)
@@ -448,26 +452,15 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
         })
         t.task(() => {
             t.next()
-            for (i = 0; i < files.length; i++) {
+            for (let i = 0; i < files.length; i++) {
                 readFileAs(files[i], 'arraybuffer', t, i)
             }
         })
         if (!password) return t.run()
-        t.task((obj, i) => {
-            files[i] = obj.file
-            keys[files[i].name] = obj.key
-            if (++count !== files.length) return
-            count = 0
-            t.next()
-            t.run()
-        })
-        keys = {}
-        for (i = 0; i < files.length; i++) {
-            encrypt(files[i], password, t, i)
-        }
+        encrypt(password, t)
     }
 
-    const importMeta = (files: File[], t: Object, id?: number|string) => {
+    const importMetadata = (files: File[], t: Object, id?: number|string) => {
         if (!files || !files.length) return t.error('no files')
         const type = files[0].type
         if (type !== 'application/json' && type !== 'text/csv') {
@@ -475,23 +468,24 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
         }
         const names = new Array(files.length)
         const texts = new Array(files.length)
-        let count = 0, i
+        let count = 0
         t.task((text, i) => {
             texts[i] = text
             if (++count !== texts.length) return
             if (type === 'application/json') {
-                meta = parseJSONs(texts, names)
+                meta.push(...parseJSONs(texts, names))
             }
             if (type === 'text/csv') {
-                meta = parseCSVs(texts, names)
+                meta.push(...parseCSVs(texts, names))
             }
             console.log('Imported metadata')
             t.next()
             t.run(id)
         })
+        meta = meta || []
         names[0] = files[0].name.split('.')[0]
         readFileAs(files[0], 'text', t, 0)
-        for (i = 1; i < files.length; i++) {
+        for (let i = 1; i < files.length; i++) {
             if (files[i].type !== type) {
                 return t.error(`expected type=${type}, got ` + files[i].type)
             }
@@ -518,7 +512,7 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
 
     const t = new Tasks()
 
-    this.exportHashes = (): ?Object => {
+    this.exportHashes = (): Object => {
         return clone({
             fileHashes,
             metaHashes
@@ -529,46 +523,51 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
         return !ipld ? null : ipld
     }
 
-    this.exportKeys = (): ?Object => {
-        return !keys ? null : keys
-    }
+    // this.exportKeys = (): ?Object => {
+    //    return !keys ? null : keys
+    // }
 
-    this.exportMeta = (): ?Object[] => {
-        return !meta ? null : meta
-    }
+    // this.exportMetadata = (): ?Object[] => {
+    //    return !meta ? null : meta
+    // }
 
-    this.exportFiles = (): ? File[] => {
-        return !files ? null : files
-    }
+    // this.exportFiles = (): ? File[] => {
+    //    return !files ? null : files
+    // }
 
-    this.importContent = (files: File[], password: Function|string, cb?: Function) => {
-      if (typeof password === 'function') {
-        [cb, password] = [password, '']
-      } else if (!cb) {
-        throw new Error('no callback')
-      }
+    this.importContent = (files: File[], cb: Function) => {
+      // if (typeof password === 'function') {
+      //  [cb, password] = [password, '']
+      // } else if (!cb) {
+      //  throw new Error('no callback')
+      // }
       t.callback(cb)
-      importContent(files, password, t)
+      importContent(files, '', t)
     }
 
-    this.importMeta = (files: File[], cb: Function) => {
+    this.importMetadata = (files: File[], cb: Function) => {
       t.callback(cb)
-      importMeta(files, t)
+      importMetadata(files, t)
     }
 
-    this.generate = (cb: Function) => {
+    this.generateIPLD = (cb: Function) => {
       t.callback(cb)
       generateIPLD(t)
     }
 
-    this.get = (query: string, key: Function|string, cb?: Function) => {
-      if (typeof key === 'function') {
-        [cb, key] = [key, '']
-      } else if (!cb) {
-        throw new Error('no callback')
-      }
+    this.getContent = (query: string, cb: Function) => {
+      // if (typeof key === 'function') {
+      //  [cb, key] = [key, '']
+      // } else if (!cb) {
+      //  throw new Error('no callback')
+      // }
       t.callback(cb)
-      get(query, key, t)
+      getContent(query, '', t)
+    }
+
+    this.getMetadata = (queries: string[], expand: boolean, cb: Function) => {
+      t.callback(cb)
+      ipfs.get(queries, expand, t)
     }
 
     this.start = (cb: Function) => {

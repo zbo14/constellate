@@ -1,0 +1,2 @@
+name,audio,performingArtist,producer,recordingOf,recordLabel
+recording,@audio.mp3,@band,"@producer1, @producer2",@song,@recordLabel
