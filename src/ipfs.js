@@ -1,24 +1,28 @@
-'use strict';
+'use strict'
 
-const CID = require('cids');
-const dagCBOR = require('ipld-dag-cbor');
-const dagPB = require('ipld-dag-pb');
-const IPFS = require('ipfs');
-const isIPFS = require('is-ipfs');
-const Unixfs = require('ipfs-unixfs');
-const wrtc = require('wrtc');
-const WStar = require('libp2p-webrtc-star');
-require('setimmediate');
+const CID = require('cids')
+const { DAGNode } = require('ipld-dag-pb')
+const IPFS = require('ipfs')
+const isIPFS = require('is-ipfs')
+const Repo = require('ipfs-repo')
+const Resolver = require('../lib/resolver.js')
+const Unixfs = require('ipfs-unixfs')
+const wrtc = require('wrtc')
+const WStar = require('libp2p-webrtc-star')
+
+const dagCBOR = require('../lib/dag-cbor')
 
 const {
-  assign,
-  isArray,
-  isObject,
-  isString,
-  order,
-  transform,
-  traverse
-} = require('../lib/util.js');
+    isArray,
+    isMerkleLink,
+    isObject,
+    isString,
+    newArray,
+    order,
+    readFileAs,
+    transform,
+    traverse
+} = require('../lib/util.js')
 
 // @flow
 
@@ -26,276 +30,225 @@ const {
  * @module constellate/src/ipfs
  */
 
- /*
+/*
 
- The following code is adapted from..
-   > https://github.com/ipfs/js-ipfs/blob/master/README.md
-   > https://github.com/ipfs/js-ipfs/blob/master/examples/basics/index.js
-   > https://github.com/ipfs/js-ipfs/blob/master/examples/transfer-files/public/js/app.js
+The following code is adapted from..
+  > https://github.com/ipfs/js-ipfs/blob/master/README.md
+  > https://github.com/ipfs/js-ipfs/blob/master/examples/basics/index.js
+  > https://github.com/ipfs/js-ipfs/blob/master/examples/transfer-files/public/js/app.js
 
- ------------------------------- LICENSE -------------------------------
+------------------------------- LICENSE -------------------------------
 
- The MIT License (MIT)
+The MIT License (MIT)
 
- Copyright (c) 2014 Juan Batiz-Benet
+Copyright (c) 2014 Juan Batiz-Benet
 
- Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- copies of the Software, and to permit persons to whom the Software is
- furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software withtask restriction, including withtask limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
- The above copyright notice and this permission notice shall be included in
- all copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
 
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 
- */
+*/
 
-const wstar = new WStar({ wrtc });
+const wstar = new WStar({
+    wrtc
+})
 
 module.exports = function() {
-   const ipfs = new IPFS({
-     init: true,
-     repo: '/tmp/' + new Date().toString(),
-     start: true,
-     EXPERIMENTAL: {
-       pubsub: true,
-       sharding: true,
-       dht: true
-     },
-     config: {
-       Addresses: {
-         Swarm: [
-           '/libp2p-webrtc-star/dns4/star-signal.cloud.ipfs.team/wss'
-         ]
-       }
-     },
-     libp2p: {
-        modules: {
-          transport: [wstar],
-          discovery: [wstar.discovery]
+
+    let intervalId, ipfs, resolver
+
+    this.addFiles = (datas: Buffer[], paths: string[], t: Object, id?: number|string) => {
+        if (!ipfs.isOnline()) {
+          return t.error('IPFS Node is offline, cannot add file')
         }
-      }
-   });
-   this.addFile = (data: Buffer|ReadableStream): Promise<string> => {
-     if (!ipfs.isOnline()) {
-       throw new Error('IPFS Node is offline, cannot add file');
-     }
-     return ipfs.files.add({
-       content: data,
-       path: ''
-     }).then(result => {
-       return result[0].hash;
-     });
-   }
-   this.addObject = (obj: Object): Promise<string> => {
-     if (!ipfs.isOnline()) {
-       throw new Error('IPFS Node is offline, cannot add object');
-     }
-     return ipfs.dag.put(order(obj), {
-       format: 'dag-cbor',
-       hashAlg: 'sha2-256'
-     }).then(cid => {
-       return cid.toBaseEncodedString()
-     });
-   }
-   this.contentUrl = (hash: string): string => '/ipfs/' + hash;
-   this.expand = (obj: Object): Promise<Object> => {
-     return new Promise((resolve, reject) => {
-       const promises = [];
-       traverse(obj, (path, val) => {
-         if (path.substr(-1) !== '/' || !this.isObjectHash(val)) return;
-         promises.push(
-           this.get(val).then(obj => {
-             return this.expand(obj);
-           }).then(v => {
-             return [path, v];
-           })
-         );
-       });
-       const expanded = assign(obj);
-       let inner, keys, lastKey, x;
-       Promise.all(promises).then(results => {
-         for (let i = 0; i < results.length; i++) {
-           keys = results[i][0].split('/').filter(key => !!key);
-           lastKey = keys.pop();
-           if (!lastKey) {
-             keys.pop();
-             lastKey = '/';
-           }
-           inner = keys.reduce((result, key) => {
-             return result[key];
-           }, expanded);
-           x = inner[lastKey];
-           if ((isObject(x) && !x['/']) || (isArray(x) && !x[0]['/'])) {
-            inner[lastKey] = [].concat(x, results[i][1]);
-           } else {
-            inner[lastKey] = results[i][1];
-           }
-         }
-         resolve(order(expanded));
-       });
-     });
-   }
-   this.flatten = (obj: Object): Promise<Object> => {
-     return new Promise(resolve => {
-       const paths = [];
-       const promises = [];
-       let hash;
-       traverse(obj, (path, val) => {
-         if (isObject(val) &&
-             !paths.some(p => path !== p && path.includes(p))) {
-           paths.push(path);
-           promises.push(
-             this.flatten(val).then(v => {
-               return [path, v];
-             })
-           );
-         }
-       });
-       let flattened = assign(obj);
-       if (!promises.length) {
-         return this.addObject(order(obj)).then(hash => {
-           flattened = order(flattened);
-           resolve({ flattened, hash });
-         });
-       }
-       Promise.all(promises).then(results => {
-         let inner, keys, lastKey, x;
-         for (let i = 0; i < results.length; i++) {
-           keys = results[i][0].split('/');
-           lastKey = keys.pop();
-           if (!lastKey) {
-             keys.pop();
-             lastKey = '/';
-           }
-           inner = keys.reduce((result, key) => {
-             return result[key];
-           }, flattened);
-           x = inner[lastKey];
-           if ((isObject(x) && x['/']) || (isArray(x) && x[0]['/'])) {
-            inner[lastKey] = [].concat(x, {
-              '/': results[i][1].hash
-            });
-           } else {
-            inner[lastKey] = {
-              '/': results[i][1].hash
-            };
-           }
-         }
-         flattened = order(flattened);
-         this.addObject(flattened).then(hash => {
-           resolve({ flattened, hash });
-         });
-       });
-     });
-   }
-   this.get = (path: string): Promise<Object> => {
-     if (!ipfs.isOnline()) {
-       throw new Error('IPFS Node is offline, cannot get');
-     }
-     return new Promise((resolve, reject) => {
-       ipfs.dag.get(path, (err, node) => {
-         if (err) return reject(err);
-         let result = node.value;
-         if (isArray(result) || isObject(result)) {
-           result = order(transform(result, (val, key) => {
-             if (key === '/') {
-               return new CID(val).toBaseEncodedString();
-             }
-             if (isObject(val) && val['/']) {
-               return { '/': new CID(val['/']).toBaseEncodedString() };
-             }
-             return val;
-           }));
-         }
-         resolve(result);
-       });
-     });
-   }
-   this.getFile = (multihash: string): Promise<Buffer> => {
-     if (!ipfs.isOnline()) {
-       throw new Error('IPFS Node is offline, cannot get file');
-     }
-     return new Promise((resolve, reject) => {
-       ipfs.files.get(multihash).then(stream => {
-         stream.on('data', file => {
-           if (!file.content) {
-             return reject('no file content');
-           }
-           const chunks = [];
-           file.content.on('data', chunk => {
-             chunks.push(chunk)
-           });
-           file.content.once('end', () => {
-             resolve(Buffer.concat(chunks));
-           });
-           file.content.resume();
-         });
-         stream.resume();
-       });
-     });
-   }
-   this.info = ipfs.id;
-   this.hashObject = (obj: Object): Promise<string> => {
-     return new Promise((resolve, reject) => {
-       dagCBOR.util.cid(obj, (err, cid) => {
-         if (err) return reject(err);
-         resolve(cid.toBaseEncodedString());
-       });
-     });
-   }
-   // https://github.com/ipfs/faq/issues/208
-   this.hashFile = (data: Buffer): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const file = new Unixfs('file', data);
-      dagPB.DAGNode.create(file.marshal(), (err, node) => {
-        if (err) return reject(err);
-        resolve(node.toJSON().multihash);
-      });
-    });
-   }
-   this.isFileHash = isIPFS.multihash;
-   this.isObjectHash = (hash: string): boolean => {
-     try {
-       const cid = new CID(hash);
-       return cid.codec === 'dag-cbor' && cid.version === 1;
-     } catch(err) {
-       return false;
-     }
-   }
-   const refreshPeers = () => {
-     if (!ipfs.isOnline()) {
-       throw new Error('IPFS Node is offline, cannot refresh peers');
-     }
-     ipfs.swarm.peers().then(peers => {
-       console.log('Refreshed peers:', peers);
-     });
-   }
-   let intervalId;
-   this.start = () => {
-     return new Promise((resolve, reject) => {
-       ipfs.on('start', () => {
-         intervalId = setInterval(refreshPeers, 3000);
-         resolve(console.log('Started IPFS Node'));
-       });
-     });
-   }
-   this.stop = () => {
-     return new Promise(resolve => {
-       return ipfs.stop(() => {
-         clearInterval(intervalId);
-         resolve(console.log('Stopped IPFS Node'));
-       });
-     });
-   }
-   this.version = ipfs.version;
+        if (datas.length !== paths.length) {
+          return t.error('different number of datas and paths')
+        }
+        ipfs.files.add(datas.map((data, i) => {
+          return { content: data, path: paths[i] }
+        }), (err, results) => {
+          if (err) return t.error(err)
+          t.run(results, id)
+        })
+    }
+
+    this.addObjects = (objs: Object[], t: Object, id?: number|string) => {
+        if (!ipfs.isOnline()) {
+            return t.error('IPFS Node is offline, cannot add object')
+        }
+        t.task(cids => {
+          const hashes = cids.map(cid => cid.toBaseEncodedString())
+          t.next()
+          t.run(hashes, id)
+        })
+        resolver.put(objs, newArray(dagCBOR.codec, objs.length), t)
+    }
+
+    this.get = (queries: string[], expand: boolean, t: Object, id?: number|string) => {
+        if (!ipfs.isOnline()) {
+          return t.error('IPFS Node is offline, cannot get')
+        }
+        const paths = new Array(queries.length)
+        const vals = new Array(queries.length)
+        let count = 0, i, parts
+        for (i = 0; i < queries.length; i++) {
+          parts = queries[i].split('/')
+          try {
+            vals[i] = new CID(parts.shift())
+          } catch(err) {
+            t.error(err)
+          }
+          paths[i] = parts.join('/')
+        }
+        t.task((val, i) => {
+          vals[i] = val
+          if (++count !== vals.length) return
+          t.next()
+          t.run(vals, id)
+        })
+        t.task(nodes => {
+          t.next()
+          if (expand) {
+            for (i = 0; i < nodes.length; i++) {
+              resolver.expand(nodes[i], t, i)
+            }
+            return
+          }
+          for (i = 0; i < nodes.length; i++) {
+            if (isArray(nodes[i]) || isObject(nodes[i])) {
+              nodes[i] = transform(nodes[i], v => {
+                if (!isMerkleLink(v)) return v
+                return {
+                  '/': new CID(v['/']).toBaseEncodedString()
+                }
+              })
+            }
+            t.run(order(nodes[i]), i)
+          }
+        })
+        resolver.get(vals, paths, t)
+    }
+
+    this.getFile = (query: string, t: Object, id?: number|string) => {
+        if (!ipfs.isOnline()) {
+            return t.error('IPFS Node is offline, cannot get file')
+        }
+        ipfs.files.get(query, (err, stream) => {
+            if (err) {
+              return t.error(err)
+            }
+            stream.on('data', file => {
+                if (!file.content) {
+                    return t.error('No file content')
+                }
+                const chunks = []
+                file.content.on('data', chunk => {
+                    chunks.push(chunk)
+                })
+                file.content.once('end', () => {
+                  t.run(Buffer.concat(chunks), id)
+                })
+                file.content.resume()
+            })
+            stream.resume()
+        })
+    }
+
+    this.hashObject = dagCBOR.hash;
+
+    this.contentUrl = (hash: string, path?: string): string => {
+      let str = '/ipfs/' + hash
+      if (path) str += '/' + path
+      return str
+    }
+
+    // https://github.com/ipfs/faq/issues/208
+    this.hashFile = (data: Buffer, t: Object, id?: number|string) => {
+        const file = new Unixfs('file', data)
+        DAGNode.create(file.marshal(), (err, node) => {
+            if (err) return t.error(err)
+            t.run(node.toJSON().multihash, id)
+        })
+    }
+
+    this.isFileHash = isIPFS.multihash
+
+    this.isObjectHash = (hash: string): boolean => {
+        try {
+            const cid = new CID(hash)
+            return cid.codec === dagCBOR.codec && cid.version === dagCBOR.version
+        } catch (err) {
+            return false
+        }
+    }
+
+    const refreshPeers = () => {
+        if (!ipfs.isOnline()) {
+            throw new Error('IPFS Node is offline, cannot refresh peers')
+        }
+        ipfs.swarm.peers().then(peers => {
+            // console.log('Refreshed peers:', peers)
+        })
+    }
+
+    this.start = (repo: Object|string, t: Object, id?: number|string) => {
+
+      ipfs = new IPFS({
+          init: true,
+          repo,
+          start: true,
+          EXPERIMENTAL: {
+              pubsub: true,
+              sharding: true,
+              dht: true
+          },
+          config: {
+              Addresses: {
+                  Swarm: [
+                      '/libp2p-webrtc-star/dns4/star-signal.cloud.ipfs.team/wss'
+                  ]
+              }
+          },
+          libp2p: {
+              modules: {
+                  transport: [wstar],
+                  discovery: [wstar.discovery]
+              }
+          }
+      })
+
+      ipfs.on('error', err => {
+          t.error(err)
+      })
+
+      ipfs.on('ready', () => {
+          intervalId = setInterval(refreshPeers, 3000)
+          resolver = new Resolver(ipfs._blockService)
+          resolver.addSupport(dagCBOR)
+          console.log('IPFS Node is ready')
+          t.run(id)
+      })
+    }
+
+    this.stop = (t: Object, id?: number|string) => {
+        ipfs.stop(() => {
+            clearInterval(intervalId)
+            console.log('Stopped IPFS Node')
+            t.run(id)
+        })
+    }
 }

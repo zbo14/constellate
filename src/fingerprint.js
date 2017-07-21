@@ -10,13 +10,11 @@ const fpcalc = require('fpcalc');
 
 module.exports = function() {
   let encoded, raw;
-  this.calc = (filepath: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      fpcalc(filepath, (err, result) => {
-        if (err) return reject(err);
-        this.decode(result.fingerprint);
-        resolve(encoded);
-      });
+  this.calc = (filepath: string, t: Object, id: number|string) => {
+    fpcalc(filepath, (err, result) => {
+      if (err) return t.error(err);
+      this.decode(result.fingerprint);
+      t.run(encoded, id);
     });
   }
   this.decode = (_encoded: string) => {

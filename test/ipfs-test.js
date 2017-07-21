@@ -1,8 +1,7 @@
-'use strict';
+'use strict'
 
-const Ipfs = require('../lib/ipfs.js');
-
-const ipfs = new Ipfs();
+const Ipfs = require('../lib/ipfs.js')
+const { Tasks } = require('../lib/util.js')
 
 const composer1 = {
   '@context': 'http://schema.org/',
@@ -45,88 +44,45 @@ const expanded = {
   publisher
 }
 
-let flattened, str1, str2;
+const ipfs = new Ipfs()
 
-const started = ipfs.start();
+const t = new Tasks()
 
-started.then(() => {
+let str1, str2
 
-  return ipfs.addObject(composer1);
+t.task(() => {
+  console.log('Done')
+  process.exit()
+})
 
-}).then(hash => {
-
-  composition.composer = [{ '/': hash }];
-
-  return ipfs.addObject(composer2);
-
-}).then(hash => {
-
-  composition.composer.push({ '/': hash });
-
-  return ipfs.addObject(publisher);
-
-}).then(hash => {
-
-  composition.publisher = { '/': hash };
-
-  return ipfs.addObject(composition);
-
-}).then(hash => {
-
-  recording.recordingOf = { '/': hash };
-
-  return ipfs.get(hash);
-
-}).then(obj => {
-
-  flattened = obj;
-
-  return ipfs.expand(obj);
-
-}).then(_expanded => {
-
-  str1 = JSON.stringify(expanded, null, 2);
-  str2 = JSON.stringify(_expanded, null, 2);
-
+t.task(objs => {
+  str1 = JSON.stringify(expanded)
+  str2 = JSON.stringify(objs[0])
   if (str1 !== str2) {
-    throw new Error('EXPECTED ' + str1 + '\nGOT ' + str2);
+    t.error(new Error('EXPECTED ' + str1 + '\nGOT ' + str2))
   }
+  t.next()
+  ipfs.stop(t)
+})
 
-  return ipfs.flatten(expanded);
+t.task(hashes => {
+  recording.recordingOf = { '/': hashes[0] }
+  t.next()
+  ipfs.get(hashes, true, t)
+})
 
-}).then(obj => {
+t.task(hashes => {
+  composition.composer = [{ '/': hashes[0] }, { '/': hashes[1] }]
+  composition.publisher = { '/': hashes[2] }
+  t.next()
+  ipfs.addObjects([composition], t)
+})
 
-  str1 = JSON.stringify(flattened, null, 2);
-  str2 = JSON.stringify(obj.flattened, null, 2);
+t.task(() => {
+  t.next()
+  ipfs.addObjects([composer1, composer2, publisher], t)
+})
 
-  if (str1 !== str2) {
-    throw new Error('EXPECTED ' + str1 + '\nGOT ' + str2);
-  }
+ipfs.start('/tmp/test', t)
 
-  return ipfs.addObject(recording);
-
-}).then(hash => {
-
-  str1 = hash;
-
-  return ipfs.hashObject(recording);
-
-}).then(hash => {
-
-  str2 = hash;
-
-  if (str1 !== str2) {
-    throw new Error('EXPECTED ' + str1 + '\nGOT ' + str2);
-  }
-
-}).then(() => {
-
-  console.log('Done');
-  process.exit();
-
-}).catch(err => {
-
-  console.error(err);
-  process.exit();
-
-});
+setTimeout(() => {}, 3000)

@@ -39,40 +39,35 @@ SOFTWARE.
 
 */
 
-module.exports = function(url: string) {
-  if (!url) url = 'http://swarm-gateways.net/';
-  this.addFile = (buf: Buffer): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      request(
-        url + 'bzzr:/',
-        { method: 'POST' },
-        (err, data, res) => {
-          if (err) return reject(err);
-          if (res.statusCode !== 200) {
-            return reject(new Error(data));
-          }
-          if (!this.isFileHash(data)) {
-            return reject(new Error('Invalid hash: ' + data));
-          }
-          resolve(data);
+module.exports = function(url: string = 'http://swarm-gateways.net/') {
+  this.addFile = (buf: Buffer, t: Object, id?: number|string) => {
+    request(
+      url + 'bzzr:/',
+      { method: 'POST' },
+      (err, data, res) => {
+        if (err) return t.error(err);
+        if (res.statusCode !== 200) {
+          return t.error(data);
         }
-      );
-    });
+        if (!this.isFileHash(data)) {
+          return t.error('invalid hash: ' + data);
+        }
+        t.run(data, id);
+      }
+    );
   }
-  this.getFile = (hash: string): Promise<Buffer> => {
-    return new Promise((resolve, reject) => {
-      request(
-        url + 'bzzr://' + hash,
-        { responseType: 'arraybuffer' },
-        (err, data, res) => {
-          if (err) return reject(err);
-          if (res.statusCode !== 200) {
-            return reject(data);
-          }
-          resolve(Buffer.from(data));
+  this.getFile = (hash: string, t: Object, id?: number|string) => {
+    request(
+      url + 'bzzr://' + hash,
+      { responseType: 'arraybuffer' },
+      (err, data, res) => {
+        if (err) return t.error(err);
+        if (res.statusCode !== 200) {
+          return t.error(err);
         }
-      );
-    });
+        t.run(Buffer.from(data), id);
+      }
+    );
   }
   this.contentUrl = (hash: string): string => url + 'bzzr://' + hash;
   this.hashFile = swarmHash;
@@ -104,11 +99,12 @@ along with the go-ethereum library. If not, see <http:www.gnu.org/licenses/>.
 
 */
 
-function swarmHash(data: Buffer): string {
+function swarmHash(data: Buffer, t: Object, id: number|string) {
     const size = data.length;
     let depth = 0, treeSize;
     for (treeSize = 4096; treeSize < size; treeSize *= 128) depth++;
-    return split(data, depth, size, treeSize/128).toString('hex');
+    const hash = split(data, depth, size, treeSize/128).toString('hex');
+    t.run(hash, id);
 }
 
 function split(chunk: Buffer, depth: number, size: number, treeSize: number): Buffer {
