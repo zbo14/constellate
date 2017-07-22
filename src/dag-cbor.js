@@ -71,22 +71,22 @@ function DagCBOR () {
 
   this.version = 1
 
-  this.deserialize = (data: Buffer, t: Object, id?: number|string) => {
+  this.deserialize = (data: Buffer, tasks: Object, t: number, i?: number) => {
     try {
       const obj = decoder.decodeFirst(data)
-      t.run(obj, id)
+      tasks.run(t, obj, i)
     } catch(err) {
-      t.error(err)
+      tasks.error(err)
     }
   }
 
-  this.serialize = (node: Object, t: Object, id?: number|string) => {
+  this.serialize = (node: Object, tasks: Object, t: number, i?: number) => {
     const seen = []
     let cid
     const tagged = transform(node, val => {
       if (!isObject(val)) return val
       if (seen.some(obj => orderStringify(obj) === orderStringify(val))) {
-        return t.error('The object passed has circular references')
+        return tasks.error('The object passed has circular references')
       }
       seen.push(val)
       if (!(cid = val['/'])) return val
@@ -99,65 +99,61 @@ function DagCBOR () {
     })
     try {
       const data = cbor.encode(tagged)
-      t.run(data, id)
+      tasks.run(t, data, i)
     } catch(err) {
-      t.error(err)
+      tasks.error(err)
     }
   }
 
-  this.cid = (node: Object, t: Object, id?: number|string) => {
-    t.task(data => {
+  this.cid = (node: Object, tasks: Object, t: number, i?: number) => {
+    const t1 = tasks.add(data => {
       try {
         const mh = multihash.encode(sha256(data), 'sha2-256')
         const cid = new CID(this.version, this.codec, mh)
-        t.next()
-        t.run(cid, id)
+        tasks.run(t, cid, i)
       } catch(err) {
-        t.error(err)
+        tasks.error(err)
       }
     })
-    this.serialize(node, t)
+    this.serialize(node, tasks, t1)
   }
 
-  this.hash = (node: Object, t: Object, id?: number|string) => {
-    t.task(data => {
+  this.hash = (node: Object, tasks: Object, t: number, i?: number) => {
+    const t1 = tasks.task(data => {
       try {
         const mh = multihash.encode(sha256(data), 'sha2-256')
         const cid = new CID(this.version, this.codec, mh)
-        t.next()
-        t.run(cid.toBaseEncodedString(), id)
+        tasks.run(t, cid.toBaseEncodedString(), i)
       } catch(err) {
-        t.error(err)
+        tasks.error(err)
       }
     })
-    this.serialize(node, t)
+    this.serialize(node, tasks, t1)
   }
 
-  this.resolve = (block: Object, path: string, t: Object, id?: number|string) => {
-    t.task(val => {
+  this.resolve = (block: Object, path: string, tasks: Object, t: number, i?: number) => {
+    const t1 = tasks.task(val => {
       if (!path || path === '/') {
-        t.next()
-        return t.run(val, '', id)
+        return tasks.run(t, val, '', i)
       }
       const parts = path.split('/')
       path = ''
-      for (let i = 0; i < parts.length; i++) {
+      for (let j = 0; j < parts.length; j++) {
         if (isArray(val) && !Buffer.isBuffer(val)) {
-          val = val[Number(parts[i])]
-        } else if (val[parts[i]]) {
-          val = val[parts[i]]
+          val = val[Number(parts[j])]
+        } else if (val[parts[j]]) {
+          val = val[parts[j]]
         } else {
           if (!val) {
-            return t.error('path not available at root')
+            return tasks.error('path not available at root')
           }
-          path = parts.slice(i).join('/')
+          path = parts.slice(j).join('/')
           break
         }
       }
-      t.next()
-      t.run(val, path, id)
+      tasks.run(t, val, path, i)
     })
-    this.deserialize(block.data, t)
+    this.deserialize(block.data, tasks, t1)
   }
 }
 

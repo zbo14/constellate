@@ -16,12 +16,8 @@ const {
     isArray,
     isMerkleLink,
     isObject,
-    isString,
-    newArray,
     order,
-    readFileAs,
-    transform,
-    traverse
+    transform
 } = require('../lib/util.js')
 
 // @flow
@@ -71,96 +67,69 @@ module.exports = function() {
 
     let intervalId, ipfs, resolver
 
-    this.addFiles = (datas: Buffer[], paths: string[], t: Object, id?: number|string) => {
+    this.addFile = (content: Buffer, path: string, tasks: Object, t: number, i?: number) => {
         if (!ipfs.isOnline()) {
-          return t.error('IPFS Node is offline, cannot add file')
+          return tasks.error('IPFS Node is offline, cannot add file')
         }
-        if (datas.length !== paths.length) {
-          return t.error('different number of datas and paths')
-        }
-        ipfs.files.add(datas.map((data, i) => {
-          return { content: data, path: paths[i] }
-        }), (err, results) => {
-          if (err) return t.error(err)
-          t.run(results, id)
+        ipfs.files.add({ content, path }), (err, results) => {
+          if (err) return tasks.error(err)
+          tasks.run(t, results[0].hash, i)
         })
     }
 
-    this.addObjects = (objs: Object[], t: Object, id?: number|string) => {
+    this.addObject = (obj: Object, tasks: Object, t: number, i?: number) => {
         if (!ipfs.isOnline()) {
-            return t.error('IPFS Node is offline, cannot add object')
+            return tasks.error('IPFS Node is offline, cannot add object')
         }
-        t.task(cids => {
-          const hashes = cids.map(cid => cid.toBaseEncodedString())
-          t.next()
-          t.run(hashes, id)
-        })
-        resolver.put(objs, newArray(dagCBOR.codec, objs.length), t)
+        resolver.put(obj, dagCBOR.codec, tasks, t, i)
     }
 
-    this.get = (queries: string[], expand: boolean, t: Object, id?: number|string) => {
+    this.get = (query: string, expand: boolean, tasks: Object, t: number, i?: number) => {
         if (!ipfs.isOnline()) {
-          return t.error('IPFS Node is offline, cannot get')
+          return tasks.error('IPFS Node is offline, cannot get')
         }
-        const paths = new Array(queries.length)
-        const vals = new Array(queries.length)
-        let count = 0, i, parts
-        for (i = 0; i < queries.length; i++) {
-          parts = queries[i].split('/')
-          try {
-            vals[i] = new CID(parts.shift())
-          } catch(err) {
-            t.error(err)
-          }
-          paths[i] = parts.join('/')
+        const parts = query.split('/')
+        let cid
+        try {
+          cid = new CID(parts.shift())
+        } catch(err) {
+          tasks.error(err)
         }
-        t.task((val, i) => {
-          vals[i] = val
-          if (++count !== vals.length) return
-          t.next()
-          t.run(vals, id)
-        })
-        t.task(nodes => {
-          t.next()
+        const t1 = tasks.add(val => {
           if (expand) {
-            for (i = 0; i < nodes.length; i++) {
-              resolver.expand(nodes[i], t, i)
-            }
-            return
+            return resolver.expand(val, tasks, t, i)
           }
-          for (i = 0; i < nodes.length; i++) {
-            if (isArray(nodes[i]) || isObject(nodes[i])) {
-              nodes[i] = transform(nodes[i], v => {
-                if (!isMerkleLink(v)) return v
-                return {
-                  '/': new CID(v['/']).toBaseEncodedString()
-                }
-              })
-            }
-            t.run(order(nodes[i]), i)
+          if (isArray(val) || isObject(val)) {
+            val = transform(val, v => {
+              if (!isMerkleLink(v)) return v
+              return {
+                '/': new CID(v['/']).toBaseEncodedString()
+              }
+            })
           }
+          tasks.run(t, order(val), i)
         })
-        resolver.get(vals, paths, t)
+        resolver.get(cid, parts.join('/'), tasks, t1)
     }
 
-    this.getFile = (query: string, t: Object, id?: number|string) => {
+    this.getFile = (query: string, tasks: Object, t: number, i?: number) => {
         if (!ipfs.isOnline()) {
-            return t.error('IPFS Node is offline, cannot get file')
+            return tasks.error('IPFS Node is offline, cannot get file')
         }
         ipfs.files.get(query, (err, stream) => {
             if (err) {
-              return t.error(err)
+              return tasks.error(err)
             }
             stream.on('data', file => {
                 if (!file.content) {
-                    return t.error('No file content')
+                    return tasks.error('No file content')
                 }
                 const chunks = []
                 file.content.on('data', chunk => {
                     chunks.push(chunk)
                 })
                 file.content.once('end', () => {
-                  t.run(Buffer.concat(chunks), id)
+                  tasks.run(t, Buffer.concat(chunks), i)
                 })
                 file.content.resume()
             })
@@ -177,11 +146,11 @@ module.exports = function() {
     }
 
     // https://github.com/ipfs/faq/issues/208
-    this.hashFile = (data: Buffer, t: Object, id?: number|string) => {
+    this.hashFile = (data: Buffer, tasks: Object, t: number, i?: number) => {
         const file = new Unixfs('file', data)
         DAGNode.create(file.marshal(), (err, node) => {
-            if (err) return t.error(err)
-            t.run(node.toJSON().multihash, id)
+            if (err) return tasks.error(err)
+            tasks.run(t, node.toJSON().multihash, i)
         })
     }
 
@@ -205,7 +174,7 @@ module.exports = function() {
         })
     }
 
-    this.start = (repo: Object|string, t: Object, id?: number|string) => {
+    this.start = (repo: Object|string, tasks: Object, t: number, i?: number) => {
 
       ipfs = new IPFS({
           init: true,
@@ -232,7 +201,7 @@ module.exports = function() {
       })
 
       ipfs.on('error', err => {
-          t.error(err)
+          tasks.error(err)
       })
 
       ipfs.on('ready', () => {
@@ -240,15 +209,15 @@ module.exports = function() {
           resolver = new Resolver(ipfs._blockService)
           resolver.addSupport(dagCBOR)
           console.log('IPFS Node is ready')
-          t.run(id)
+          tasks.run(t, i)
       })
     }
 
-    this.stop = (t: Object, id?: number|string) => {
+    this.stop = (tasks: Object, t: number, i?: number) => {
         ipfs.stop(() => {
             clearInterval(intervalId)
             console.log('Stopped IPFS Node')
-            t.run(id)
+            tasks.run(t, i)
         })
     }
 }

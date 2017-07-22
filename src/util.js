@@ -10,59 +10,6 @@ const fs = require('fs')
  * @module constellate/src/util
  */
 
-function Tasks() {
-    let cb, done = [], todo = [];
-    this.callback = (_cb: Function) => {
-      cb = _cb
-    }
-    this.task = (onRun: Function) => {
-        const e = new EventEmitter()
-        e.on('run', onRun)
-        todo.push(e)
-    }
-    this.todo = () => todo.length
-    this.run = (...args: any[]) => {
-        if (!todo.length) {
-          if (!cb) {
-            throw new Error('no more tasks')
-          }
-          done = []
-          cb(null, ...args)
-          return cb = null
-        }
-        todo[todo.length-1].emit('run', ...args)
-
-    }
-    this.next = () => {
-        if (!todo.length) {
-          throw new Error('no more tasks')
-        }
-        done.push(todo.pop())
-    }
-    this.move = (i: number) => {
-        if (!todo.length) {
-          throw new Error('no more tasks')
-        }
-        if (todo.length-i <= 0) {
-          throw new Error('not that many tasks')
-        }
-        if (i > 0) {
-          done.push(...todo.splice(todo.length-i, i).reverse())
-        }
-        if (i < 0) {
-          todo.push(...done.splice(done.length+i, -i).reverse())
-        }
-    }
-    this.error = (err: Error|string) => {
-      if (isString(err)) {
-        err = new Error(err)
-      }
-      done = todo = []
-      if (cb) return cb(err)
-      throw err
-    }
-}
-
 const assign = (...objs: Object[]): Object => {
   return Object.assign({}, ...objs)
 }
@@ -217,6 +164,38 @@ const traverse = (val: any, fn: Function) => {
     }
   }
   _traverse('', val, fn)
+}
+
+function Tasks() {
+  let cb, done, e, t
+  this.init = (_cb: Function) => {
+    cb = _cb
+    done = false
+    e = new EventEmitter()
+    t = 0
+  }
+  this.add = (onRun: Function): number => {
+    if (done) return -1
+    e.on('run-task' + t, onRun)
+    return t++
+  }
+  this.run = (t: number, ...args: any[]) => {
+    if (done) return
+    if (t < 0) {
+      cb(null, ...args)
+      done = true
+      return
+    }
+    e.emit('run-task' + t, ...args)
+  }
+  this.error = (err: Error|string) => {
+    if (done) return
+    if (isString(err)) {
+      err = new Error(err)
+    }
+    if (!cb) throw err
+    cb(err)
+  }
 }
 
 module.exports = {

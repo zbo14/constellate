@@ -35,178 +35,107 @@ module.exports = function(blockService: Object) {
     delete mods[codec]
   }
 
-  const resolvePath = (block: Object, cid: Object, path: string, t: Object, id?: number|string) => {
-    t.task((val, remPath) => {
+  const resolvePath = (block: Object, cid: Object, path: string, tasks: Object, t: number, i?: number) => {
+    let t1, t2
+    t1 = tasks.add(() => {
+      mods[cid.codec].resolve(block, path, tasks, t2)
+    })
+    t2 = tasks.add((val, remPath) => {
       if (!(path = remPath) || path === '/' && (val && !val['/'])) {
-        t.next()
-        return t.run(val, id)
+        return tasks.run(t, val, i)
       }
       if (val) cid = new CID(val['/'])
       blockService.get(cid, (err, _block) => {
-        if (err) return t.error(err)
+        if (err) return tasks.error(err)
         block = _block
-        t.move(-1)
-        t.run()
+        tasks.run(t1)
       })
     })
-    t.task(() => {
-      t.next()
-      mods[cid.codec].resolve(block, path, t)
-    })
-    t.run()
+    tasks.run(t1)
   }
 
-  this.get = (cids: Object[], paths: string[], t: Object, id?: number|string) => {
-    const results = new Array(cids.length)
-    let count = 0
-    t.task((val, i) => {
-      results[i] = val // { val, remPath }
-      if (++count !== results.length) return
-      t.next()
-      t.run(results, id)
-    })
-    t.task((block, i) => {
-      results[i] = block
-      if (++count !== cids.length) return
-      count = 0
-      t.next()
-      for (i = 0; i < cids.length; i++) {
-        if (!paths[i]) {
-          mods[cids[i].codec].deserialize(results[i].data, t, i)
-        } else {
-          resolvePath(results[i], cids[i], paths[i], t, i)
-        }
-      }
-    })
-    cids.forEach((cid, i) => {
-      if (!mods[cid.codec]) {
-        return t.error(cid.codec + ' not supported')
-      }
-      blockService.get(cid, (err, block) => {
-        if (err) return t.error(err)
-        t.run(block, i)
-      })
-    })
-  }
-
-  this.put = (nodes: Object[], codecs: string[], t: Object, id?: number|string) => {
-    // hashAlg = hashAlg | 'sha2-256'
-    const cids = new Array(nodes.length)
-    let count = 0
-    t.task((data, i) => {
-      blockService.put(new Block(Buffer.from(data.buffer), cids[i]), err => {
-        if (err) return t.error(err)
-        if (++count !== nodes.length) return
-        t.next()
-        t.run(cids, id)
-      })
-    })
-    t.task((cid, i) => {
-      cids[i] = cid
-      if (++count !== nodes.length) return
-      count = 0
-      t.next()
-      for (i = 0; i < nodes.length; i++) {
-        mods[codecs[i]].serialize(nodes[i], t, i)
-      }
-    })
-    for (let i = 0; i < nodes.length; i++) {
-      if (!mods[codecs[i]]) {
-        return t.error(codecs[i] + ' not supported')
-      }
-      mods[codecs[i]].cid(nodes[i], t, i)
+  this.get = (cid: Object, path: string, tasks: Object, t: number, i?: number) => {
+    if (!mods[cid.codec]) {
+      return tasks.error(cid.codec + ' not supported')
     }
-  }
-
-  this.expand = (node: Object, t: Object, id?: number|string) => {
-      const expanded = order(node)
-      const trails = []
-      let cid, i = 0, inner, keys, lastKey, parts, vals = [], x
-      traverse(node, (trail, val) => {
-          if (!isMerkleLink(val)) return
-          try {
-              cid = new CID(val['/'])
-          } catch (err) {
-              return
-          }
-          trails.push(trail)
-          vals.push(cid)
-      })
-      if (!vals.length) {
-          return t.run(expanded, id)
+    const t1 = tasks.add(block => {
+      if (!path) {
+        mods[cid.codec].deserialize(block.data, tasks, t, i)
+      } else {
+        resolvePath(block, cid, path, tasks, t, i)
       }
-      t.task(result => {
-          if (!i) vals = result
-          else vals[i-1] = result
-          if (i !== vals.length) {
-            return this.expand(vals[i++], t, i)
-          }
-          for (i = 0; i < vals.length; i++) {
-              keys = trails[i].split('.')
-              lastKey = keys.pop()
-              inner = keys.reduce((result, key) => {
-                  return result[key]
-              }, expanded)
-              x = inner[lastKey]
-              if ((isObject(x) && !x['/']) || (isArray(x) && !x[0]['/'])) {
-                  inner[lastKey] = [].concat(x, vals[i])
-              } else {
-                  inner[lastKey] = vals[i]
-              }
-          }
-          t.next()
-          t.run(expanded, id)
-      })
-      this.get(vals, [], t)
+    })
+    blockService.get(cid, (err, block) => {
+      if (err) return tasks.error(err)
+      tasks.run(t1, block)
+    })
   }
-}
 
-/*
+  this.put = (node: Object, codec: string, tasks: Object, t: number, i?: number) => {
+    if (!mods[codec]) {
+      return tasks.error(codec + ' not supported')
+    }
+    let cid, t1, t2
+    t1 = tasks.add(_cid => {
+      cid = _cid
+      mods[codec].serialize(node, tasks, t2)
+    })
+    t2 = tasks.add(data => {
+      blockService.put(new Block(Buffer.from(data.buffer), cid), err => {
+        if (err) return tasks.error(err)
+        tasks.run(t, cid, i)
+      })
+    })
+    mods[codec].cid(node, tasks, t1)
+  }
 
-this.compact = (node: Object, t: Object, id?: number|string) => {
+  this.expand = (node: Object, tasks: Object, t: number, i?: number) => {
+    const expanded = order(node)
     const trails = []
     const vals = []
-    let count = 0, compacted = order(node), i, inner, keys, lastKey, x
-    t.task(cid => {
-        t.run({ cid, compacted }, id)
-    })
+    let cid, parts
     traverse(node, (trail, val) => {
-        if (!isObject(val) || val['/']) return
-        if (trails.some(tr => trail !== tr && trail.includes(tr))) return
+        if (!isMerkleLink(val)) return
+        try {
+            cid = new CID(val['/'])
+        } catch (err) {
+            return
+        }
         trails.push(trail)
-        vals.push(val)
+        vals.push(cid)
     })
     if (!vals.length) {
-        return this.cid(compacted, t);
+        return tasks.run(t, expanded, i)
     }
-    t.task((obj, i) => {
-        vals[i] = obj
-        if (++count !== vals.length) return
-        count = 0
-        for (i = 0; i < vals.length; i++) {
-            keys = vals[i].path.split('.')
-            lastKey = keys.pop()
-            inner = keys.reduce((result, key) => {
-                return result[key]
-            }, compacted)
-            x = inner[lastKey]
-            if ((isObject(x) && x['/']) || (isArray(x) && x[0]['/'])) {
-                inner[lastKey] = [].concat(x, {
-                    '/': vals[i].cid.toBaseEncodedString()
-                })
-            } else {
-                inner[lastKey] = {
-                    '/': vals[i].cid.toBaseEncodedString()
-                }
-            }
-        }
-        compacted = order(compacted)
-        t.next()
-        this.cid(compacted, t)
+    let count = 0, inner, keys, lastKey, t1, t2, x
+    t1 = tasks.add((val, j) => {
+      vals[j] = val
+      if (++count !== vals.length) return
+      count = 0
+      for (j = 0; j < vals.length; j++) {
+        this.expand(vals[j], tasks, t2, j)
+      }
     })
-    for (i = 0; i < vals.length; i++) {
-        this.compact(vals[i], t, i)
+    t2 = tasks.add((val, j) => {
+      vals[j] = val
+      if (++count !== vals.length) return
+      for (j = 0; j < vals.length; j++) {
+          keys = trails[j].split('.')
+          lastKey = keys.pop()
+          inner = keys.reduce((result, key) => {
+              return result[key]
+          }, expanded)
+          x = inner[lastKey]
+          if ((isObject(x) && !x['/']) || (isArray(x) && !x[0]['/'])) {
+              inner[lastKey] = [].concat(x, vals[j])
+          } else {
+              inner[lastKey] = vals[j]
+          }
+      }
+      tasks.run(t, expanded, i)
+    })
+    for (let j = 0; j < vals.length; j++) {
+      this.get(vals[j], '', tasks, t1, j)
     }
+  }
 }
-
-*/

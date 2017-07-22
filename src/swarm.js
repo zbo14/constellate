@@ -40,36 +40,36 @@ SOFTWARE.
 */
 
 module.exports = function(url: string = 'http://swarm-gateways.net/') {
-  this.addFile = (buf: Buffer, t: Object, id?: number|string) => {
+  this.contentUrl = (hash: string): string => url + 'bzzr://' + hash;
+  this.addFile = (data: Buffer, tasks: Object, t: number, i?: number) => {
     request(
       url + 'bzzr:/',
       { method: 'POST' },
       (err, data, res) => {
-        if (err) return t.error(err);
+        if (err) return tasks.error(err);
         if (res.statusCode !== 200) {
-          return t.error(data);
+          return tasks.error(data);
         }
         if (!this.isFileHash(data)) {
-          return t.error('invalid hash: ' + data);
+          return tasks.error('invalid hash: ' + data);
         }
-        t.run(data, id);
+        tasks.run(t, data, i);
       }
     );
   }
   this.getFile = (hash: string, t: Object, id?: number|string) => {
     request(
-      url + 'bzzr://' + hash,
+      this.contentUrl(hash),
       { responseType: 'arraybuffer' },
       (err, data, res) => {
-        if (err) return t.error(err);
+        if (err) return tasks.error(err);
         if (res.statusCode !== 200) {
-          return t.error(err);
+          return tasks.error(err);
         }
-        t.run(Buffer.from(data), id);
+        tasks.run(Buffer.from(data), id);
       }
     );
   }
-  this.contentUrl = (hash: string): string => url + 'bzzr://' + hash;
   this.hashFile = swarmHash;
   this.isFileHash = (hash: string): boolean => {
     return /^[a-f0-9]{64}$/.test(hash);
@@ -104,7 +104,7 @@ function swarmHash(data: Buffer, t: Object, id: number|string) {
     let depth = 0, treeSize;
     for (treeSize = 4096; treeSize < size; treeSize *= 128) depth++;
     const hash = split(data, depth, size, treeSize/128).toString('hex');
-    t.run(hash, id);
+    tasks.run(hash, id);
 }
 
 function split(chunk: Buffer, depth: number, size: number, treeSize: number): Buffer {
