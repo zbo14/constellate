@@ -33,7 +33,7 @@ const capitalize = (str: string): string => {
   return str.charAt(0).toUpperCase() + str.slice(1)
 }
 
-const clone = (obj: Object): Object => {
+const cloneObject = (obj: Object): Object => {
   return JSON.parse(JSON.stringify(obj))
 }
 
@@ -74,42 +74,52 @@ const newArray = (_default: any, length: number): any[] => {
   return (Array : any).apply(null, { length }).map(() => _default)
 }
 
-// adapted from http://stackoverflow.com/questions/16167581/sort-object-properties-and-json-stringify#comment73545624_40646557
-
-const orderStringify = (x: any[]|Object, space?: number): string => {
-  const keys = []
-  JSON.stringify(x, (k, v) => {
-    keys.push(k)
-    if (isArray(v)) {
-      v.sort((x, y) => {
-        if (isObject(x) && isObject(y)) {
-          const xkeys = Object.keys(x).sort()
-          const ykeys = Object.keys(y).sort()
-          let i
-          for (i = 0; i < xkeys.length && i < ykeys.length; i++) {
-            if (xkeys[i] < ykeys[i]) return -1
-            if (xkeys[i] > ykeys[i]) return 1
-          }
-          if (xkeys.length < ykeys.length) return -1
-          if (xkeys.length > ykeys.length) return 1
-          for (i = 0; i < xkeys.length && i < ykeys.length; i++) {
-            if (x[xkeys[i]] < y[ykeys[i]]) return -1
-            if (x[xkeys[i]] > y[ykeys[i]]) return 1
-          }
-          return 0
-        }
-        if (x < y) return -1
-        if (x > y) return 1
-        return 0
-      })
+const sort = (x: any, y: any) => {
+  let i
+  if (isArray(x) && isArray(y)) {
+    x.sort(sort)
+    y.sort(sort)
+    let result
+    for (i = 0; i < x.length && i < y.length; i++) {
+      result = sort(x[i], y[i])
+      if (result) return result
     }
-    return v
-  })
-  return JSON.stringify(x, keys.sort(), space)
+    return 0
+  }
+  if (isObject(x) && isObject(y)) {
+      const xkeys = Object.keys(x).sort()
+      const ykeys = Object.keys(y).sort()
+      for (i = 0; i < xkeys.length && i < ykeys.length; i++) {
+          if (xkeys[i] < ykeys[i]) return -1
+          if (xkeys[i] > ykeys[i]) return 1
+      }
+      if (xkeys.length < ykeys.length) return -1
+      if (xkeys.length > ykeys.length) return 1
+      for (i = 0; i < xkeys.length && i < ykeys.length; i++) {
+          if (x[xkeys[i]] < y[ykeys[i]]) return -1
+          if (x[xkeys[i]] > y[ykeys[i]]) return 1
+      }
+      return 0
+  }
+  if (x < y) return -1
+  if (x > y) return 1
+  return 0
 }
 
-const order = (x: any[]|Object): Object => {
-  return JSON.parse(orderStringify(x))
+const orderStringify = (x: any, space?: number): string => {
+    const keys = []
+    JSON.stringify(x, (k, v) => {
+        keys.push(k)
+        if (isArray(v)) {
+            v.sort(sort)
+        }
+        return v
+    })
+    return JSON.stringify(x, keys.sort(), space)
+}
+
+const orderObject = (x: any) => {
+    return JSON.parse(orderStringify(x))
 }
 
 const readFileAs = (file: File, readAs: string, t: Object, id: number|string) => {
@@ -204,7 +214,7 @@ module.exports = {
   bufferToArrayBuffer,
   bufferToFile,
   capitalize,
-  clone,
+  cloneObject,
   fileToAnchor,
   isArray,
   isBoolean,
@@ -213,7 +223,7 @@ module.exports = {
   isObject,
   isString,
   newArray,
-  order,
+  orderObject,
   orderStringify,
   readFileAs,
   splice,

@@ -1,8 +1,8 @@
 'use strict'
 
 const cbor = require('borc')
-const CID = require('cids')
 const crypto = require('crypto')
+const CID = require('cids')
 const multihash = require('multihashes')
 
 const {
@@ -51,6 +51,9 @@ const {
 
 */
 
+const codec = 'dag-cbor'
+const version = 1
+
 const CID_CBOR_TAG = 42
 
 const decoder = new cbor.Decoder({
@@ -61,100 +64,83 @@ const decoder = new cbor.Decoder({
   }
 })
 
-const sha256 = (data: Buffer): Buffer => {
+const serialize = (node: Object, tasks: Object, t: number, i?: number) => {
+  const seen = []
+  let cid
+  const tagged = transform(node, val => {
+    if (!isObject(val)) return val
+    if (seen.some(obj => orderStringify(obj) === orderStringify(val))) {
+      return tasks.error('The object passed has circular references')
+    }
+    seen.push(val)
+    if (!(cid = val['/'])) return val
+    if (isString(cid)) {
+      cid = new CID(cid).buffer
+    }
+    return new cbor.Tagged(CID_CBOR_TAG, Buffer.concat([
+      Buffer.from('00', 'hex'), cid
+    ]))
+  })
+  try {
+    const data = cbor.encode(tagged)
+    tasks.run(t, data, i)
+  } catch(err) {
+    tasks.error(err)
+  }
+}
+
+const sha2_256 = (data: Buffer): Buffer => {
   return crypto.createHash('sha256').update(data).digest()
 }
 
-function DagCBOR () {
+module.exports = {
 
-  this.codec = 'dag-cbor'
+  codec,
 
-  this.version = 1
+  version,
 
-  this.deserialize = (data: Buffer, tasks: Object, t: number, i?: number) => {
+  serialize,
+
+  deserialize: (data: Buffer, tasks: Object, t: number, i?: number) => {
     try {
-      const obj = decoder.decodeFirst(data)
-      tasks.run(t, obj, i)
+      const node = decoder.decodeFirst(data)
+      tasks.run(t, node, i)
     } catch(err) {
       tasks.error(err)
     }
-  }
+  },
 
-  this.serialize = (node: Object, tasks: Object, t: number, i?: number) => {
-    const seen = []
-    let cid
-    const tagged = transform(node, val => {
-      if (!isObject(val)) return val
-      if (seen.some(obj => orderStringify(obj) === orderStringify(val))) {
-        return tasks.error('The object passed has circular references')
-      }
-      seen.push(val)
-      if (!(cid = val['/'])) return val
-      if (isString(cid)) {
-        cid = new CID(cid).buffer
-      }
-      return new cbor.Tagged(CID_CBOR_TAG, Buffer.concat([
-        Buffer.from('00', 'hex'), cid
-      ]))
-    })
-    try {
-      const data = cbor.encode(tagged)
-      tasks.run(t, data, i)
-    } catch(err) {
-      tasks.error(err)
-    }
-  }
-
-  this.cid = (node: Object, tasks: Object, t: number, i?: number) => {
+  cid: (node: Object, tasks: Object, t: number, i?: number) => {
     const t1 = tasks.add(data => {
       try {
-        const mh = multihash.encode(sha256(data), 'sha2-256')
-        const cid = new CID(this.version, this.codec, mh)
+        const mh = multihash.encode(sha2_256(data), 'sha2-256')
+        const cid = new CID(version, codec, mh)
         tasks.run(t, cid, i)
       } catch(err) {
         tasks.error(err)
       }
     })
-    this.serialize(node, tasks, t1)
-  }
+    serialize(node, tasks, t1)
+  },
 
-  this.hash = (node: Object, tasks: Object, t: number, i?: number) => {
-    const t1 = tasks.task(data => {
-      try {
-        const mh = multihash.encode(sha256(data), 'sha2-256')
-        const cid = new CID(this.version, this.codec, mh)
-        tasks.run(t, cid.toBaseEncodedString(), i)
-      } catch(err) {
-        tasks.error(err)
-      }
-    })
-    this.serialize(node, tasks, t1)
-  }
-
-  this.resolve = (block: Object, path: string, tasks: Object, t: number, i?: number) => {
-    const t1 = tasks.task(val => {
-      if (!path || path === '/') {
-        return tasks.run(t, val, '', i)
-      }
-      const parts = path.split('/')
-      path = ''
-      for (let j = 0; j < parts.length; j++) {
-        if (isArray(val) && !Buffer.isBuffer(val)) {
-          val = val[Number(parts[j])]
-        } else if (val[parts[j]]) {
-          val = val[parts[j]]
-        } else {
-          if (!val) {
-            return tasks.error('path not available at root')
-          }
-          path = parts.slice(j).join('/')
-          break
+  resolve: (node: Object, path: string, tasks: Object, t: number, i?: number) => {
+    if (!path || path === '/') {
+      return tasks.run(t, node, '', i)
+    }
+    const parts = path.split('/')
+    let remPath = '', val = node
+    for (let j = 0; j < parts.length; j++) {
+      if (isArray(val) && !Buffer.isBuffer(val)) {
+        val = val[Number(parts[j])]
+      } else if (val[parts[j]]) {
+        val = val[parts[j]]
+      } else {
+        if (!val) {
+          return tasks.error(`could not find path="${path}"`)
         }
+        remPath = parts.slice(j).join('/')
+        break
       }
-      tasks.run(t, val, path, i)
-    })
-    this.deserialize(block.data, tasks, t1)
+    }
   }
 }
-
-module.exports = new DagCBOR();

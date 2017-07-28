@@ -20,6 +20,7 @@
   "dependencies": {
     "aes-js": "^3.1.0",
     "bcryptjs": "^2.4.3",
+    "bigchaindb-driver": "^0.3.0",
     "bip39": "^2.3.1",
     "body-parser": "^1.17.2",
     "borc": "^2.0.2",
@@ -37,8 +38,10 @@
     "ipld-resolver": "^0.12.1",
     "is-buffer": "^1.1.5",
     "is-ipfs": "^0.3.0",
+    "js-sha3": "^0.6.1",
     "keccakjs": "^0.2.1",
     "libp2p-webrtc-star": "^0.11.0",
+    "merkle-patricia-tree": "^2.1.2",
     "multibase": "^0.3.4",
     "prop-types": "^15.5.10",
     "protocol-buffers": "^3.2.1",

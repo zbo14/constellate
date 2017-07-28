@@ -1,2 +1,2 @@
-name,audio,performingArtist,producer,recordingOf,recordLabel
-recording,@audio.mp3,@band,"@producer1, @producer2",@song,@recordLabel
+name,audio,performingArtist,producer,recordingOf,recordLabel,owner,amount
+recording,@audio.mp3,@band,"@producer1, @producer2",@song,@recordLabel,"@band,@producer1,@producer2,@recordLabel","20,10,10,60"

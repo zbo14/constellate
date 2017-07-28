@@ -23,9 +23,14 @@ const uploadBtn = document.getElementById('upload-btn')
 
 const constellate = new Constellate()
 
-constellate.start(err => {
+constellate.BigchainDB('http://192.168.99.100:9984/api/v1', err => {
   if (err) return console.error(err)
-  console.log('Constellate is running!')
+  console.log('Configured BigchainDB MetadataService')
+})
+
+constellate.IPFS(err => {
+  if (err) return console.error(err)
+  console.log('Started IPFS Node and configured services')
 })
 
 exportBtn.addEventListener('click', () => {
@@ -67,9 +72,9 @@ getContentBtn.addEventListener('click', () => {
 
 getMetaBtn.addEventListener('click', () => {
   if (!getMeta.value) return
-  constellate.getMetadata(getMeta.value.split(/,\s*/), expand.checked, (err, results) => {
+  constellate.getMetadata('bigchaindb-metadata-service', getMeta.value, expand.checked, (err, result) => {
     if (err) return console.error(err)
-    json.value = JSON.stringify(results, null, 2)
+    json.value = JSON.stringify(result, null, 2)
   })
 })
 

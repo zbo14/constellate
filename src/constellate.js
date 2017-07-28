@@ -5,9 +5,12 @@ const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
 const request = require('xhr-request')
 
+const BigchainDB = require('../lib/bigchaindb.js')
 const Fingerprint = require('../lib/fingerprint.js')
 const Ipfs = require('../lib/ipfs.js')
-// const Swarm = require('../lib/swarm.js')
+const Resolver = require('../lib/resolver.js')
+const Services = require('../lib/services.js')
+const Swarm = require('../lib/swarm.js')
 
 const {
     Tasks,
@@ -164,21 +167,15 @@ const toCSV = (arr: Array < Array < string | string[] >> ): string => {
     return csv
 }
 
-// if (modName === 'ipfs') {
-//   mod = ipfs
-// } else if (modName === 'swarm') {
-//   mod = new Swarm()
-// } else {
-//   throw new Error('unexpected module name: ' + modName)
-// }
+const defaultRepoPath = '/tmp/constellate'
 
-module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: string = 'http://127.0.0.1:8888') {
+module.exports = function () {
 
-    const fp = new Fingerprint()
+    // const fp = new Fingerprint()
 
-    const ipfs = new Ipfs(repoPath)
+    const services = new Services()
 
-    let fileHashes, files, ipld, keys, meta, metaHashes, names
+    let fileHashes, files, ipld, keys, meta, metaHashes, names, owners, publicKeys
 
     //-----------------------------------------------------------------------
 
@@ -225,30 +222,40 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
         tasks.run(t, i)
     }
 
-    const pushIPLD = (tasks: Object, t: number, i?: number) => {
+    const pushIPLD = (service: Object, privateKey: string, tasks: Object, t: number, i?: number) => {
         if (!ipld || !ipld.length) {
             return tasks.error('no ipld')
         }
+        let count = 0
         const t1 = tasks.add((hash, j) => {
             if (hash !== metaHashes[names[j]]) {
                 return tasks.error(`expected hash=${metaHashes[names[j]]}, got ` + hash)
             }
+            if (++count !== ipld.length) return
             console.log('Pushed IPLD')
             tasks.run(t, i)
         })
         for (let j = 0; j < ipld.length; j++) {
-          ipfs.addObject(ipld[j], tasks, t1, j)
+          service.put({
+            data: ipld[j],
+            issuer: privateKey,
+            metadata: null,
+            owners: owners[names[j]]
+          }, tasks, t1, j)
         }
     }
 
-    const uploadFiles = (tasks: Object, t: number, i?: number) => {
+    const uploadContent = (service: Object, tasks: Object, t: number, i?: number) => {
         if (!files || !files.length) {
             return tasks.error('no files')
         }
         const paths = new Array(files.length)
         let count = 0, t1, t2;
         t1 = tasks.add((ab, j) => {
-            ipfs.addFile(Buffer.from(ab), paths[j], tasks, t2, j)
+            service.put({
+              content: Buffer.from(ab),
+              path: paths[j]
+            }, tasks, t2, j)
         })
         t2 = tasks.add((hash, j) => {
             if (hash !== fileHashes[files[j].name]) {
@@ -263,6 +270,8 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
             readFileAs(files[j], 'arraybuffer', tasks, t1, j)
         }
     }
+
+    /*
 
     const fingerprint = (file: File, tasks: Object, t: number, i?: number) => {
         const type = file.type.split('/')[0]
@@ -291,6 +300,8 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
         })
         return readFileAs(file, 'arraybuffer', tasks, t1)
     }
+
+    */
 
     const encrypt = (password: string, tasks: Object, t: number, i?: number) => {
         let count = 0, t1, t2
@@ -325,13 +336,14 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
         }
     }
 
-    const generateIPLD = (tasks: Object, t: number, i?: number) => {
+    const generateIPLD = (service: Object, tasks: Object, t: number, i?: number) => {
         if (!meta || !meta.length) {
           return tasks.error('no metadata')
         }
         const hashes = []
+        const resolver = new Resolver(service)
         let j, t2, t3;
-        ipld = [], metaHashes = {}, names = []
+        ipld = [], metaHashes = {}, names = [], owners = {}, publicKeys = {}
         t2 = tasks.add(() => {
           j = 0
           orderMetadata(tasks, t3)
@@ -342,55 +354,71 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
               return tasks.run(t, i)
             }
             if (isString(hash)) {
-                metaHashes[meta[j++].name] = hash
-                return tasks.run(t3)
+              metaHashes[meta[j++].name] = hash
+              return tasks.run(t3)
+            }
+            if (meta[j].publicKey) {
+              publicKeys[meta[j].name] = meta[j].publicKey
             }
             if (meta[j]['#']) {
-                metaHashes[meta[j].name] = meta[j++]['#']
-                return tasks.run(t3)
+              metaHashes[meta[j].name] = meta[j++]['#']
+              return tasks.run(t3)
             }
-            meta[j] = order(transform(meta[j], val => {
-                if (isString(val)) {
-                  if (val[0] === '@') {
-                      return {
-                          '/': metaHashes[val.slice(1)]
-                      }
-                  }
-                  if (val[0] === '#') {
-                      return {
-                          '/': val.slice(1)
-                      }
-                  }
-                }
-                return val
-            }))
+            if (meta[j].owner) {
+              if (!meta[j].amount) {
+                return tasks.error('owner with no amount')
+              }
+              meta[j].amount = [].concat(meta[j].amount)
+              meta[j].owner = [].concat(meta[j].owner)
+              if (meta[j].amount.length !== meta[j].owner.length) {
+                return tasks.error('different number of amounts and owners')
+              }
+              owners[meta[j].name]= {
+                amount: meta[j].amount,
+                publicKeys: meta[j].owner.map(owner => publicKeys[owner.slice(1)])
+              }
+            }
             names.push(meta[j].name)
-            meta[j].name = meta[j].name.match(/^(.+?)(?:\s*?\(.*?\))?$/)[1]
+            meta[j].name = meta[j].name.match(/^(.+?)\s*(?:\s*?\(.*?\))?$/)[1]
+            meta[j] = order(transform(meta[j], val => {
+              if (isString(val)) {
+                if (val[0] === '@') {
+                    return {
+                        '/': metaHashes[val.slice(1)]
+                    }
+                }
+                if (val[0] === '#') {
+                    return {
+                        '/': val.slice(1)
+                    }
+                }
+              }
+              return val
+            }))
             ipld.push(meta[j])
-            ipfs.hashObject(meta[j], tasks, t3)
+            service.hash(meta[j], tasks, t3)
         })
         for (j = 0; j < meta.length; j++) {
             if (meta[j].type === 'Hash' && isString(meta[j]['#'])) {
-                hashes.push(meta.splice(j, 1)[0]['#'])
+                hashes.push(meta[j]['#'])
             }
         }
-        if (!hashes.length) return tasks.run(t2)
+        if (!hashes.length) {
+          return tasks.run(t2)
+        }
         let count = 0
         const t1 = tasks.add((obj, j) => {
-          meta.push({
-              '#': hashes[j],
-              name: obj.name,
-              type: obj.type
-          })
+          obj['#'] = hashes[j]
+          meta.push(obj)
           if (++count !== hashes.length) return
           tasks.run(t2)
         })
         for (j = 0; j < hashes.length; j++) {
-            ipfs.get(hashes[j], tasks, t1, j)
+            resolver.get(hashes[j], tasks, t1, j)
         }
     }
 
-    const getContent = (query: string, key: string, tasks: Object, t: number, i?: number) => {
+    const getContent = (service: Object, path: string, key: string, tasks: Object, t: number, i?: number) => {
         const t1 = tasks.add(data => {
             if (key) {
               try {
@@ -400,29 +428,30 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
                 tasks.error(err)
               }
             }
-            bufferToFile(data, query, tasks, t, i)
+            bufferToFile(data, path, tasks, t, i)
         })
-        ipfs.getFile(query, tasks, t1)
+        service.get(path, tasks, t1)
     }
 
-    const importContent = (_files: File[], password: string, tasks: Object, t: number, i?: number) => {
-        if (!_files || !_files.length) {
+    const importContent = (service: Object, filez: File[], password: string, tasks: Object, t: number, i?: number) => {
+        if (!filez || !filez.length) {
             return tasks.error('no files')
         }
         let count = 0, t1, t2, t3
-        fileHashes = {}, files = _files, meta = meta || []
+        fileHashes = {}, files = filez, meta = meta || []
         t1 = tasks.add(() => {
             for (let j = 0; j < files.length; j++) {
                 readFileAs(files[j], 'arraybuffer', tasks, t2, j)
             }
         })
         t2 = tasks.add((ab, j) => {
-            ipfs.hashFile(Buffer.from(ab), tasks, t3, j)
+            const content = Buffer.from(ab)
+            service.hash(service, { content }, tasks, t3, j)
         })
         t3 = tasks.add((hash, j) => {
             fileHashes[files[j].name] = hash
             meta.push({
-                contentUrl: ipfs.contentUrl(hash, files[j].name),
+                contentUrl: service.pathToIRI(hash + '/' + files[j].name),
                 name: files[j].name,
                 type: capitalize(files[j].type.split('/')[0]) + 'Object'
             })
@@ -430,8 +459,10 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
             console.log('Imported content')
             tasks.run(t, i)
         })
-        if (!password) return tasks.run()
-        encrypt(password, tasks, t1)
+        if (password) {
+          return encrypt(password, tasks, t1)
+        }
+        tasks.run(t1)
     }
 
     const importMetadata = (files: File[], tasks: Object, t: number, i?: number) => {
@@ -472,16 +503,6 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
         }
     }
 
-    const upload = (tasks: Object, t: number, i?: number) => {
-        let t1 = t
-        if (files && files.length) {
-            t1 = tasks.add(() => {
-                uploadFiles(tasks, t, i)
-            })
-        }
-        pushIPLD(tasks, t1, i)
-    }
-
     //-----------------------------------------------------------------------
 
     const tasks = new Tasks()
@@ -509,14 +530,17 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
     //    return !files ? null : files
     // }
 
-    this.importContent = (files: File[], cb: Function) => {
+    this.importContent = (name: string, files: File[], cb: Function) => {
       // if (typeof password === 'function') {
       //  [cb, password] = [password, '']
       // } else if (!cb) {
       //  throw new Error('no callback')
       // }
       tasks.init(cb)
-      importContent(files, '', tasks, -1)
+      tasks.add(service => {
+        importContent(service, files, '', tasks, -1)
+      })
+      services.use(name, tasks, 0)
     }
 
     this.importMetadata = (files: File[], cb: Function) => {
@@ -524,38 +548,90 @@ module.exports = function (repoPath: string = '/tmp/constellate', serverAddr: st
       importMetadata(files, tasks, -1)
     }
 
-    this.generateIPLD = (cb: Function) => {
+    this.generateIPLD = (name: string, cb: Function) => {
       tasks.init(cb)
-      generateIPLD(tasks, -1)
+      tasks.add(service => {
+        generateIPLD(service, tasks, -1)
+      })
+      services.use(name, tasks, 0)
     }
 
-    this.getContent = (query: string, cb: Function) => {
+    this.getContent = (service: string, path: string, cb: Function) => {
       // if (typeof key === 'function') {
       //  [cb, key] = [key, '']
       // } else if (!cb) {
       //  throw new Error('no callback')
       // }
       tasks.init(cb)
-      getContent(query, '', tasks, -1)
+      tasks.add(service => {
+        getContent(service, path, '', tasks, -1)
+      })
+      services.use(service, tasks, 0)
     }
 
-    this.getMetadata = (query: string, expand: boolean, cb: Function) => {
+    this.getMetadata = (name: string, path: string, expand: boolean, cb: Function) => {
       tasks.init(cb)
-      ipfs.get(query, expand, tasks, -1)
+      let resolver
+      tasks.add(service => {
+        resolver = new Resolver(service)
+        resolver.get(path, tasks, 1)
+      })
+      tasks.add(result => {
+        if (expand) {
+          return resolver.expand(result, tasks, -1)
+        }
+        tasks.run(-1, result)
+      })
+      services.use(name, tasks, 0)
     }
 
-    this.start = (cb: Function) => {
+    this.BigchainDB = (url: string, cb: Function) => {
       tasks.init(cb)
-      ipfs.start(repoPath, tasks, -1)
+      const service = new BigchainDB.MetadataService(url)
+      services.add(service, tasks, -1)
     }
 
-    this.stop = (cb: Function) => {
+    this.IPFS = (repoPath: string = defaultRepoPath, cb: Function) => {
       tasks.init(cb)
-      ipfs.stop(tasks, -1)
+      if (typeof repoPath === 'function') {
+        [cb, repoPath] = [repoPath, defaultRepoPath]
+      }
+      let count = 0
+      tasks.add(ipfs => {
+        services.add(new Ipfs.ContentService(ipfs._blockService), tasks, 1)
+        services.add(new Ipfs.MetadataService(ipfs.files), tasks, 1)
+      })
+      tasks.add(() => {
+        if (++count === 2) {
+          tasks.run(-1)
+        }
+      })
+      const ipfs = new Ipfs.Node()
+      ipfs.start(repoPath, tasks, 0)
     }
 
-    this.upload = (cb: Function) => {
+    this.Swarm = (url: string, cb: Function) => {
       tasks.init(cb)
-      upload(tasks, -1)
+      if (typeof url === 'function') {
+        [cb, url] = [url, '']
+      }
+      const service = new Swarm.ContentService(url)
+      services.add(service, tasks, -1)
+    }
+
+    this.pushIPLD = (name: string, privateKey: string, cb: Function) => {
+      tasks.init(cb)
+      tasks.add(service => {
+        pushIPLD(service, privateKey, tasks, -1)
+      })
+      services.use(name, tasks, 0)
+    }
+
+    this.uploadContent = (name: string, cb: Function) => {
+      tasks.init(cb)
+      tasks.add(service => {
+        uploadContent(service, tasks, -1)
+      })
+      services.use(name, tasks, 0)
     }
 }

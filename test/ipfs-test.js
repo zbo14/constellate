@@ -1,7 +1,12 @@
 'use strict'
 
 const Ipfs = require('../lib/ipfs.js')
-const { Tasks } = require('../lib/util.js')
+const Resolver = require('../lib/resolver.js')
+
+const {
+  order,
+  Tasks
+} = require('../lib/util.js')
 
 const composer1 = {
   '@context': 'http://schema.org/',
@@ -44,45 +49,63 @@ const expanded = {
   publisher
 }
 
-const ipfs = new Ipfs()
+const ipfs = new Ipfs.Node()
 
-const t = new Tasks()
+const tasks = new Tasks()
 
-let str1, str2
+tasks.init()
 
-t.task(() => {
+let actual, count = 0, expected, i, resolver, service,
+    t1, t2, t3, t4, t5, t6
+
+t1 = tasks.add(ipfs => {
+  service = new Ipfs.MetadataService(ipfs._blockService)
+  // TODO: content service
+  resolver = new Resolver(service)
+  composition.composer = new Array(2)
+  service.put(composer1, tasks, t2, 0)
+  service.put(composer2, tasks, t2, 1)
+  service.put(publisher, tasks, t2, 2)
+})
+
+t2 = tasks.add((cid, j) => {
+  if (j === 2) {
+    composition.publisher = { '/': cid.toBaseEncodedString() }
+  } else {
+    composition.composer[j] = { '/': cid.toBaseEncodedString() }
+  }
+  if (++count !== 3) return
+  service.put(composition, tasks, t3)
+})
+
+t3 = tasks.add(cid => {
+  recording.recordingOf = { '/': cid.toBaseEncodedString() }
+  resolver.get(cid, '', tasks, t4)
+})
+
+t4 = tasks.add(obj => {
+  actual = JSON.stringify(obj)
+  expected = JSON.stringify(order(composition))
+  if (expected !== actual) {
+    return tasks.error('EXPECTED ' + expected + '\nGOT ' + actual)
+  }
+  resolver.expand(obj, tasks, t5)
+})
+
+t5 = tasks.add(obj => {
+  actual = JSON.stringify(obj)
+  expected = JSON.stringify(order(expanded))
+  if (expected !== actual) {
+    return tasks.error('EXPECTED ' + expected + '\nGOT ' + actual)
+  }
+  ipfs.stop(tasks, t6)
+})
+
+t6 = tasks.add(() => {
   console.log('Done')
   process.exit()
 })
 
-t.task(objs => {
-  str1 = JSON.stringify(expanded)
-  str2 = JSON.stringify(objs[0])
-  if (str1 !== str2) {
-    t.error(new Error('EXPECTED ' + str1 + '\nGOT ' + str2))
-  }
-  t.next()
-  ipfs.stop(t)
-})
-
-t.task(hashes => {
-  recording.recordingOf = { '/': hashes[0] }
-  t.next()
-  ipfs.get(hashes, true, t)
-})
-
-t.task(hashes => {
-  composition.composer = [{ '/': hashes[0] }, { '/': hashes[1] }]
-  composition.publisher = { '/': hashes[2] }
-  t.next()
-  ipfs.addObjects([composition], t)
-})
-
-t.task(() => {
-  t.next()
-  ipfs.addObjects([composer1, composer2, publisher], t)
-})
-
-ipfs.start('/tmp/test', t)
+ipfs.start('/tmp/test', tasks, t1)
 
 setTimeout(() => {}, 3000)
