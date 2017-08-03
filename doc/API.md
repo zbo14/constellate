@@ -8,30 +8,49 @@
 const Constellate = require('./lib/constellate')
 
 const constellate = new Constellate()
-
-constellate.start(err => {})
 ```
 
-#### constellate.start
+#### constellate.IPFS
 
 ##### Parameters
 
+`string` [optional] - the IPFS repo path
+
 `Function` - callback with the signature `function (err)`
+
+#### constellate.Swarm
+
+##### Paramters
+
+`string` - the Swarm HTTP API endpoint
 
 #### constellate.importContent
 
 ##### Parameters
 
-`File[]` - audio, image, and/or video files
+`Object[]` - an array of objects with the following properties
+```js
+{
+  content: <Buffer ...>,
+  name: 'filename',
+  type: 'audio/*|image/*|video/*'
+}
+```
 
 `Function` - callback with the signature `function (err)`
-
 
 #### constellate.importMetadata
 
 ##### Parameters
 
-`File[]` - csv or json files
+`Object[]` - an array of objects with the following properties
+```js
+{
+  content: 'text',
+  name: 'filename',
+  type: 'application/json|text/csv'
+}
+```
 
 `Function` - callback with the signature `function (err)`
 
@@ -39,11 +58,23 @@ constellate.start(err => {})
 
 ##### Parameters
 
+`string` - the metadata service to use
+
 `Function` - callback with the signature `function (err)`
 
-#### constellate.upload
+#### constellate.uploadContent
 
 ##### Parameters
+
+`string` - the content service to use
+
+`Function` - callback with the signature `function (err)`
+
+#### constellate.pushIPLD
+
+##### Paramters
+
+`string` - the metadata service to use
 
 `Function` - callback with the signature `function (err)`
 
@@ -51,23 +82,33 @@ constellate.start(err => {})
 
 ##### Parameters
 
-`string` - the hash and/or path to query
+`string` - the content service to use
 
-`Function` - callback with the signature `function (err, file)`
+`string` - the path to query
+
+`Function` - callback with the signature `function (err, object)`
 
 #### constellate.getMetadata
 
 ##### Parameters
 
-`string[]` - the hashes and/or paths to query
+`string` - the metadata service to use
 
-`Function` - callback with the signature `function (err, objects)`
+`string[]` - the path to query
 
-#### constellate.exportHashes
+`Function` - callback with the signature `function (err, object)`
+
+#### constellate.exportFileHashes
 
 ##### Returns
 
-`Object` - an object with file and metadata hashes
+`Object` - an object with file hashes
+
+#### constellate.exportMetaHashes
+
+##### Returns
+
+`Object` - an object with metadata hashes
 
 #### constellate.exportIPLD
 
@@ -75,8 +116,30 @@ constellate.start(err => {})
 
 `Object[]` - an array of IPLD objects
 
-#### constellate.stop
+### Browser
+
+#### constellate.Browser.importContent
 
 ##### Parameters
 
+`File[]` - audio, image, or video files
+
 `Function` - callback with the signature `function (err)`
+
+#### constellate.Browser.importMetadata
+
+##### Parameters
+
+`File[]` - CSV or JSON files
+
+`Function` - callback with the signature `function (err)`
+
+#### constellate.Browser.getContent
+
+##### Parameters
+
+`string` - the content service to use
+
+`string` - the path to query
+
+`Function` - callback with the signature `function (err, file)`

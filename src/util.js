@@ -19,22 +19,23 @@ const bufferToArrayBuffer = (buf: Buffer): ArrayBuffer => {
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length)
 }
 
-const bufferToFile = (buf: Buffer, name: string, t: Object, id?: number|string) => {
+const bufferToFile = (buf: Buffer, name: string, tasks: Object, t: number, i?: number) => {
   const ab = bufferToArrayBuffer(buf)
   let type = fileType(buf.slice(0, 4100))
   if (!type) {
-    return t.error('could not get file type')
+    return tasks.error('could not get file type')
   }
   type = type.mime.split('/')[0] + '/' + type.ext // e.g. audio/mpeg -> audio/mp3
-  t.run(new File([ab], name, { type }), id)
+  const file = new File([ab], name, { type })
+  tasks.run(t, file, i)
 }
 
 const capitalize = (str: string): string => {
   return str.charAt(0).toUpperCase() + str.slice(1)
 }
 
-const cloneObject = (obj: Object): Object => {
-  return JSON.parse(JSON.stringify(obj))
+const clone = (x: any): Object => {
+  return JSON.parse(JSON.stringify(x))
 }
 
 const fileToAnchor = (file: File, type: string): HTMLAnchorElement => {
@@ -54,12 +55,11 @@ const isBoolean = (bool: any): boolean => {
 }
 
 const isMerkleLink = (link: any): boolean => {
-  // isString(link['/'])
   return link && link.constructor === Object && link['/'] && Object.keys(link).length === 1
 }
 
 const isNumber = (num: any): boolean => {
-  return typeof num === 'number' &&  num !== NaN
+  return typeof num === 'number' &&  !isNaN(num)
 }
 
 const isObject = (obj: any): boolean => {
@@ -67,7 +67,7 @@ const isObject = (obj: any): boolean => {
 }
 
 const isString = (str: any): boolean => {
-  return typeof str === 'string' && str.length
+  return typeof str === 'string' && !!str.length
 }
 
 const newArray = (_default: any, length: number): any[] => {
@@ -106,6 +106,8 @@ const sort = (x: any, y: any) => {
   return 0
 }
 
+// adapted from https://stackoverflow.com/questions/16167581/sort-object-properties-and-json-stringify#comment73545624_40646557
+
 const orderStringify = (x: any, space?: number): string => {
     const keys = []
     JSON.stringify(x, (k, v) => {
@@ -118,24 +120,26 @@ const orderStringify = (x: any, space?: number): string => {
     return JSON.stringify(x, keys.sort(), space)
 }
 
-const orderObject = (x: any) => {
+const order = (x: any) => {
     return JSON.parse(orderStringify(x))
 }
 
-const readFileAs = (file: File, readAs: string, t: Object, id: number|string) => {
+const readFileAs = (file: File, readAs: string, tasks: Object, t: number, i: number) => {
   const reader = new FileReader()
-  reader.onload = () => t.run(reader.result, id)
+  reader.onload = () => {
+    tasks.run(t, reader.result, i)
+  }
   if (readAs === 'arraybuffer') {
     reader.readAsArrayBuffer(file)
   } else if (readAs === 'text') {
     reader.readAsText(file)
   } else {
-    t.error(new Error('unexpected readAs: ' + readAs))
+    tasks.error('unexpected readAs: ' + readAs)
   }
 }
 
 const splice = (arr: any[], start: number, deleteCount: number, ...items: any[]): any[] => {
-  return arr.slice(0, start).concat(items).concat(arr.slice(start+1+deleteCount))
+  return arr.slice(0, start).concat(items).concat(arr.slice(start+deleteCount))
 }
 
 const transform = (obj: Object, fn: Function) => {
@@ -160,7 +164,7 @@ const traverse = (val: any, fn: Function) => {
     let i
     if (isArray(val)) {
       for (i = 0; i < val.length; i++) {
-        _traverse(trail, val[i], fn)
+        _traverse(trail + '.' + i, val[i], fn)
       }
     } else if (isObject(val)) {
       let fullPath
@@ -185,16 +189,17 @@ function Tasks() {
     t = 0
   }
   this.add = (onRun: Function): number => {
-    if (done) return -1
+    if (done) {
+      return -1
+    }
     e.on('run-task' + t, onRun)
     return t++
   }
   this.run = (t: number, ...args: any[]) => {
     if (done) return
     if (t < 0) {
-      cb(null, ...args)
       done = true
-      return
+      return cb(null, ...args)
     }
     e.emit('run-task' + t, ...args)
   }
@@ -214,7 +219,7 @@ module.exports = {
   bufferToArrayBuffer,
   bufferToFile,
   capitalize,
-  cloneObject,
+  clone,
   fileToAnchor,
   isArray,
   isBoolean,
@@ -223,7 +228,7 @@ module.exports = {
   isObject,
   isString,
   newArray,
-  orderObject,
+  order,
   orderStringify,
   readFileAs,
   splice,

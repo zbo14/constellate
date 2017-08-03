@@ -1,2 +1,2 @@
-name,composer,lyricist,publisher,owner,amount
-song,@composer,@lyricist,@publisher,"@composer,@publisher","25,75"
+name,composer,lyricist,publisher
+song,@composer,@lyricist,@publisher

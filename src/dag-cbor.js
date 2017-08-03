@@ -11,7 +11,7 @@ const {
   isString,
   orderStringify,
   transform
-} = require('../lib/util.js')
+} = require('../lib/util')
 
 // @flow
 
@@ -68,12 +68,16 @@ const serialize = (node: Object, tasks: Object, t: number, i?: number) => {
   const seen = []
   let cid
   const tagged = transform(node, val => {
-    if (!isObject(val)) return val
+    if (!isObject(val)) {
+      return val
+    }
     if (seen.some(obj => orderStringify(obj) === orderStringify(val))) {
       return tasks.error('The object passed has circular references')
     }
     seen.push(val)
-    if (!(cid = val['/'])) return val
+    if (!(cid = val['/'])) {
+      return val
+    }
     if (isString(cid)) {
       cid = new CID(cid).buffer
     }
@@ -115,7 +119,7 @@ module.exports = {
       try {
         const mh = multihash.encode(sha2_256(data), 'sha2-256')
         const cid = new CID(version, codec, mh)
-        tasks.run(t, cid, i)
+        tasks.run(t, cid, data, i)
       } catch(err) {
         tasks.error(err)
       }
@@ -142,5 +146,6 @@ module.exports = {
         break
       }
     }
+    tasks.run(t, val, remPath, i)
   }
 }

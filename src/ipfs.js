@@ -2,7 +2,8 @@
 
 const Block = require('ipfs-block')
 const CID = require('cids')
-const { DAGNode } = require('ipld-dag-pb')
+const dagCBOR = require('../lib/dag-cbor')
+const DAGNode = require('ipld-dag-pb').DAGNode
 const IPFS = require('ipfs')
 const isIpfs = require('is-ipfs')
 const Repo = require('ipfs-repo')
@@ -10,15 +11,13 @@ const UnixFS = require('ipfs-unixfs')
 const wrtc = require('wrtc')
 const WStar = require('libp2p-webrtc-star')
 
-const dagCBOR = require('../lib/dag-cbor')
-
 const {
     isArray,
     isMerkleLink,
     isObject,
     order,
     transform
-} = require('../lib/util.js')
+} = require('../lib/util')
 
 // @flow
 
@@ -59,9 +58,7 @@ THE SOFTWARE.
 
 */
 
-const wstar = new WStar({
-    wrtc
-})
+const wstar = new WStar({ wrtc })
 
 const Ipfs = {}
 
@@ -78,53 +75,16 @@ Ipfs.ContentService = function (files: Object) {
   this.hash = (node: Object, tasks: Object, t: number, i?: number) => {
     const file = new UnixFS('file', node.content)
     DAGNode.create(file.marshal(), (err, dagNode) => {
-      if (err) return tasks.error(err)
-      tasks.run(t, dagNode.toJSON().multihash, i)
+      if (err) {
+        return tasks.error(err)
+      }
+      const mh = dagNode.toJSON().multihash
+      tasks.run(t, mh, i)
     })
   }
 
-  /*
-
-  this.hash = (node: Object, tasks: Object, t: number, i?: number) => {
-    tasks.run(t, node.toJSON().multihash, i)
-  }
-
-  this.resolve = dagPB.resolve
-
-  this.get = (cid: Object, tasks: Object, t: number, i?: number) => {
-    if (cid.codec !== dagPB.codec) {
-      return tasks.error(`expected codec="${dagPB.codec}", got "${cid.codec}"`)
-    }
-    if (cid.version !== dagPB.version) {
-      return tasks.error(`expected version=${dagPB.version}, got ${cid.version}`)
-    }
-    blockService.get(cid, (err, block) => {
-      if (err) return tasks.error(err)
-      dagPB.deserialize(block.data, tasks, t, i)
-    })
-  }
-
-  this.put = (node: Object, tasks: Object, t: number, i?: number) => {
-    const t1 = tasks.add(cid => {
-      blockService.put(new Block(node.data, cid), err => {
-        if (err) return tasks.error(err)
-        tasks.run(t, cid, i)
-      })
-    })
-    dagPB.cid(node, tasks, t1)
-  }
-
-  */
-
-  this.resolve = (node: Object, path: string, tasks: Object, t: number, i?: number) => {
-    if (node.path !== path) {
-      return tasks.error(`expected path=${node.path}, got ` + path)
-    }
-    tasks.run(t, node.content, '', i)
-  }
-
-  this.get = (cid: Object, tasks: Object, t: number, i?: number) => {
-    files.get(cid.multihash, (err, stream) => {
+  this.get = (path: string, tasks: Object, t: number, i?: number) => {
+    files.get(path, (err, stream) => {
       if (err) {
         return tasks.error(err)
       }
@@ -145,9 +105,10 @@ Ipfs.ContentService = function (files: Object) {
 
   this.put = (node: Object, tasks: Object, t: number, i?: number) => {
     files.add(node, (err, results) => {
-      if (err) return tasks.error(err)
-      const cid = new CID(results[0].hash)
-      tasks.run(t, cid, i)
+      if (err) {
+        return tasks.error(err)
+      }
+      tasks.run(t, results[0].hash, i)
     })
   }
 }
@@ -171,7 +132,7 @@ Ipfs.MetadataService = function (blockService: Object) {
     const t1 = tasks.add(cid => {
       tasks.run(t, cid.toBaseEncodedString(), i)
     })
-    dagCBOR.cid(node, tasks, t1)
+    dagCBOR.cid(node.data, tasks, t1)
   }
 
   this.isValidHash = (hash: string): boolean => {
@@ -192,8 +153,8 @@ Ipfs.MetadataService = function (blockService: Object) {
     if (cid.version !== dagCBOR.version) {
       return tasks.error(`expected version=${dagCBOR.version}, got ${cid.version}`)
     }
-    const t1 = tasks.add(data => {
-      data = order(transform(data, val => {
+    const t1 = tasks.add(obj => {
+      obj = order(transform(obj, val => {
         if (!isMerkleLink(val)) {
           return val
         }
@@ -201,7 +162,7 @@ Ipfs.MetadataService = function (blockService: Object) {
           '/': new CID(val['/']).toBaseEncodedString()
         }
       }))
-      tasks.run(t, { data }, i)
+      tasks.run(t, obj, i)
     })
     blockService.get(cid, (err, block) => {
       if (err) return tasks.error(err)
@@ -212,7 +173,9 @@ Ipfs.MetadataService = function (blockService: Object) {
   this.put = (node: Object, tasks: Object, t: number, i?: number) => {
     const t1 = tasks.add((cid, data) => {
       blockService.put(new Block(data, cid), err => {
-        if (err) return tasks.error(err)
+        if (err) {
+          return tasks.error(err)
+        }
         tasks.run(t, cid, i)
       })
     })

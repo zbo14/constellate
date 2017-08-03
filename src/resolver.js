@@ -1,8 +1,5 @@
 'use strict'
 
-const Block = require('ipfs-block')
-const CID = require('cids')
-
 const {
   isArray,
   isMerkleLink,
@@ -10,7 +7,7 @@ const {
   order,
   transform,
   traverse
-} = require('../lib/util.js')
+} = require('../lib/util')
 
 // @flow
 
@@ -68,7 +65,7 @@ module.exports = function (service: Object) {
         }
         cid = val.cid
         if (val.remPath) {
-          path = val.remPath
+          path = val.remPath + '/' + path
         }
       }
       service.get(cid, tasks, t1)
@@ -92,37 +89,36 @@ module.exports = function (service: Object) {
       vals.push(val)
     })
     if (!vals.length) {
-      return tasks.run(t, expanded, i)
+        return tasks.run(t, expanded, i)
     }
     let count = 0, inner, keys, lastKey, t1, t2, x
     t1 = tasks.add((val, j) => {
-      vals[j] = val
-      if (++count !== vals.length) return
-      count = 0
-      for (j = 0; j < vals.length; j++) {
-        this.expand(vals[j], tasks, t2, j)
-      }
+        this.expand(val, tasks, t2, j)
     })
     t2 = tasks.add((val, j) => {
-      vals[j] = val
-      if (++count !== vals.length) return
-      for (j = 0; j < vals.length; j++) {
-        keys = trails[j].split('.')
-        lastKey = keys.pop()
+      keys = trails[j].split('.')
+      lastKey = keys.pop()
+      try {
         inner = keys.reduce((result, key) => {
-            return result[key]
+          if (!isNaN(Number(key))) {
+              key = Number(key)
+          }
+          return result[key]
         }, expanded)
-        x = inner[lastKey]
-        if ((isObject(x) && !x['/']) || (isArray(x) && !x[0]['/'])) {
-            inner[lastKey] = [].concat(x, vals[j])
-        } else {
-            inner[lastKey] = vals[j]
-        }
+      } catch (err) {
+        tasks.error(err)
       }
+      x = inner[lastKey]
+      if ((isObject(x) && !x['/']) || (isArray(x) && !x[0]['/'])) {
+          inner[lastKey] = [].concat(x, val)
+      } else {
+          inner[lastKey] = val
+      }
+      if (++count !== vals.length) return
       tasks.run(t, expanded, i)
     })
     for (let j = 0; j < vals.length; j++) {
-      this.get(vals[j].cid, vals[j].remPath, tasks, t1, j)
+        this.get(vals[j].cid, vals[j].remPath, tasks, t1, j)
     }
   }
 }

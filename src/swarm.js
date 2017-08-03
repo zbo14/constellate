@@ -87,24 +87,20 @@ const swarmHash = (data: Buffer, tasks: Object, t: number, i?: number) => {
    if (!depth) {
      return hashChunk(chunk, size, tasks, t, i)
    }
-   let chunks, count, secSize
+   let chunks, count = 0, secSize
    const t1 = tasks.add((chunk, j) => {
      chunks[j] = chunk
-     if (--count) return
-     hashChunk(Buffer.concat(chunks), tasks, t, i)
+     if (++count !== chunks.length) return
+     hashChunk(Buffer.concat(chunks), size, tasks, t, i)
    })
-   count = Math.round(treeSize/size)
-   if (treeSize % size) {
-     count++
-   }
-   chunks = new Array(count)
-   for (let j = 0; j < chunks.length; j++) {
-     if (size - j < treeSize) {
-       secSize = size - j
+   chunks = new Array(size%treeSize ? Math.round(size/treeSize)+1 : Math.round(size/treeSize))
+   for (let j = 0, s = 0; s < size; j++, s += treeSize) {
+     if (size - s < treeSize) {
+       secSize = size - s
      } else {
        secSize = treeSize
      }
-     split(chunk.slice(j, j+secSize), depth-1, secSize, treeSize/128, tasks, t1, j)
+     split(chunk.slice(s, s+secSize), depth-1, secSize, treeSize/128, tasks, t1, j)
    }
  }
 
@@ -141,57 +137,28 @@ SOFTWARE.
 
 const Swarm = {}
 
-const codec = 'swarm'
-const version = 1
+Swarm.ContentService = function (url: string) {
 
-Swarm.Util = {
-
-  codec,
-
-  version,
-
-  cid: (node: Buffer, tasks: Object, t: number, i?: number) => {
-    const t1 = tasks.add(data => {
-      try {
-        const mh = multihash.encode(data, 'keccak-256')
-        const cid = new CID(version, codec, mh)
-        tasks.run(t, cid, i)
-      } catch(err) {
-        tasks.error(err)
-      }
-    })
-    swarmHash(node, tasks, t1)
-  }
-}
-
-Swarm.ContentService = function (url: string = 'http://swarm-gateways.net/') {
   this.name = 'swarm-content-service'
+
   this.hash = (node: Object, tasks: Object, t: number, i?: number) => {
-    const t1 = tasks.add(cid => {
-      tasks.run(t, cid.toBaseEncodedString(), i)
+    const t1 = tasks.add(data => {
+      tasks.run(t, data.toString('hex'), i)
     })
-    Swarm.util.cid(node, tasks, t1)
+    swarmHash(node.content, tasks, t1)
   }
+
   this.isValidHash = (hash: string): boolean => {
     return /^[a-f0-9]{64}$/.test(hash)
   }
+
   this.pathToIRI = (path: string): string => {
-    return url + 'bzzr://' + path
+    return url + '/bzzr://' + path
   }
-  this.resolve = (node: Object, path: string, tasks: Object, t: number, i?: number) => {
-    node.path += '/' + path
-    tasks.run(t, node, '', i)
-  }
-  this.get = (cid: Object, tasks: Object, t: number, i?: number) => {
-    if (cid.codec !== codec) {
-      return tasks.error(`expected codec="${codec}", got ` + cid.codec)
-    }
-    if (cid.version !== version) {
-      return tasks.error(`expected version=${version}, got ` + cid.version)
-    }
-    const hash = multihash.decode(cid.multihash).toString('hex')
+
+  this.get = (path: string, tasks: Object, t: number, i?: number) => {
     request(
-      this.pathToIRI(hash),
+      this.pathToIRI(path),
       { responseType: 'arraybuffer' },
       (err, data, res) => {
         if (err) {
@@ -200,13 +167,14 @@ Swarm.ContentService = function (url: string = 'http://swarm-gateways.net/') {
         if (res.statusCode !== 200) {
           return tasks.error(err)
         }
-        tasks.run(t, Buffer.from(data), i)
+        const content = Buffer.from(data)
+        tasks.run(t, { content }, i)
       }
     )
   }
-  this.put = (node: Buffer, tasks: Object, t: number, i?: number) => {
-    const body = node.toString('binary')
-    request(url + 'bzzr:/', { method: 'POST', body }, (err, data, res) => {
+
+  this.put = (node: Object, tasks: Object, t: number, i?: number) => {
+    request(url + '/bzzr:', { method: 'POST', body: node.content }, (err, data, res) => {
       if (err) {
         return tasks.error(err)
       }
@@ -216,9 +184,9 @@ Swarm.ContentService = function (url: string = 'http://swarm-gateways.net/') {
       if (!this.isValidHash(data)) {
         return tasks.error('invalid hash: ' + data)
       }
-      const mh = multihash.encode(Buffer.from(data, 'hex'), 'keccak-256')
-      const cid = new CID(version, codec, mh)
-      tasks.run(t, cid, i)
+      tasks.run(t, data, i)
     })
   }
 }
+
+module.exports = Swarm

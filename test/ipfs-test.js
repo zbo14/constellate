@@ -1,5 +1,7 @@
 'use strict'
 
+const assert = require('chai').assert
+
 const Ipfs = require('../lib/ipfs.js')
 const Resolver = require('../lib/resolver.js')
 
@@ -32,12 +34,6 @@ const composition = {
   name: 'song'
 }
 
-const recording = {
-  '@context': 'http://schema.org/',
-  '@type': 'MusicRecording',
-  name: 'version title'
-}
-
 const expanded = {
   '@context': 'http://schema.org/',
   '@type': 'MusicComposition',
@@ -55,57 +51,49 @@ const tasks = new Tasks()
 
 tasks.init()
 
-let actual, count = 0, expected, i, resolver, service,
-    t1, t2, t3, t4, t5, t6
+let count = 0, resolver, service, t = 0
 
-t1 = tasks.add(ipfs => {
+tasks.add(ipfs => {
   service = new Ipfs.MetadataService(ipfs._blockService)
   // TODO: content service
   resolver = new Resolver(service)
   composition.composer = new Array(2)
-  service.put(composer1, tasks, t2, 0)
-  service.put(composer2, tasks, t2, 1)
-  service.put(publisher, tasks, t2, 2)
+  service.put({ data: composer1 }, tasks, t, 0)
+  service.put({ data: composer2 }, tasks, t, 1)
+  service.put({ data: publisher }, tasks, t++, 2)
 })
 
-t2 = tasks.add((cid, j) => {
+tasks.add((cid, j) => {
   if (j === 2) {
-    composition.publisher = { '/': cid.toBaseEncodedString() }
+    composition.publisher = {
+      '/': cid.toBaseEncodedString()
+    }
   } else {
-    composition.composer[j] = { '/': cid.toBaseEncodedString() }
+    composition.composer[j] = {
+      '/': cid.toBaseEncodedString()
+    }
   }
   if (++count !== 3) return
-  service.put(composition, tasks, t3)
+  service.put({ data: composition }, tasks, t++)
 })
 
-t3 = tasks.add(cid => {
-  recording.recordingOf = { '/': cid.toBaseEncodedString() }
-  resolver.get(cid, '', tasks, t4)
+tasks.add(cid => {
+  resolver.get(cid, '', tasks, t++)
 })
 
-t4 = tasks.add(obj => {
-  actual = JSON.stringify(obj)
-  expected = JSON.stringify(order(composition))
-  if (expected !== actual) {
-    return tasks.error('EXPECTED ' + expected + '\nGOT ' + actual)
-  }
-  resolver.expand(obj, tasks, t5)
+tasks.add(result => {
+  assert.deepEqual(result, order(composition), 'query result does not equal composition')
+  resolver.expand(result, tasks, t++)
 })
 
-t5 = tasks.add(obj => {
-  actual = JSON.stringify(obj)
-  expected = JSON.stringify(order(expanded))
-  if (expected !== actual) {
-    return tasks.error('EXPECTED ' + expected + '\nGOT ' + actual)
-  }
-  ipfs.stop(tasks, t6)
+tasks.add(result => {
+  assert.deepEqual(result, order(expanded), 'query result does not equal expanded composition')
+  ipfs.stop(tasks, t++)
 })
 
-t6 = tasks.add(() => {
+tasks.add(() => {
   console.log('Done')
   process.exit()
 })
 
-ipfs.start('/tmp/test', tasks, t1)
-
-setTimeout(() => {}, 3000)
+ipfs.start('/tmp/ipfs-test', tasks, t++)

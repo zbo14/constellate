@@ -1,10 +1,10 @@
-'use strict';
+'use strict'
 
-const Web3 = require('web3');
+const Web3 = require('web3')
 
 const {
   order
-} = require('../lib/util.js');
+} = require('../lib/util')
 
 // @flow
 
@@ -14,117 +14,151 @@ const {
 
 module.exports = function(provider: Object) {
 
-  const web3 = new Web3(provider);
+  const web3 = new Web3(provider)
 
   this.callContract = (
     contract: Object, from: string, method: string, params: any[],
-    to: string, value: number, t: Object, id?: number|string) => {
-    const instance = contract.at(to);
-    value *= 1.0e18;
+    to: string, value: number, tasks: Object, t: number, i?: number) => {
+    const instance = contract.at(to)
+    value *= 1.0e18
     instance[method].estimateGas((err, gas) => {
-      if (err) return t.error(err);
+      if (err) {
+        return tasks.error(err)
+      }
       instance[method].call(...params, { from, gas, value }, (err, val) => {
-        if (err) return t.error(err);
-        t.run(val, id);
-      });
-    });
+        if (err) {
+          return tasks.error(err)
+        }
+        tasks.run(t, val, i)
+      })
+    })
   }
 
-  this.deployContract = (contract: Object, from: string, t: Object, id?: number|string) => {
-    const data = contract.code;
+  this.deployContract = (contract: Object, from: string, tasks: Object, t: number, i?: number) => {
+    const data = contract.code
     web3.eth.estimateGas({ data }, (err, gas) => {
-      if (err) return t.error(err);
+      if (err) {
+        return tasks.error(err)
+      }
       contract.new({ data, from, gas }, (err, deployed) => {
-        if (err) return t.error(err);
-        if (deployed.address) t.run(deployed, id);
-      });
-    });
+        if (err) {
+          return tasks.error(err)
+        }
+        if (deployed.address) {
+          tasks.run(t, deployed, i)
+        }
+      })
+    })
   }
 
-  this.getAccounts = (t: Object, id?: number|string) => {
+  this.getAccounts = (tasks: Object, t: number, i?: number) => {
     web3.eth.getAccounts((err, accounts) => {
-      if (err) return t.error(err);
-      t.run(accounts, id);
-    });
+      if (err) {
+        return tasks.error(err)
+      }
+      tasks.run(t, accounts, i)
+    })
   }
 
-  this.getAccountStatus = (address: string, t: Object, id?: number|string) => {
+  this.getAccountStatus = (address: string, tasks: Object, t: number, i?: number) => {
     web3.eth.getBalance(address, (err, balance) => {
-      if (err) return t.error(err);
-        web3.eth.getTransactionCount(address, (err, nonce) => {
-        if (err) return t.error(err);
-        balance /= 1.0e18;
-        t.run(balance, nonce, id);
-      });
-    });
+      if (err) {
+        return tasks.error(err)
+      }
+      web3.eth.getTransactionCount(address, (err, nonce) => {
+        if (err) {
+          return tasks.error(err)
+        }
+        balance /= 1.0e18
+        tasks.run(t, balance, nonce, i)
+      })
+    })
   }
 
-  this.getBlock = (argv: number|string, t: Object, id?: number|string) => {
+  this.getBlock = (argv: number|string, tasks: Object, t: number, i?: number) => {
     web3.eth.getBlock(argv, (err, block) => {
-      if (err) return t.error(err);
-      t.run(order(block), id);
-    });
+      if (err) {
+        return tasks.error(err)
+      }
+      tasks.run(t, order(block), i)
+    })
   }
 
-  this.getContractCode = (address: string, t: Object, id?: number|string) => {
+  this.getContractCode = (address: string, tasks: Object, t: number, i?: number) => {
     web3.eth.getCode(address, (err, code) => {
-      if (err) return t.error(err);
-      t.run(code, id)
-    });
+      if (err) {
+        return tasks.error(err)
+      }
+      tasks.run(t, code, i)
+    })
   }
 
-  this.getTransaction = (hash: string, t: Object, id?: number|string) => {
+  this.getTransaction = (hash: string, tasks: Object, t: number, i?: number) => {
     web3.eth.getTransaction(hash, (err, tx) => {
-      if (err) return t.error(err);
-      t.run(order(tx), id);
-    });
+      if (err) {
+        return tasks.error(err)
+      }
+      tasks.run(t, order(tx), i)
+    })
   }
 
-  this.getTransactionReceipt = (hash: string, t: Object, id?:number|string) => {
+  this.getTransactionReceipt = (hash: string, tasks: Object, t: number, i?: number) => {
     web3.eth.getTransactionReceipt(hash, (err, receipt) => {
-      if (err) return t.error(err);
-      t.run(order(receipt), id);
-    });
+      if (err) {
+        return tasks.error(err)
+      }
+      tasks.run(t, order(receipt), i)
+    })
   }
 
-  this.newContract = (source: string, t: Object, id?: number|string) => {
+  this.newContract = (source: string, tasks: Object, t: number, i?: number) => {
     web3.eth.compile.solidity(source, (err, compiled) => {
-      if (err) return t.error(err);
-      const contract = web3.eth.contract(compiled.info.abiDefinition);
-      contract.code = compiled.code;
-      t.run(contract, id);
-    });
+      if (err) {
+        return tasks.error(err)
+      }
+      const contract = web3.eth.contract(compiled.info.abiDefinition)
+      contract.code = compiled.code
+      tasks.run(t, contract, i)
+    })
   }
 
-  this.sendEther = (from: string, to: string, value: number, t: Object, id?: number|string)  => {
-    value *= 1.0e18;
+  this.sendEther = (from: string, to: string, value: number, tasks: Object, t: number, i?: number)  => {
+    value *= 1.0e18
     web3.eth.sendTransaction({ from, to, value }, (err, hash) => {
-      if (err) return t.error(err);
-      t.run(hash, id)
-    });
+      if (err) {
+        return tasks.error(err)
+      }
+      tasks.run(t, hash, i)
+    })
   }
 
   this.sendTransaction = (
     contract: Object, from: string, method: string, params: any[],
-    to: string, value: number, t: Object, id?: number|string) => {
-    const instance = contract.at(to);
-    value *= 1.0e18;
+    to: string, value: number, tasks: Object, t: number, i?: number) => {
+    const instance = contract.at(to)
+    value *= 1.0e18
     return instance[method].estimateGas((err, gas) => {
-      if (err) return t.error(err);
+      if (err) {
+        return tasks.error(err)
+      }
       instance[method].sendTransaction(...params, { from, gas, value }, (err, hash) => {
-        if (err) return t.error(err);
-        t.run(hash, id);
-      });
-    });
+        if (err) {
+          return tasks.error(err)
+        }
+        tasks.run(t, hash, i)
+      })
+    })
   }
 
-  this.signData = (address: string, data: string, t: Object, id?: number|string) => {
+  this.signData = (address: string, data: string, tasks: Object, t: number, i?: number) => {
     web3.eth.sign(address, new Web3().sha3(data), (err, sig) => {
-      if (err) return t.error(err);
-      const r = '0x' + sig.slice(2, 66);
-      const s = '0x' + sig.slice(66, 130);
-      const v = parseInt(sig.slice(130, 132), 16) + 27;
-      t.run({ r, s, v }, id);
-    });
+      if (err) {
+        return tasks.error(err)
+      }
+      const r = '0x' + sig.slice(2, 66)
+      const s = '0x' + sig.slice(66, 130)
+      const v = parseInt(sig.slice(130, 132), 16) + 27
+      tasks.run(t, { r, s, v }, i)
+    })
   }
 }
