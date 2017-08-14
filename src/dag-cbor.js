@@ -6,6 +6,7 @@ const CID = require('cids')
 const multihash = require('multihashes')
 
 const {
+  errPathNotFound,
   isArray,
   isObject,
   isString,
@@ -64,22 +65,22 @@ const decoder = new cbor.Decoder({
   }
 })
 
-const serialize = (node: Object, tasks: Object, t: number, i?: number) => {
+const serialize = (elem: Object, tasks: Object, t: number, i?: number) => {
   const seen = []
   let cid
-  const tagged = transform(node, val => {
+  const tagged = transform(elem, val => {
     if (!isObject(val)) {
       return val
     }
     if (seen.some(obj => orderStringify(obj) === orderStringify(val))) {
-      return tasks.error('The object passed has circular references')
+      return tasks.error('the object passed has circular references')
     }
     seen.push(val)
     if (!(cid = val['/'])) {
       return val
     }
     if (isString(cid)) {
-      cid = new CID(cid).buffer
+      cid = new CID(cid.split('/')[0]).buffer
     }
     return new cbor.Tagged(CID_CBOR_TAG, Buffer.concat([
       Buffer.from('00', 'hex'), cid
@@ -107,14 +108,14 @@ module.exports = {
 
   deserialize: (data: Buffer, tasks: Object, t: number, i?: number) => {
     try {
-      const node = decoder.decodeFirst(data)
-      tasks.run(t, node, i)
+      const elem = decoder.decodeFirst(data)
+      tasks.run(t, elem, i)
     } catch(err) {
       tasks.error(err)
     }
   },
 
-  cid: (node: Object, tasks: Object, t: number, i?: number) => {
+  cid: (elem: Object, tasks: Object, t: number, i?: number) => {
     const t1 = tasks.add(data => {
       try {
         const mh = multihash.encode(sha2_256(data), 'sha2-256')
@@ -124,15 +125,15 @@ module.exports = {
         tasks.error(err)
       }
     })
-    serialize(node, tasks, t1)
+    serialize(elem, tasks, t1)
   },
 
-  resolve: (node: Object, path: string, tasks: Object, t: number, i?: number) => {
+  resolve: (elem: Object, path: string, tasks: Object, t: number, i?: number) => {
     if (!path || path === '/') {
-      return tasks.run(t, node, '', i)
+      return tasks.run(t, elem, '', i)
     }
     const parts = path.split('/')
-    let remPath = '', val = node
+    let remPath = '', val = elem
     for (let j = 0; j < parts.length; j++) {
       if (isArray(val) && !Buffer.isBuffer(val)) {
         val = val[Number(parts[j])]
@@ -140,7 +141,7 @@ module.exports = {
         val = val[parts[j]]
       } else {
         if (!val) {
-          return tasks.error(`could not find path="${path}"`)
+          return tasks.error(errPathNotFound(path))
         }
         remPath = parts.slice(j).join('/')
         break

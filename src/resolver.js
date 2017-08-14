@@ -47,10 +47,10 @@ const {
 
 module.exports = function (service: Object) {
 
-  this.get = (cid: Object, path: string, tasks: Object, t: number, i?: number) => {
+  const get = (cid: Object, path: string, tasks: Object, t: number, i?: number) => {
     let t1, t2
-    t1 = tasks.add(node => {
-      service.resolve(node, path, tasks, t2)
+    t1 = tasks.add(elem => {
+      service.resolve(elem, path, tasks, t2)
     })
     t2 = tasks.add((val, remPath) => {
       path = remPath
@@ -73,12 +73,30 @@ module.exports = function (service: Object) {
     service.get(cid, tasks, t1)
   }
 
-  this.expand = (node: Object, tasks: Object, t: number, i?: number) => {
-    const expanded = order(node)
+  this.get = (cid: Object, path: string, tasks: Object, t: number, i?: number) => {
+    const t1 = tasks.add(val => {
+      service.toElement(val, path, tasks, t, i)
+    })
+    get(cid, path, tasks, t1)
+  }
+
+  this.expand = (elem: Object, tasks: Object, t: number, i?: number) => {
+    const expanded = order(elem)
     const trails = []
     const vals = []
-    let parts
-    traverse(node, (trail, val) => {
+    let t1
+    if (isMerkleLink(elem)) {
+      try {
+        const { cid, remPath } = service.pathToCID(elem['/'])
+        t1 = tasks.add(result => {
+          this.expand(result, tasks, t, i)
+        })
+        return get(cid, remPath, tasks, t1)
+      } catch (err) {
+        tasks.error(err)
+      }
+    }
+    traverse(elem, (trail, val) => {
       if (!isMerkleLink(val)) return
       try {
           val = service.pathToCID(val['/'])
@@ -91,13 +109,16 @@ module.exports = function (service: Object) {
     if (!vals.length) {
         return tasks.run(t, expanded, i)
     }
-    let count = 0, inner, keys, lastKey, t1, t2, x
+    let count = 0, inner, keys, lastKey, t2, x
     t1 = tasks.add((val, j) => {
         this.expand(val, tasks, t2, j)
     })
     t2 = tasks.add((val, j) => {
-      keys = trails[j].split('.')
+      keys = trails[j].split('.').filter(Boolean)
       lastKey = keys.pop()
+      if (!isNaN(Number(lastKey))) {
+        lastKey = Number(lastKey)
+      }
       try {
         inner = keys.reduce((result, key) => {
           if (!isNaN(Number(key))) {
@@ -118,7 +139,7 @@ module.exports = function (service: Object) {
       tasks.run(t, expanded, i)
     })
     for (let j = 0; j < vals.length; j++) {
-        this.get(vals[j].cid, vals[j].remPath, tasks, t1, j)
+        get(vals[j].cid, vals[j].remPath, tasks, t1, j)
     }
   }
 }

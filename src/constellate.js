@@ -1,28 +1,34 @@
 'use strict'
 
 const aes = require('aes-js')
-// const bcrypt = require('bcryptjs')
+const base58 = require('bs58')
 const crypto = require('crypto')
-const pbkdf2 = require('pbkdf2')
+const nacl = require('tweetnacl')
 const request = require('xhr-request')
+const scrypt = require('scrypt-async')
 
 const BigchainDB = require('../lib/bigchaindb')
-const Fingerprint = require('../lib/fingerprint')
+// const Fingerprint = require('../lib/fingerprint')
 const Ipfs = require('../lib/ipfs')
 const Resolver = require('../lib/resolver')
-const Services = require('../lib/services')
 const Swarm = require('../lib/swarm')
 
 const {
     Tasks,
+    assign,
     bufferToFile,
     capitalize,
     clone,
+    errUnexpectedType,
+    getType,
     isArray,
     isObject,
+    isRecipient,
+    isSender,
     isString,
     newArray,
     order,
+    prettyJSON,
     readFileAs,
     transform,
     traverse
@@ -34,790 +40,791 @@ const {
  * @module constellate/src/constellate
  */
 
-const parseCSVs = (csvs: string[], types: string[], tasks: Object, t: number, i?: number) => {
-     if (csvs.length !== types.length) {
-         return tasks.error('different number of csvs and types')
-     }
-     let a, b, key, keys, length = 0, obj, val
-     const combined = csvs.reduce((result, csv, idx) => {
-         obj = parseCSV(csv, types[idx])
-         keys = Object.keys(obj)
-         for (a = 0; a < keys.length; a++) {
-             key = keys[a]
-             if (!result[key]) {
-                 result[key] = newArray(null, length)
-             }
-             result[key] = result[key].concat(obj[key])
-         }
-         length += obj[key].length
-         return result
-     }, {})
-     const objs = new Array(combined['name'].length)
-     keys = Object.keys(combined)
-     for (a = 0; a < objs.length; a++) {
-         obj = {}
-         for (b = 0; b < keys.length; b++) {
-             key = keys[b]
-             val = combined[key][a]
-             if (val) {
-               obj[key] = val
-             }
-         }
-         objs[a] = obj
-     }
-     tasks.run(t, objs, i)
+const ErrNoAccount = new Error('no account')
+const ErrNoCallback = new Error('no callback')
+const ErrNoDecryption = new Error('no decryption')
+const ErrNoLinkedData = new Error('no elements')
+const ErrNoHashes = new Error('no hashes')
+
+const errUnexpectedHash = (actual: string, expected: string) => {
+  return new Error(`expected hash="${expected}", got "${actual}"`)
 }
 
- const parseCSV = (csv: string, type: string): Object => {
-     // adapted from https://gist.github.com/jonmaim/7b896cf5c8cfe932a3dd
-     const data = {}
-     const lines = csv.replace(/\r/g, '').split('\n').filter(line => !!line)
-     const headers = lines[0].split(',')
-     let i
-     for (i = 0; i < headers.length; i++) {
-         data[headers[i]] = new Array(lines.length - 1)
-     }
-     data.type = newArray(type, lines.length-1)
-     let idx, queryIdx, startIdx
-     let key, length, obj, row, v, vals
-     for (i = 1; i < lines.length; i++) {
-         idx = 0, queryIdx = 0, startIdx = 0
-         obj = {}, row = lines[i]
-         if (!row.trim()) continue
-         while (idx < row.length) {
-             if (row[idx] === '"') {
-                 while (idx < row.length - 1) {
-                     if (row[++idx] === '"') break
-                 }
-             }
-             if (row[idx] === ',' || idx + 1 === row.length) {
-                 length = idx - startIdx
-                 if (idx + 1 === row.length) length++
-                 v = row.substr(startIdx, length).replace(/\,\s+/g, ',').trim()
-                 if (v[0] === '"') {
-                     v = v.substr(1)
-                 }
-                 if (v.substr(-1) === ',' || v.substr(-1) === '"') {
-                     v = v.substr(0, v.length - 1)
-                 }
-                 const key = headers[queryIdx++]
-                 if (!v) {
-                     data[key][i - 1] = null
-                 } else {
-                     vals = v.split(',')
-                     if (vals.length > 1) {
-                         data[key][i - 1] = vals
-                     } else {
-                         data[key][i - 1] = v
-                     }
-                 }
-                 startIdx = idx + 1
-             }
-             idx++
-         }
-     }
-     return data
- }
+const errInvalidPassword = (password: string) => {
+  return new Error('invalid password: ' + password)
+}
 
- const parseJSONs = (jsons: string[], types: string[], tasks: Object, t: number, i?: number) => {
-     if (jsons.length !== types.length) {
-         return tasks.error('different number of jsons and types')
-     }
-     let arr, j
-     return jsons.reduce((result, json, idx) => {
-         if (!isArray(arr = JSON.parse(json), isObject)) {
-             return tasks.error('expected array of objects')
-         }
-         for (j = 0; j < arr.length; j++) {
-             arr[j].type = types[idx]
-         }
-         return result.concat(arr)
-     }, [])
- }
+const errUnsupportedService = (name: string) => {
+  return new Error(`"${name}" is not supported`)
+}
 
- const toCSV = (arr: Array < Array < string | string[] >> ): string => {
-     let csv = '',
-         i, j, k, val
-     for (i = 0; i < arr[0].length; i++) {
-         for (j = 0; j < arr.length; j++) {
-             val = arr[j][i]
-             if (typeof val === 'string') { // isString(val)
-                 csv += val
-             } else if (isArray(val, isString)) {
-                 csv += '"'
-                 for (k = 0; k < val.length; k++) {
-                     csv += val[k]
-                 }
-                 csv += '"'
-             } else {
-                 throw new Error('unexpected value: ' + JSON.stringify(val))
-             }
-             if (j === arr.length - 1) {
-                 csv += '\n'
-             } else {
-                 csv += ','
-             }
-         }
-     }
-     return csv
- }
-
-const readFilesAs = (_files: File[], readAs: string, tasks: Object, t: number, i?: number) => {
-   const files = new Array(_files.length)
+const readFilesAs = (files: File[], readAs: string, tasks: Object, t: number, i?: number) => {
    let count = 0
    const t1 = tasks.add((result, j) => {
-     files[j].content = isString(result) ? result : Buffer.from(result)
+     files[j] = {
+       content: isString(result) ? result : Buffer.from(result),
+       name: files[j].name,
+       type: files[j].type
+     }
      if (++count !== files.length) return
      tasks.run(t, files, j)
    })
-   for (let j = 0; j < _files.length; j++) {
-     files[j] = {
-       name: _files[j].name,
-       path: '',
-       type: _files[j].type
-     }
-     readFileAs(_files[j], readAs, tasks, t1, j)
+   for (let j = 0; j < files.length; j++) {
+     readFileAs(files[j], readAs, tasks, t1, j)
    }
 }
 
-const saltLength = 20
-const iters = 100000
-const digest = 'sha256'
 const keyLength = 32
+const saltLength = 20
 
-const hashPassword2x = (password: string, salt: Buffer, tasks: Object, t: number, i?: number) => {
-  crypto.pbkdf2(password, salt, iters, keyLength, digest, (err, hash1) => {
-    if (err) {
-      return tasks.error(err)
-    }
-    crypto.pbkdf2(hash1, salt, iters, keyLength, digest, (err, hash2) => {
-      if (err) {
-        return tasks.error(err)
-      }
-      tasks.run(t, hash1, hash2, i)
+const options = {
+  N: 16384,
+  r: 8,
+  p: 1,
+  dkLen: keyLength,
+  encoding: 'hex'
+}
+
+const scrypt2x = (password: string, salt: Buffer, tasks: Object, t: number, i?: number) => {
+  scrypt(password, salt, options, result => {
+    const dkey = Buffer.from(result, 'hex')
+    scrypt(dkey, salt, options, hash => {
+      tasks.run(t, dkey, hash, i)
     })
   })
 }
 
-const defaultPath = '/tmp/constellate'
+function MetadataService({ browser, name, path }: Object) {
 
-const Constellate = {}
+  let hashes, ld, names, resolver, service
 
-module.exports = function () {
+  if (name === 'bigchaindb') {
+    service = new BigchainDB.MetadataService(path)
+  } else if (name === 'ipfs') {
+    service = new Ipfs.MetadataService(path)
+  } else {
+    throw errUnsupportedService(name)
+  }
+  resolver = new Resolver(service)
 
-    // const fp = new Fingerprint()
+  this.name = (): string => name
 
-    const services = new Services()
+  this.path = (): string => path
 
-    let decryption, fileHashes, files, ipld, meta, metaHashes, names
-
-    //-----------------------------------------------------------------------
-
-    const importDecryption = (text: string, tasks: Object, t: number, i?: number) => {
-      let dec = {}
+  const resolveMetadata = (meta: Object[], tasks: Object, t: number, i?: number) => {
+    const hashes = []
+    const idxs = []
+    let j
+    for (j = 0; j < meta.length; j++) {
+      if (isString(meta[j]['#'])) {
+          hashes.push(meta[j]['#'])
+          idxs.push(j)
+      }
+    }
+    if (!hashes.length) {
+      return tasks.run(t, meta, i)
+    }
+    const resolver = new Resolver(service)
+    let count = 0
+    const t1 = tasks.add((elem, j) => {
+      elem.data['#'] = hashes[j]
+      meta[idxs[j]] = elem.data
+      if (++count !== hashes.length) return
+      tasks.run(t, meta, i)
+    })
+    let val
+    for (j = 0; j < hashes.length; j++) {
       try {
-        dec = JSON.parse(text)
+        val = service.pathToCID(hashes[j])
+        resolver.get(val.cid, val.remPath, tasks, t1, j)
       } catch(err) {
         tasks.error(err)
       }
-      if (!dec.keys) {
-        return tasks.error('no decryption keys')
-      }
-      if (!dec.password) {
-        return tasks.error('no decryption password')
-      }
-      if (!dec.salt) {
-        return tasks.error('no decryption salt')
-      }
-      decryption = dec
-      tasks.run(t, i)
     }
+  }
 
-    const importProject = (project: Object, tasks: Object, t: number, i?: number) => {
-        if (!project.title) {
-            return tasks.error('no project title')
-        }
-        if (!project.sheets || !project.sheets.length) {
-            return tasks.error('no sheets in project')
-        }
-        meta = meta || []
-        let c, r, objs, sheet, val
-        for (let s = 0; s < project.sheets.length; s++) {
-            sheet = project.sheets[s]
-            if (!sheet.subject) {
-                return tasks.error('no sheet subject')
-            }
-            if (!sheet.cols || !sheet.cols.length) {
-                return tasks.error('no columns in sheet')
-            }
-            if (!sheet.rows || !sheet.rows.length) {
-                return tasks.error('no rows in sheet')
-            }
-            objs = (Array : any).apply(null, { length: sheet.rows.length }).map(() => {
-              return { type: sheet.subject }
-            })
-            for (c = 0; c < sheet.cols.length; c++) {
-                if (!sheet.cols[c]) {
-                    return tasks.error('empty column in sheet')
-                }
-                for (r = 0; r < sheet.rows.length; r++) {
-                    val = sheet.rows[r][c]
-                    if (val) {
-                        val = val.split(/,\s*/)
-                        if (val.length === 1) {
-                          val = val[0]
-                        }
-                        objs[r][sheet.cols[c]] = val
-                    }
-                }
-            }
-            meta.push(...objs)
-        }
-        tasks.run(t, i)
-    }
-
-    const orderMetadata = (tasks: Object, t: number, i?: number) => {
-        const ordered = []
-        let next, obj, queue = [], stop = false
-        while (meta.length) {
-            if (next) {
-                const idx = meta.findIndex(obj => obj.name === next)
-                if (idx < 0) {
-                  return tasks.error(`could not find "${next}"`)
-                }
-                obj = meta.splice(idx, 1)[0]
-            } else {
-                obj = meta.shift()
-            }
-            if (obj.type === 'Hash') {
-              continue
-            }
-            if (!obj.name) {
-              return tasks.error('no name specified')
-            }
-            if (!obj.type) {
-              return tasks.error('no type specified')
-            }
-            next = ''
-            traverse(obj, (_, val) => {
-                if (isString(val) && val[0] === '@') {
-                    val = val.slice(1)
-                    if (!next && ordered.every(obj => obj.name !== val)) {
-                        if (queue.includes(val)) {
-                            stop = true
-                            return tasks.error(`circular reference between "${val}" and "${obj.name}"`)
-                        }
-                        meta.push(obj)
-                        next = val
-                        queue.push(obj.name)
-                    }
-                }
-            })
-            if (stop) return
-            if (next) continue
-            ordered.push(obj)
-            queue = []
-        }
-        meta = ordered
-        tasks.run(t, i)
-    }
-
-    const pushIPLD = (service: Object, tasks: Object, t: number, i?: number) => {
-        if (!ipld || !ipld.length) {
-            return tasks.error('no ipld')
-        }
-        let count = 0, hash
-        const t1 = tasks.add((cid, j) => {
-            hash = cid.toBaseEncodedString()
-            if (hash !== metaHashes[names[j]]) {
-                return tasks.error(`expected hash=${metaHashes[names[j]]}, got ` + hash)
-            }
-            if (++count !== ipld.length) return
-            tasks.run(t, i)
-        })
-        for (let j = 0; j < ipld.length; j++) {
-          service.put({
-            data: ipld[j]
-            // issuer
-            // owner
-          }, tasks, t1, j)
-        }
-    }
-
-    const uploadContent = (service: Object, tasks: Object, t: number, i?: number) => {
-        if (!files || !files.length) {
-            return tasks.error('no content')
-        }
-        // const paths = new Array(files.length)
-        let count = 0
-        const t1 = tasks.add((hash, j) => {
-            if (hash !== fileHashes[files[j].name]) {
-              return tasks.error(`expected hash=${fileHashes[files[j].name]}, got ` + hash)
-            }
-            if (++count !== files.length) return
-            tasks.run(t, i)
-        })
-        for (let j = 0; j < files.length; j++) {
-            // paths[j] = '/' + files[j].name
-            service.put(files[j], tasks, t1, j)
-        }
-    }
-
-    /*
-
-    const fingerprint = (file: Object, tasks: Object, t: number, i?: number) => {
-        const t1 = tasks.add(() => {
-          tasks.run(t, fp, i)
-        })
-        const body = file.content.toString('binary')
-        request(
-            serverAddr + '/fingerprint', {
-                body,
-                method: 'POST'
-            },
-            (err, data, res) => {
-                if (err) return tasks.error(err)
-                if (res.statusCode !== 200) {
-                    return tasks.error(data)
-                }
-                fp.calc(data, tasks, t2)
-            }
-        )
-    }
-
-    */
-
-    const encrypt = (password: string, tasks: Object, t: number, i?: number) => {
-      if (!files || !files.length) {
-        return tasks.error('no content')
-      }
-      const salt = crypto.randomBytes(saltLength)
-      const t1 = tasks.add((hash1, hash2) => {
-        decryption = {}
-        decryption.keys = {}
-        decryption.hash2 = hash2.toString('hex')
-        decryption.salt = salt.toString('hex')
-        let aesCtr, key
-        for (let j = 0; j < files.length; j++) {
-          key = crypto.randomBytes(keyLength)
-          aesCtr = new aes.ModeOfOperation.ctr(key)
-          console.log(files[j].content.lenth)
-          files[j].content = Buffer.from(aesCtr.encrypt(files[j].content).buffer)
-          aesCtr = new aes.ModeOfOperation.ctr(hash1)
-          key = Buffer.from(aesCtr.encrypt(key).buffer)
-          decryption.keys[files[j].name] = key.toString('hex')
-        }
-        tasks.run(t, i)
-      })
-      hashPassword2x(password, salt, tasks, t1)
-    }
-
-    /*
-
-    const encrypt = (password: string, tasks: Object, t: number, i?: number) => {
-        let count = 0, t1, t2
-        t1 = tasks.add((ab, j) => {
-          const name = files[j].name
-          bcrypt.genSalt(10, (err, salt) => {
-            if (err) return tasks.error(err)
-            bcrypt.hash(password, salt, (err, hash) => {
-              if (err) return tasks.error(err)
-              try {
-                keys[name] = Buffer.concat([
-                    Buffer.from(hash.substr(-31), 'base64'),
-                    crypto.randomBytes(9)
-                ]).slice(0, 32)
-                const aesCtr = new aes.ModeOfOperation.ctr(keys[name])
-                const data = aesCtr.encrypt(Buffer.from(ab))
-                files[j] = new File([data], name)
-              } catch(err) {
-                tasks.error(err)
+  const orderMetadata = (resolved: Object[], tasks: Object, t: number, i?: number) => {
+      const ordered = []
+      let next, obj, queue = [], stop = false
+      while (resolved.length) {
+          if (next) {
+              const idx = resolved.findIndex(obj => obj.name === next)
+              if (idx < 0) {
+                return tasks.error(`could not find "${next}"`)
               }
-              keys[name] = keys[name].toString('hex')
-              tasks.run(t2)
-            })
+              obj = resolved.splice(idx, 1)[0]
+          } else {
+              obj = resolved.shift()
+          }
+          if (!obj.name) {
+            return tasks.error('no metadata name')
+          }
+          next = ''
+          traverse(obj, (_, val) => {
+              if (isString(val) && val[0] === '@') {
+                  val = val.slice(1)
+                  if (!next && ordered.every(obj => obj.name !== val)) {
+                      if (queue.includes(val)) {
+                          stop = true
+                          return tasks.error(`circular reference between ${val} and ${obj.name}`)
+                      }
+                      resolved.push(obj)
+                      next = val
+                      queue.push(obj.name)
+                  }
+              }
           })
-        })
-        t2 = tasks.add(() => {
-          if (++count !== files.length) return
-          tasks.run(t, i)
-        })
-        for (let j = 0; j < files.length; j++) {
-          readFileAs(files[j], 'arraybuffer', tasks, t1, j)
-        }
-    }
-
-    */
-
-    const generateIPLD = (service: Object, tasks: Object, t: number, i?: number) => {
-      if (!meta || !meta.length) {
-        return tasks.error('no metadata')
+          if (stop) return
+          if (next) continue
+          ordered.push(obj)
+          queue = []
       }
-      const hashes = []
-      const resolver = new Resolver(service)
-      let j, t2, t3;
-      ipld = [], metaHashes = {}, names = []
-      t2 = tasks.add(() => {
-        j = 0
-        orderMetadata(tasks, t3)
-      })
-      t3 = tasks.add(hash => {
-        if (j === meta.length) {
-          return tasks.run(t, i)
-        }
-        if (isString(hash)) {
-          metaHashes[meta[j++].name] = hash
-          return tasks.run(t3)
-        }
-        if (meta[j]['#']) {
-          metaHashes[meta[j].name] = meta[j++]['#']
-          return tasks.run(t3)
-        }
-        names.push(meta[j].name)
-        meta[j].name = meta[j].name.match(/^(.+?)\s*(?:\s*?\(.*?\))?$/)[1]
-        meta[j] = order(transform(meta[j], val => {
-          if (isString(val)) {
-            if (val[0] === '@') {
-              return {
-                  '/': metaHashes[val.slice(1)]
-              }
-            }
-            if (val[0] === '#') {
-              return {
-                  '/': val.slice(1)
-              }
+      tasks.run(t, ordered, i)
+  }
+
+  const generateLinkedData = (ordered: Object, sender: Object, recipient: Object|Object[], tasks: Object, t: number, i?: number) => {
+    ld = [], names = []
+    const parties : Object = {}
+    if (isSender(sender)) {
+      parties.sender = sender
+    }
+    if (isRecipient(recipient)) {
+      parties.recipient = recipient
+    }
+    let count = 0, data, elem, t1, t2
+    t1 = tasks.add(() => {
+      if (ordered[count]['#']) {
+        return tasks.run(t2, ordered[count]['#'])
+      }
+      data = clone(ordered[count])
+      names.push(data.name)
+      data.name = data.name.match(/^(.+?)\s*(?:\s*?\(.*?\))?$/)[1]
+      data = order(transform(data, val => {
+        if (isString(val)) {
+          if (val[0] === '@') {
+            return {
+                '/': hashes[val.slice(1)]
             }
           }
-          return val
-        }))
-        ipld.push(meta[j])
-        service.hash({ data: meta[j] }, tasks, t3)
-      })
-      for (j = 0; j < meta.length; j++) {
-        if (meta[j].type === 'Hash' && isString(meta[j]['#'])) {
-            hashes.push(meta[j]['#'])
-        }
-      }
-      if (!hashes.length) {
-        return tasks.run(t2)
-      }
-      let count = 0
-      const t1 = tasks.add((node, j) => {
-        node['#'] = hashes[j]
-        meta.push(node)
-        if (++count !== hashes.length) return
-        tasks.run(t2)
-      })
-      let val
-      for (j = 0; j < hashes.length; j++) {
-        try {
-          val = service.pathToCID(hashes[j])
-          resolver.get(val.cid, val.remPath, tasks, t1, j)
-        } catch(err) {
-          tasks.error(err)
-        }
-      }
-    }
-
-    const getContent = (service: Object, path: string, decrypt: Object, tasks: Object, t: number, i?: number) => {
-      let t1 = t, t2
-      if (decrypt && decrypt.name && decrypt.password) {
-        t1 = tasks.add(node => {
-          let key = decryption.keys[decrypt.name]
-          if (!key) {
-            return tasks.error('no decryption key associated with name: ' + decrypt.name)
+          if (val[0] === '#') {
+            return {
+                '/': val.slice(1)
+            }
           }
-          const salt = Buffer.from(decryption.salt, 'hex')
-          hashPassword2x(decrypt.password, salt, tasks, t2)
-        })
-        t2 = tasks.add((hash1, hash2) => {
-          if (decryption.hash2 !== hash2.toString('hex')) {
-            return tasks.error('hash of password hash does not equal decryption hash2')
-          }
-          try {
-            let aesCtr = new aes.ModeOfOperation.ctr(hash1)
-            key = Buffer.from(aesCtr.decrypt(Buffer.from(key, 'hex')).buffer)
-            aesCtr = new aes.ModeOfOperation.ctr(key)
-            node.content = Buffer.from(aesCtr.decrypt(node.content).buffer)
-            console.log(node.content.length)
-            tasks.run(t, node, i)
-          } catch(err) {
-            tasks.error(err)
-          }
-        })
-      }
-      service.get(path, tasks, t1, i)
-    }
-
-    const importContent = (service: Object, _files: Object[], password: string, tasks: Object, t: number, i?: number) => {
-      fileHashes = {}, files = _files, meta = meta || []
-      let count = 0, t2
-      const t1 = tasks.add(() => {
-        for (let j = 0; j < files.length; j++) {
-          service.hash(files[j], tasks, t2, j)
         }
-      })
-      t2 = tasks.add((hash, j) => {
-        fileHashes[files[j].name] = hash
-        meta.push({
-            contentUrl: service.pathToIRI(hash),
-            name: files[j].name,
-            type: capitalize(files[j].type.split('/')[0]) + 'Object'
-        })
-        if (++count !== files.length) return
-        tasks.run(t, i)
-      })
-      if (password) {
-        return encrypt(password, tasks, t1)
+        return val
+      }))
+      elem = Object.assign({ data }, parties)
+      ld.push(elem)
+      service.hash(elem, tasks, t2)
+    })
+    t2 = tasks.add(hash => {
+      hashes[ordered[count].name] = hash
+      if (++count === ordered.length) {
+        return tasks.run(t, i)
       }
       tasks.run(t1)
-    }
+    })
+    tasks.run(t1)
+  }
 
-    const importMetadata = (files: Object[], tasks: Object, t: number, i?: number) => {
-        meta = meta || []
-        const t1 = tasks.add(objs => {
-          meta.push(...objs)
-          tasks.run(t, i)
-        })
-        const type = files[0].type
-        if (type !== 'application/json' && type !== 'text/csv') {
-          return tasks.error('expected "application/json" or "text/csv", got ' + type)
+  this._import = (meta: Object[], sender: Object, recipient: Object|Object[], tasks: Object, t: number, i?: number) => {
+    hashes = {}
+    meta = clone(meta)
+    let t1, t2
+    t1 = tasks.add(resolved => {
+      orderMetadata(resolved, tasks, t2)
+    })
+    t2 = tasks.add(ordered => {
+      generateLinkedData(ordered, sender, recipient, tasks, t, i)
+    })
+    resolveMetadata(meta, tasks, t1)
+  }
+
+  this._put = (sender: Object, tasks: Object, t: number, i?: number) => {
+    if (!ld || !ld.length) {
+      return tasks.error(ErrNoLinkedData)
+    }
+    let count = 0, hash
+    const t1 = tasks.add((cid, j) => {
+        hash = service.hashFromCID(cid)
+        if (hash !== hashes[names[j]]) {
+            return tasks.error(errUnexpectedHash(hash, hashes[names[j]]))
         }
-        const texts = new Array(files.length)
-        const names = new Array(files.length)
-        texts[0] = files[0].content
-        names[0] = files[0].name
-        for (let j = 1; j < files.length; j++) {
-          if (files[j].type !== type) {
-            return tasks.error(`expected ${type}, got ` + files[j].type)
-          }
-          texts[j] = files[j].content
-          names[j] = files[j].name
-        }
-        if (type === 'application/json') {
-          parseJSONs(texts, names, tasks, t1)
-        }
-        if (type === 'text/csv') {
-          parseCSVs(texts, names, tasks, t1)
-        }
-    }
-
-    //-----------------------------------------------------------------------
-
-    const tasks = new Tasks()
-
-    this.clearFileHashes = () => {
-      fileHashes = undefined
-    }
-
-    this.clearMetaHashes = () => {
-      metaHashes = undefined
-    }
-
-    this.clearMetadata = () => {
-      meta = undefined // ipld = undefined
-    }
-
-    this.exportDecryption = (): ?Object => {
-      return decryption ? decryption : null
-    }
-
-    this.exportFileHashes = (): ?Object => {
-      return fileHashes ? fileHashes : null
-    }
-
-    this.exportIPLD = (): ?Object[] => {
-      return ipld ? ipld : null
-    }
-
-    this.exportMetaHashes = (): ?Object => {
-      return metaHashes ? metaHashes : null
-    }
-
-    // this.exportMetadata = (): ?Object[] => {
-    //    return meta ? meta : null
-    // }
-
-    // this.exportFiles = (): ?File[] => {
-    //    return files ? files : null
-    // }
-
-    this.importContent = (name: string, files: Object[], password: string, cb: Function) => {
-      if (typeof password === 'function') {
-        [cb, password] = [password, '']
-      } else if (!cb) {
-        throw new Error('no callback')
+        if (++count !== ld.length) return
+        tasks.run(t, i)
+    })
+    const addSender = isSender(sender)
+    for (let j = 0; j < ld.length; j++) {
+      if (addSender) {
+        service.put(assign(ld[j], { sender }), tasks, t1, j)
+      } else {
+        service.put(ld[j], tasks, t1, j)
       }
-      tasks.init(cb)
-      tasks.add(service => {
-        importContent(service, files, password, tasks, -1)
-      })
-      services.use(name, tasks, 0)
     }
+  }
 
-    this.importDecryption = (text: string, cb: Function) => {
-      tasks.init(cb)
-      importDecryption(text, tasks, -1)
-    }
-
-    this.importKeypair = (keypair: Object)
-
-    this.importMetadata = (files: Object[], cb: Function) => {
-      tasks.init(cb)
-      importMetadata(files, tasks, -1)
-    }
-
-    this.importProject = (project: Object, cb: Function) => {
-      tasks.init(cb)
-      importProject(project, tasks, -1)
-    }
-
-    this.generateIPLD = (name: string, cb: Function) => {
-      tasks.init(cb)
-      tasks.add(service => {
-        generateIPLD(service, tasks, -1)
-      })
-      services.use(name, tasks, 0)
-    }
-
-    this.getContent = (service: string, path: string, decrypt: Object, cb: Function) => {
-      if (typeof decrypt === 'function') {
-        [cb, decrypt] = [decrypt, {}]
-      } else if (!cb) {
-        throw new Error('no callback')
+  this._get = (path: string, expand: boolean, tasks: Object, t: number, i?: number) => {
+    const parts = path.split('/')
+    const first = parts.shift()
+    if (hashes[first]) {
+      path = hashes[first]
+      if (parts.length) {
+        path += '/' + parts.join('/')
       }
-      tasks.init(cb)
-      tasks.add(service => {
-        getContent(service, path, decrypt, tasks, -1)
-      })
-      services.use(service, tasks, 0)
     }
-
-    this.getMetadata = (name: string, path: string, expand: boolean, cb: Function) => {
-      tasks.init(cb)
-      let resolver
-      tasks.add(service => {
-        try {
-          const { cid, remPath } = service.pathToCID(path)
-          resolver = new Resolver(service)
-          resolver.get(cid, remPath, tasks, 1)
-        } catch(err) {
-          tasks.error(err)
-        }
-      })
-      tasks.add(result => {
-        if (expand) {
-          return resolver.expand(result, tasks, -1)
-        }
-        tasks.run(-1, result)
-      })
-      services.use(name, tasks, 0)
-    }
-
-    this.BigchainDB = (url: string, cb: Function) => {
-      tasks.init(cb)
-      const service = new BigchainDB.MetadataService(url)
-      services.add(service, tasks, -1)
-    }
-
-    this.IPFS = (repoPath: string, cb: Function) => {
-      if (typeof repoPath === 'function') {
-        [cb, repoPath] = [repoPath, defaultPath]
+    const t1 = tasks.add(result => {
+      if (expand) {
+        return resolver.expand(result, tasks, t)
       }
-      tasks.init(cb)
-      let count = 0, t1, t2
-      t1 = tasks.add(ipfs => {
-        try {
-          const contentService = new Ipfs.ContentService(ipfs.files)
-          const metadataService = new Ipfs.MetadataService(ipfs._blockService)
-          services.add(contentService, tasks, t2)
-          services.add(metadataService, tasks, t2)
-        } catch(err) {
-          tasks.error(err)
-        }
-      })
-      t2 = tasks.add(() => {
-        if (++count === 2) {
-          tasks.run(-1)
-        }
-      })
-      const ipfs = new Ipfs.Node()
-      ipfs.start(repoPath, tasks, t1)
+      tasks.run(t, result)
+    })
+    try {
+      const { cid, remPath } = service.pathToCID(path)
+      resolver.get(cid, remPath, tasks, t1)
+    } catch(err) {
+      tasks.error(err)
     }
+  }
 
-    this.Swarm = (url: string, cb: Function) => {
-      tasks.init(cb)
-      const service = new Swarm.ContentService(url)
-      services.add(service, tasks, -1)
-    }
+  this.get = (path: string, expand: boolean, cb: Function) => {
+    const tasks = new Tasks(cb)
+    this._get(path, expand, tasks, -1)
+  }
 
-    this.pushIPLD = (name: string, cb: Function) => {
-      tasks.init(cb)
-      tasks.add(service => {
-        pushIPLD(service, tasks, -1)
-      })
-      services.use(name, tasks, 0)
-    }
+  this.LinkedData = {}
 
-    this.uploadContent = (name: string, cb: Function) => {
-      tasks.init(cb)
-      tasks.add(service => {
-        uploadContent(service, tasks, -1)
-      })
-      services.use(name, tasks, 0)
-    }
+  this.Hashes = {}
 
-    //-----------------------------------------------------------------------
+  if (browser) {
 
-    this.Browser = {}
-
-    this.Browser.getContent = (service: string, path: string, decrypt: Object, cb: Function) => {
-      if (typeof decrypt === 'function') {
-        [cb, decrypt] = [decrypt, {}]
-      } else if (!cb) {
-        throw new Error('no callback')
+    this.Hashes._export = (): File => {
+      if (!hashes) {
+        throw ErrNoHashes
       }
-      tasks.init(cb)
-      tasks.add(service => {
-        getContent(service, path, decrypt, tasks, 1)
-      })
-      tasks.add(node => {
-        bufferToFile(node.content, node.path, tasks, -1)
-      })
-      services.use(service, tasks, 0)
+      return new File(
+        [prettyJSON(hashes)],
+        'metadata_hashes.json',
+        { type: 'application/json' }
+      )
     }
 
-    this.Browser.importContent = (name: string, files: File[], password: string, cb: Function) => {
-      if (typeof password === 'function') {
-        [cb, password] = [password, '']
-      } else if (!cb) {
-        throw new Error('no callback')
+    this.Hashes.import = (file: File, cb: Function) => {
+      if (file.type !== 'application/json') {
+        return cb(errUnexpectedType(file.type, 'application/json'))
       }
-      tasks.init(cb)
-      let service
-      tasks.add(result => {
-        service = result
-        readFilesAs(files, 'arraybuffer', tasks, 1)
-      })
-      tasks.add(files => {
-        importContent(service, files, password, tasks, -1)
-      })
-      services.use(name, tasks, 0)
-    }
-
-    this.Browser.importDecryption = (file: File, cb: Function) => {
-      tasks.init(cb)
+      const tasks = new Tasks(cb)
       tasks.add(text => {
-        importDecryption(text, tasks, -1)
+        try {
+          hashes = JSON.parse(text)
+          tasks.run(-1)
+        } catch (err) {
+          tasks.error(err)
+        }
       })
       readFileAs(file, 'text', tasks, 0)
     }
 
-    this.Browser.importMetadata = (files: File[], cb: Function) => {
-      tasks.init(cb)
-      tasks.add(files => {
-        importMetadata(files, tasks, -1)
-      })
-      readFilesAs(files, 'text', tasks, 0)
+    this.LinkedData._export = (): File => {
+      if (!ld || !ld.length) {
+        throw ErrNoLinkedData
+      }
+      return new File(
+        [prettyJSON(ld)],
+        'linked_data.json',
+        { type: 'application/json' }
+      )
     }
+
+    this.LinkedData._import = (file: File, cb: Function) => {
+      if (file.type !== 'application/json') {
+        return cb(errUnexpectedType(file.type, 'application/json'))
+      }
+      const tasks = new Tasks(cb)
+      tasks.add(text => {
+        try {
+          ld = JSON.parse(text)
+          tasks.run(-1)
+        } catch (err) {
+          tasks.error(err)
+        }
+      })
+      readFileAs(file, 'text', tasks, 0)
+    }
+
+  } else {
+
+    this.Hashes._export = (): Object => {
+      return hashes || {}
+    }
+
+    this.Hashes.import = (_hashes: Object) => {
+      hashes = _hashes
+    }
+
+    this.LinkedData._export = (): Object[] => {
+      return ld || []
+    }
+
+    this.LinkedData._import = (_ld: Object[]) => {
+      ld = _ld
+    }
+  }
+}
+
+function ContentService({ browser, name, path }: Object) {
+
+  let decryption, files, hashes, service
+
+  if (name === 'ipfs') {
+    service = new Ipfs.ContentService(path)
+  } else if (name === 'swarm') {
+    service = new Swarm.ContentService(path)
+  } else {
+    throw errUnsupportedService(name)
+  }
+
+  this.name = (): string => name
+
+  this.path = (): string => path
+
+  const encryptFiles = (password: string, tasks: Object, t: number, i?: number) => {
+    const salt = crypto.randomBytes(saltLength)
+    const t1 = tasks.add((dkey, hash) => {
+      decryption = {
+        hash,
+        keys: {},
+        salt: salt.toString('hex')
+      }
+      const aesCtrDkey = new aes.ModeOfOperation.ctr(dkey)
+      let aesCtrKey, key
+      for (let j = 0; j < files.length; j++) {
+        key = crypto.randomBytes(keyLength)
+        aesCtrKey = new aes.ModeOfOperation.ctr(key)
+        files[j] = {
+          content: Buffer.from(aesCtrKey.encrypt(files[j].content).buffer),
+          name: files[j].name,
+          type: files[j].type
+        }
+        key = Buffer.from(aesCtrDkey.encrypt(key).buffer)
+        decryption.keys[files[j].name] = key.toString('hex')
+      }
+      tasks.run(t, i)
+    })
+    scrypt2x(password, salt, tasks, t1)
+  }
+
+  this._import = (_files: Object[], password: string, tasks: Object, t: number, i?: number) => {
+    files = _files
+    hashes = {}
+    const meta = new Array(files.length)
+    let count = 0, t1, t2
+    t1 = tasks.add(() => {
+      for (let j = 0; j < files.length; j++) {
+        service.hash(files[j].content, tasks, t2, j)
+      }
+    })
+    t2 = tasks.add((hash, j) => {
+      hashes[files[j].name] = hash
+      meta[j] = {
+          contentUrl: service.pathToIRI(hash),
+          name: files[j].name,
+          type: capitalize(files[j].type.split('/')[0]) + 'Object'
+      }
+      if (++count !== files.length) return
+      tasks.run(t, meta, i)
+    })
+    if (password) {
+      return encryptFiles(password, tasks, t1)
+    }
+    tasks.run(t1)
+  }
+
+  this._get = (path: string, decrypt: Object, tasks: Object, t: number, i?: number) => {
+      const parts = path.split('/')
+      const first = parts.shift()
+      if (hashes[first]) {
+        path = hashes[first]
+        if (parts.length) {
+          path += '/' + parts.join('/')
+        }
+      }
+      let t1 = t
+      if (decrypt && decrypt.password) {
+          let content, key, t2
+          t1 = tasks.add(_content => {
+              content = _content
+              decrypt.name = decrypt.name || first
+              key = decryption.keys[decrypt.name]
+              if (!key) {
+                  return tasks.error('no decryption key for name: ' + decrypt.name)
+              }
+              const salt = Buffer.from(decryption.salt, 'hex')
+              scrypt2x(decrypt.password, salt, tasks, t2)
+          })
+          t2 = tasks.add((dkey, hash) => {
+              if (decryption.hash !== hash) {
+                  return tasks.error(errInvalidPassword(decrypt.password))
+              }
+              try {
+                  let aesCtr = new aes.ModeOfOperation.ctr(dkey)
+                  key = Buffer.from(aesCtr.decrypt(Buffer.from(key, 'hex')).buffer)
+                  aesCtr = new aes.ModeOfOperation.ctr(key)
+                  content = Buffer.from(aesCtr.decrypt(content).buffer)
+                  tasks.run(t, content, i)
+              } catch (err) {
+                  tasks.error(err)
+              }
+          })
+      }
+      service.get(path, tasks, t1, i)
+  }
+
+  this._put = (tasks: Object, t: number, i?: number) => {
+      if (!files.length) {
+        return tasks.error('no files')
+      }
+      let count = 0
+      const t1 = tasks.add(results => {
+          for (let j = 0; j < files.length; j++) {
+            if (results[j] !== hashes[files[j].name]) {
+              return tasks.error(errUnexpectedHash(results[j], hashes[files[j].name]))
+            }
+          }
+          tasks.run(t, i)
+      })
+      const contents = files.map(file => file.content)
+      service.put(contents, tasks, t1)
+  }
+
+  this.Decryption = {}
+
+  this.Hashes = {}
+
+  if (browser) {
+
+    this.get = (path: string, decrypt: Object, cb: Function) => {
+      if (typeof decrypt === 'function') {
+        [cb, decrypt] = [decrypt, {}]
+      } else if (!cb) {
+        throw ErrNoCallback
+      }
+      const tasks = new Tasks(cb)
+      tasks.add(content => {
+        bufferToFile(content, path, tasks, -1)
+      })
+      this._get(path, decrypt, tasks, 0)
+    }
+
+    this.Decryption._export = (): File => {
+      if (!decryption) {
+        throw ErrNoDecryption
+      }
+      return new File(
+        [prettyJSON(decryption)],
+        'decryption.json',
+        { type: 'application/json' }
+      )
+    }
+
+    this.Decryption.import = (file: File, cb: Function) => {
+      if (file.type !== 'application/json') {
+        return cb(errUnexpectedType(file.type, 'application/json'))
+      }
+      const tasks = new Tasks(cb)
+      tasks.add(text => {
+        try {
+          decryption = JSON.parse(text)
+          tasks.run(-1)
+        } catch (err) {
+          tasks.error(err)
+        }
+      })
+      readFileAs(file, 'text', tasks, 0)
+    }
+
+    this.Hashes._export = (): File => {
+      if (!hashes) {
+        throw ErrNoHashes
+      }
+      return new File(
+        [prettyJSON(hashes)],
+        'content_hashes.json',
+        { type: 'application/json' }
+      )
+    }
+
+    this.Hashes.import = (file: File, cb: Function) => {
+      if (file.type !== 'application/json') {
+        return cb(errUnexpectedType(file.type, 'application/json'))
+      }
+      const tasks = new Tasks(cb)
+      tasks.add(text => {
+        try {
+          hashes = JSON.parse(text)
+          tasks.run(-1)
+        } catch (err) {
+          tasks.error(err)
+        }
+      })
+      readFileAs(file, 'text', tasks, 0)
+    }
+
+  } else {
+
+    this.Decryption._export = (): Object => {
+      return decryption || {}
+    }
+
+    this.Decryption.import = (_decryption: Object) => {
+      decryption = _decryption
+    }
+
+    this.Hashes._export = (): Object => {
+      return hashes || {}
+    }
+
+    this.Hashes.import = (_hashes: Object) => {
+      hashes = _hashes
+    }
+
+    this.get = (path: string, decrypt: Object, cb: Function) => {
+      if (typeof decrypt === 'function') {
+        [cb, decrypt] = [decrypt, {}]
+      } else if (!cb) {
+        throw ErrNoCallback
+      }
+      const tasks = new Tasks(cb)
+      this._get(path, decrypt, tasks, -1)
+    }
+  }
+}
+
+function Account({ browser }: Object = {}) {
+
+  let account = {}
+
+  this.publicKey = (): string => {
+    return account.publicKey || ''
+  }
+
+  this._decrypt = (password: string, tasks: Object, t: number, i?: number) => {
+    const t1 = tasks.add((dkey, hash) => {
+      if (account.hash !== hash) {
+        return tasks.error(errInvalidPassword(password))
+      }
+      const aesCtr = new aes.ModeOfOperation.ctr(dkey)
+      const encryptedPrivateKey = Buffer.from(account.encryptedPrivateKey, 'hex')
+      const privateKey = base58.encode(Buffer.from(aesCtr.decrypt(encryptedPrivateKey).buffer))
+      tasks.run(t, privateKey, i)
+    })
+    try {
+      const salt = Buffer.from(account.salt, 'hex')
+      return scrypt2x(password, salt, tasks, t1)
+    } catch (err) {
+      tasks.errror(err)
+    }
+  }
+
+  this._import = (acc: Object, password: string, tasks: Object, t: number, i?: number) => {
+    const t1 = tasks.add((dkey, hash) => {
+      if (acc.hash !== hash) {
+        return tasks.error(errInvalidPassword(password))
+      }
+      account = acc
+      tasks.run(t, i)
+    })
+    const salt = Buffer.from(acc.salt, 'hex')
+    scrypt2x(password, salt, tasks, t1)
+  }
+
+  this._generate = (password: string, tasks: Object, t: number, i?: number) => {
+    const keypair = nacl.sign.keyPair()
+    const salt = crypto.randomBytes(saltLength)
+    const t1 = tasks.add((dkey, hash) => {
+      const aesCtr = new aes.ModeOfOperation.ctr(dkey)
+      const encryptedPrivateKey = Buffer.from(
+        aesCtr.encrypt(keypair.secretKey.slice(0, 32)).buffer
+      ).toString('hex')
+      account = {
+        encryptedPrivateKey,
+        hash,
+        publicKey: base58.encode(keypair.publicKey),
+        salt: salt.toString('hex')
+      }
+      tasks.run(t, account, i)
+    })
+    scrypt2x(password, salt, tasks, t1)
+  }
+
+  if (browser) {
+
+    this.generate = (password: string, cb: Function) => {
+      const tasks = new Tasks(cb)
+      tasks.add(account => {
+        const file = new File(
+          [prettyJSON(account)],
+          'account.json',
+          { type: 'application/json' }
+        )
+        tasks.run(-1, file)
+      })
+      this._generate(password, tasks, 0)
+    }
+
+    this.import = (file: File, password: string, cb: Function) => {
+      if (file.type !== 'application/json') {
+        throw errUnexpectedType(file.type, 'application/json')
+      }
+      const tasks = new Tasks(cb)
+      tasks.add(text => {
+        try {
+          const account = JSON.parse(text)
+          this._import(account, password, tasks, -1)
+        } catch (err) {
+          tasks.error(err)
+        }
+      })
+      readFileAs(file, 'text', tasks, 0)
+    }
+
+  } else {
+
+    this.generate = (password: string, cb: Function) => {
+      const tasks = new Tasks(cb)
+      this._generate(password, tasks, -1)
+    }
+
+    this.import = (account: Object, password: string, cb: Function) => {
+      const tasks = new Tasks(cb)
+      this._import(account, password, tasks, -1)
+    }
+  }
+}
+
+function Project({ account, browser, contentService, metadataService, title }: Object) {
+
+  contentService = new ContentService({
+    name: contentService.name,
+    path: contentService.path
+  })
+
+  metadataService = new MetadataService({
+    name: metadataService.name,
+    path: metadataService.path
+  })
+
+  this._import = (content: Object[], metadata: Object[], password: string, tasks: Object, t: number, i?: number) => {
+    const publicKey = account ? account.publicKey() : ''
+    const t1 = tasks.add(meta => {
+      metadataService._import(metadata.concat(meta), { publicKey }, { amount: 1, publicKey }, tasks, t, i)
+    })
+    contentService._import(content, password, tasks, t1)
+  }
+
+  this._upload = (password: string, tasks: Object, t: number, i?: number) => {
+    let t1, t2
+    t2 = tasks.add(() => {
+      contentService._put(tasks, t, i)
+    })
+    const publicKey = account ? account.publicKey() : ''
+    if (!publicKey) {
+      return metadataService._put({}, tasks, t2)
+    }
+    t1 = tasks.add(privateKey => {
+      metadataService._put({ privateKey, publicKey }, tasks, t2)
+    })
+    account._decrypt(password, tasks, t1)
+  }
+
+  this._export = (name: string): Object|Object[] => {
+    switch (name) {
+      case 'content_decryption':
+        return contentService.Decryption._export()
+      case 'content_hashes':
+        return contentService.Hashes._export()
+      case 'linked_data':
+        return metadataService.LinkedData._export()
+      case 'metadata_hashes':
+        return metadataService.Hashes._export()
+      default:
+        throw new Error('unexpected export: ' + name)
+    }
+  }
+
+  this.upload = (password: string, cb: Function) => {
+    if (typeof password === 'function') {
+      [cb, password] = [password, '']
+    } else if (!cb) {
+      throw ErrNoCallback
+    }
+    const tasks = new Tasks(cb)
+    this._upload(password, tasks, -1)
+  }
+
+  if (browser) {
+
+    this.export = (name): File => {
+      return new File(
+        [prettyJSON(this._export(name))],
+        `${title}_${name}.json`,
+        { type: 'application/json' }
+      )
+    }
+
+    this.import = (content: File[], metadata: File, password: string, cb: Function) => {
+      if (typeof password === 'function') {
+        [cb, password] = [password, '']
+      } else if (!cb) {
+        throw ErrNoCallback
+      }
+      const tasks = new Tasks(cb)
+      const args = [null, null, password, tasks, -1]
+      let count = 0
+      tasks.add((result, j) => {
+        try {
+          if (!j) {
+            args[0] = result
+          } else {
+            args[1] = JSON.parse(result)
+          }
+          if (++count !== 2) return
+          this._import(...args)
+        } catch (err) {
+          tasks.error(err)
+        }
+      })
+      readFilesAs(content, 'arraybuffer', tasks, 0, 0)
+      readFileAs(metadata, 'text', tasks, 0, 1)
+    }
+
+  } else {
+
+    this.export = this._export
+
+    this.import = (content: Object[], metadata: Object[], password: string, cb: Function) => {
+      if (typeof password === 'function') {
+        [cb, password] = [password, '']
+      } else if (!cb) {
+        throw ErrNoCallback
+      }
+      const tasks = new Tasks(cb)
+      this._import(content, metadata, password, tasks, -1)
+    }
+  }
+}
+
+module.exports = {
+  Account,
+  ContentService,
+  MetadataService,
+  Project,
+  ErrNoAccount,
+  ErrNoCallback,
+  ErrNoDecryption,
+  ErrNoLinkedData,
+  ErrNoHashes,
+  errInvalidPassword,
+  errUnexpectedHash,
+  errUnsupportedService
 }

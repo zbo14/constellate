@@ -10,17 +10,17 @@ const fs = require('fs')
  * @module constellate/src/util
  */
 
-const assign = (...objs: Object[]): Object => {
+exports.assign = (...objs: Object[]): Object => {
   return Object.assign({}, ...objs)
 }
 
-const bufferToArrayBuffer = (buf: Buffer): ArrayBuffer => {
+exports.bufferToArrayBuffer = (buf: Buffer): ArrayBuffer => {
   // from https://stackoverflow.com/a/31394257
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length)
 }
 
-const bufferToFile = (buf: Buffer, name: string, tasks: Object, t: number, i?: number) => {
-  const ab = bufferToArrayBuffer(buf)
+exports.bufferToFile = (buf: Buffer, name: string, tasks: Object, t: number, i?: number) => {
+  const ab = exports.bufferToArrayBuffer(buf)
   let type = fileType(buf.slice(0, 4100))
   if (!type) {
     return tasks.error('could not get file type')
@@ -30,15 +30,31 @@ const bufferToFile = (buf: Buffer, name: string, tasks: Object, t: number, i?: n
   tasks.run(t, file, i)
 }
 
-const capitalize = (str: string): string => {
+exports.capitalize = (str: string): string => {
   return str.charAt(0).toUpperCase() + str.slice(1)
 }
 
-const clone = (x: any): Object => {
+exports.clone = (x: any): Object => {
   return JSON.parse(JSON.stringify(x))
 }
 
-const fileToAnchor = (file: File, type: string): HTMLAnchorElement => {
+exports.errInvalidElement = (elem: Object): Error => {
+  return new Error('invalid element: ' + JSON.stringify(elem))
+}
+
+exports.errPathNotFound = (path: string): Error => {
+  return new Error('path not found: ' + path)
+}
+
+exports.errUnexpectedCID = (cid: Object): Error => {
+  return new Error('unexpected cid: ' + cid.toJSON())
+}
+
+exports.errUnexpectedType = (actual: string, expected: string): Error => {
+  return new Error(`expected type="${expected}", got "${actual}"`)
+}
+
+exports.fileToAnchor = (file: File, type: string): HTMLElement => {
   const a = document.createElement('a')
   a.setAttribute('href', URL.createObjectURL(file))
   a.setAttribute('download', file.name)
@@ -46,42 +62,85 @@ const fileToAnchor = (file: File, type: string): HTMLAnchorElement => {
   return a
 }
 
-const isArray = (arr: any, isType?: Function): boolean => {
-  return Array.isArray(arr) && arr.length && (!isType || arr.every(isType))
+// from https://toddmotto.com/understanding-javascript-types-and-reliable-type-checking/
+
+exports.getType = (x: any): string => {
+  if (x.constructor) {
+    return x.constructor.name
+  }
+  return Object.prototype.toString.call(x).slice(8, -1)
 }
 
-const isBoolean = (bool: any): boolean => {
-  return typeof bool === 'boolean'
+const isArray = (x: any, isType?: Function): boolean => {
+  return x instanceof Array && (!isType || x.every(isType))
 }
 
-const isMerkleLink = (link: any): boolean => {
-  return link && link.constructor === Object && link['/'] && Object.keys(link).length === 1
+exports.isArray = isArray
+
+exports.isBoolean = (x: any): boolean => {
+  return typeof x === 'boolean'
 }
 
-const isNumber = (num: any): boolean => {
-  return typeof num === 'number' &&  !isNaN(num)
+exports.isFunction = (x: any): boolean => {
+  return typeof x === 'function'
 }
 
-const isObject = (obj: any): boolean => {
-  return obj && obj.constructor === Object && !!Object.keys(obj).length
+exports.isNumber = (x: any): boolean => {
+  return typeof x === 'number'
 }
 
-const isString = (str: any): boolean => {
-  return typeof str === 'string' && !!str.length
+const isObject = (x: any): boolean => {
+  return x && x.constructor === Object
 }
 
-const newArray = (_default: any, length: number): any[] => {
+exports.isObject = isObject
+
+const isString = (x: any): boolean => {
+  return typeof x === 'string'
+}
+
+exports.isString = isString
+
+exports.isMerkleLink = (x: any): boolean => {
+  return x && x['/'] && Object.keys(x).length === 1
+}
+
+exports.isSender = (sender: any): boolean => {
+  return sender && sender.publicKey && isString(sender.publicKey)
+}
+
+exports.isRecipient = (recipient: any): boolean => {
+  if (isObject(recipient)) {
+    return recipient.amount && exports.isNumber(recipient.amount) &&
+           recipient.publicKey && isString(recipient.publicKey)
+  }
+  if (isArray(recipient, isObject)) {
+    return recipient.every(recipient => {
+      return recipient.amount && exports.isNumber(recipient.amount) &&
+             recipient.publicKey && isString(recipient.publicKey)
+    })
+  }
+  return false
+}
+
+exports.isElement = (x: any): boolean => {
+  return isObject(x.data) &&
+         (!x.sender || exports.isSender(x.sender)) &&
+         (!x.recipient || exports.isRecipient(x.recipient))
+}
+
+exports.newArray = (_default: any, length: number): any[] => {
   return (Array : any).apply(null, { length }).map(() => _default)
 }
 
-const sort = (x: any, y: any) => {
+exports.sort = (x: any, y: any) => {
   let i
   if (isArray(x) && isArray(y)) {
-    x.sort(sort)
-    y.sort(sort)
+    x.sort(exports.sort)
+    y.sort(exports.sort)
     let result
     for (i = 0; i < x.length && i < y.length; i++) {
-      result = sort(x[i], y[i])
+      result = exports.sort(x[i], y[i])
       if (result) return result
     }
     return 0
@@ -108,23 +167,27 @@ const sort = (x: any, y: any) => {
 
 // adapted from https://stackoverflow.com/questions/16167581/sort-object-properties-and-json-stringify#comment73545624_40646557
 
-const orderStringify = (x: any, space?: number): string => {
+exports.orderStringify = (x: any, space?: number): string => {
     const keys = []
     JSON.stringify(x, (k, v) => {
         keys.push(k)
         if (isArray(v)) {
-            v.sort(sort)
+            v.sort(exports.sort)
         }
         return v
     })
     return JSON.stringify(x, keys.sort(), space)
 }
 
-const order = (x: any) => {
-    return JSON.parse(orderStringify(x))
+exports.order = (x: any) => {
+    return JSON.parse(exports.orderStringify(x))
 }
 
-const readFileAs = (file: File, readAs: string, tasks: Object, t: number, i: number) => {
+exports.prettyJSON = (x: any): string => {
+  return JSON.stringify(x, null, 2)
+}
+
+exports.readFileAs = (file: File, readAs: string, tasks: Object, t: number, i: number) => {
   const reader = new FileReader()
   reader.onload = () => {
     tasks.run(t, reader.result, i)
@@ -138,56 +201,47 @@ const readFileAs = (file: File, readAs: string, tasks: Object, t: number, i: num
   }
 }
 
-const splice = (arr: any[], start: number, deleteCount: number, ...items: any[]): any[] => {
-  return arr.slice(0, start).concat(items).concat(arr.slice(start+deleteCount))
-}
-
-const transform = (obj: Object, fn: Function) => {
-  const _transform = (x: any) => {
+exports.transform = (obj: Object, fn: Function) => {
+  const transform = (x: any) => {
     x = fn(x)
     if (isArray(x)) {
-        return x.map(_transform)
+        return x.map(transform)
     } else if (isObject(x)) {
        return Object.keys(x).reduce((result, k) => {
-       		result[k] = _transform(x[k])
+       		result[k] = transform(x[k])
           return result
        }, {})
     }
     return x
   }
-  return _transform(obj)
+  return transform(obj)
 }
 
-const traverse = (val: any, fn: Function) => {
-  const _traverse = (trail: string, val: any, fn: Function) => {
+exports.traverse = (val: any, fn: Function) => {
+  const traverse = (trail: string, val: any, fn: Function) => {
     if (trail) fn(trail, val)
     let i
     if (isArray(val)) {
       for (i = 0; i < val.length; i++) {
-        _traverse(trail + '.' + i, val[i], fn)
+        traverse(trail + '.' + i, val[i], fn)
       }
     } else if (isObject(val)) {
       let fullPath
       const keys = Object.keys(val)
       for (i = 0; i < keys.length; i++) {
-        _traverse(
+        traverse(
           !trail ? keys[i] : trail + '.' + keys[i],
           val[keys[i]], fn
         )
       }
     }
   }
-  _traverse('', val, fn)
+  traverse('', val, fn)
 }
 
-function Tasks() {
-  let cb, done, e, t
-  this.init = (_cb: Function) => {
-    cb = _cb
-    done = false
-    e = new EventEmitter()
-    t = 0
-  }
+function Tasks(cb?: Function) {
+  const e = new EventEmitter()
+  let done = false, t = 0
   this.add = (onRun: Function): number => {
     if (done) {
       return -1
@@ -195,11 +249,17 @@ function Tasks() {
     e.on('run-task' + t, onRun)
     return t++
   }
+  this.callback = (_cb: Function) => {
+    cb = _cb
+  }
   this.run = (t: number, ...args: any[]) => {
     if (done) return
     if (t < 0) {
       done = true
-      return cb(null, ...args)
+      if (cb) {
+        cb(null, ...args)
+      }
+      return
     }
     e.emit('run-task' + t, ...args)
   }
@@ -208,30 +268,11 @@ function Tasks() {
     if (isString(err)) {
       err = new Error(err)
     }
-    if (!cb) throw err
+    if (!cb) {
+      throw err
+    }
     cb(err)
   }
 }
 
-module.exports = {
-  Tasks,
-  assign,
-  bufferToArrayBuffer,
-  bufferToFile,
-  capitalize,
-  clone,
-  fileToAnchor,
-  isArray,
-  isBoolean,
-  isMerkleLink,
-  isNumber,
-  isObject,
-  isString,
-  newArray,
-  order,
-  orderStringify,
-  readFileAs,
-  splice,
-  transform,
-  traverse
-}
+exports.Tasks = Tasks

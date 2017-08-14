@@ -1,145 +1,368 @@
-## API
+# API
 
-### constellate
+## Node.js
 
-#### new Constellate
+### ContentService
 
+NOTE: some functionality isn't documented below (e.g. `import` and `put`). It is recommended to use `Project` for this, as it handles content and metadata together.
+
+#### new ContentService
 ```js
-const Constellate = require('./lib/constellate')
+const ContentService = require('./lib/constellate').ContentService
 
-const constellate = new Constellate()
-```
-
-#### constellate.IPFS
-
-##### Parameters
-
-`string` [optional] - the IPFS repo path
-
-`Function` - callback with the signature `function (err)`
-
-#### constellate.Swarm
-
-##### Paramters
-
-`string` - the Swarm HTTP API endpoint
-
-#### constellate.importContent
-
-##### Parameters
-
-`Object[]` - an array of objects with the following properties
-```js
-{
-  content: <Buffer ...>,
-  name: 'filename',
-  type: 'audio/*|image/*|video/*'
+const params = {
+  name: 'ipfs',
+  path: '/ip4/127.0.0.1/tcp/5001'
 }
+
+const contentService = new ContentService(params)
 ```
 
-`Function` - callback with the signature `function (err)`
+#### contentService.Hashes.import
 
-#### constellate.importMetadata
+Import hashes to enable querying by name.
 
-##### Parameters
-
-`Object[]` - an array of objects with the following properties
 ```js
-{
-  content: 'text',
-  name: 'filename',
-  type: 'application/json|text/csv'
+const hashes = {
+  name1: 'hash1',
+  name2: 'hash2',
+  ...
 }
+
+contentService.Hashes.import(hashes)
 ```
 
-`Function` - callback with the signature `function (err)`
+##### Parameters
 
-#### constellate.generateIPLD
+`Object` - an object with the hashes
+
+#### contentService.get
+
+Query content by hash or name.
 
 ##### Parameters
 
-`string` - the metadata service to use
+```js
+contentService.get('{hash|name}', (err, buf) => {
+  if (err) {
+    throw err
+  }
+  console.log(buf)
 
-`Function` - callback with the signature `function (err)`
+  // <Buffer ...>
+})
+```
 
-#### constellate.uploadContent
+`string` - the hash or name to query
+
+`Function` - callback with the signature `function (err, buffer)`
+
+### MetadataService
+
+NOTE: some functionality isn't documented below (e.g. `import` and `put`). It is recommended to use `Project` for this, as it handles content and metadata together.
+
+#### new MetadataService
+```js
+const MetadataService = require('./lib/constellate').MetadataService
+
+const params = {
+  name: 'bigchaindb',
+  path: 'API_ENDPOINT'
+}
+
+const metadataService = new MetadataService(params)
+```
+
+#### metadataService.Hashes.import
+
+Import hashes to enable querying by name.
+
+```js
+const hashes = {
+  name1: 'hash1',
+  name2: 'hash2',
+  ...
+}
+
+metadataService.Hashes.import(hashes)
+```
 
 ##### Parameters
 
-`string` - the content service to use
+`Object` - an object with the hashes
 
-`Function` - callback with the signature `function (err)`
+#### metadataService.get
 
-#### constellate.pushIPLD
+Query metadata by path.
 
-##### Paramters
+```js
+metadataService.get('{hash|name}/data', false, (err, obj) => {
+  if (err) {
+    throw err
+   }
+   console.log(obj)
 
-`string` - the metadata service to use
-
-`Function` - callback with the signature `function (err)`
-
-#### constellate.getContent
+   // {
+   //   name: 'Band',
+   //   member: [
+   //     {
+   //       '/': 'hash1'
+   //     },
+   //     {
+   //       '/': 'hash2'
+   //     }
+   //   ]
+   // }
+})
+```
 
 ##### Parameters
-
-`string` - the content service to use
 
 `string` - the path to query
 
-`Function` - callback with the signature `function (err, object)`
-
-#### constellate.getMetadata
-
-##### Parameters
-
-`string` - the metadata service to use
-
-`string[]` - the path to query
+`boolean` - whether to expand the object (i.e. resolve merkle links)
 
 `Function` - callback with the signature `function (err, object)`
 
-#### constellate.exportFileHashes
+### Project
 
-##### Returns
+#### new Project
+```js
+const Project = require('./lib/constellate').Project
 
-`Object` - an object with file hashes
+const params = {
+  contentService: {
+    name: 'ipfs',
+    path: '/ip4/127.0.0.1/tcp/5001'
+  },
+  metadataService: {
+    name: 'bigchaindb',
+    path: 'API_ENDPOINT'
+  },
+  title: 'proj1'
+}
 
-#### constellate.exportMetaHashes
+const project = new Project(params)
+```
 
-##### Returns
+#### project.import
 
-`Object` - an object with metadata hashes
+Imports content, metadata and generates linked data.
 
-#### constellate.exportIPLD
+```js
+const fs = require('fs')
 
-##### Returns
+const buf = fs.readFileSync('./test/proj1/track1.mp3')
 
-`Object[]` - an array of IPLD objects
+const content = {
+  content: buf,
+  name: 'track1.mp3',
+  type: 'audio/mp3'
+}
 
-### Browser
+const text = fs.readFileSync('./test/proj1/metadata.json', 'utf8')
 
-#### constellate.Browser.importContent
+const metadata = JSON.parse(text)
+
+project.import([content, ...], metadata, err => {
+  if (err) {
+    throw err
+  }
+  // ...
+})
+```
 
 ##### Parameters
 
-`File[]` - audio, image, or video files
+`Object[]` - an array of content objects
+
+`Object[]` - an array of metadata objects (see examples in `./test/{proj1|proj2}`)
+
+#### project.upload
+
+Uploads content and pushes linked data.
+
+```js
+project.upload(err => {
+  if (err) {
+    throw err
+  }
+  // ...
+})
+```
+
+##### Parameters
 
 `Function` - callback with the signature `function (err)`
 
-#### constellate.Browser.importMetadata
+#### project.export
+
+```js
+const linkedData = project.export('linked_data')
+const contentHashes = project.export('content_hashes')
+const metadataHashes = project.export('metadata_hashes')
+```
 
 ##### Parameters
 
-`File[]` - CSV or JSON files
+`string` - the name of the object to export
 
-`Function` - callback with the signature `function (err)`
+##### Returns
 
-#### constellate.Browser.getContent
+`Object` - the exported object
+
+## Browser
+
+### ContentService
+
+#### new ContentService
+```js
+const ContentService = require('./lib/constellate').ContentService
+
+const params = {
+  browser: true,
+  name: 'ipfs',
+  path: '/ip4/127.0.0.1/tcp/5001'
+}
+
+const contentService = new ContentService(params)
+```
+
+#### contentService.Hashes.import
+
+Import hashes to enable querying by name.
+
+```js
+const input = document.querySelector('input[type="file"]')
+
+const file = input.files[0]
+
+contentService.Hashes.import(file)
+```
 
 ##### Parameters
 
-`string` - the content service to use
+`File` - a JSON file with the hashes
 
-`string` - the path to query
+#### contentService.get
+
+Query content by hash or name.
+
+##### Parameters
+
+```js
+contentService.get('{hash|name}', (err, file) => {
+  if (err) {
+    throw err
+  }
+  console.log(file)
+
+  // File { name: 'track1.mp3', ... , type: 'audio/mp3' }
+})
+```
+
+`string` - the hash or name to query
 
 `Function` - callback with the signature `function (err, file)`
+
+### MetadataService
+
+#### new MetadataService
+```js
+const MetadataService = require('./lib/constellate').MetadataService
+
+const params = {
+  browser: true,
+  name: 'bigchaindb',
+  path: 'API_ENDPOINT'
+}
+
+const metadataService = new MetadataService(params)
+```
+
+#### metadataService.Hashes.import
+
+Import hashes to enable querying by name.
+
+```js
+const input = document.querySelector('input[type="file"]')
+
+const file = input.files[0]
+
+metadataService.Hashes.import(file)
+```
+
+##### Parameters
+
+`Object` - a JSON file with the hashes
+
+#### metadataService.get
+
+same as Node.js API method
+
+### Project
+
+#### new Project
+```js
+const Project = require('./lib/constellate').Project
+
+const params = {
+  browser: true,
+  contentService: {
+    name: 'ipfs',
+    path: '/ip4/127.0.0.1/tcp/5001'
+  },
+  metadataService: {
+    name: 'bigchaindb',
+    path: 'API_ENDPOINT'
+  },
+  title: 'proj1'
+}
+
+const project = new Project(params)
+```
+
+#### project.import
+
+Imports content, metadata and generates linked data.
+
+```js
+const contentInput = document.getElementById('content-input')
+const metadataInput = document.getElementById('metadata-input')
+
+const content = Array.from(contentInput.files)
+const metadata = metadataInput.files[0]
+
+project.import(content, metadata, err => {
+  if (err) {
+    throw err
+  }
+  // ...
+})
+```
+
+##### Parameters
+
+`File[]` - an array of audio, image, and/or video files
+
+`File` - the metadata JSON file (see examples in `./test/{proj1|proj2}`)
+
+#### project.export
+
+```js
+const linkedData = project.export('linked_data')
+const contentHashes = project.export('content_hashes')
+const metadataHashes = project.export('metadata_hashes')
+
+console.log(linkedData)
+
+// File { name: 'proj1_linked_data.json', ... , type: 'application/json' }
+```
+
+##### Parameters
+
+`string` - the name of the file to export
+
+##### Returns
+
+`File` - the exported file

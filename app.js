@@ -10,7 +10,7 @@ const Tasks = require('./lib/util').Tasks
 
 const app = express()
 const fp = new Fingerprint()
-const tasks = new Tasks
+const tasks = new Tasks()
 
 app.use(bodyParser.text())
 
@@ -41,4 +41,4 @@ app.post('/fingerprint', (req, res) => {
   })
 })
 
-app.listen(8888)
+app.listen(8888, '127.0.0.1')

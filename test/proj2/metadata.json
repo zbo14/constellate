@@ -1,0 +1,18 @@
+[
+  {
+    "#": "0cec23eb631af515868fc36a3e3ea231a71730a5874a77eeba090a0399e1db8e"
+  },
+  {
+    "#": "fbe6f5dc1e5cab2f9f43a518a68ce862890815ad4126770e400dcb31d93f540b"
+  },
+  {
+    "name": "AnotherComposition",
+    "composer": "@Singer"
+  },
+  {
+    "name": "AnotherRecording",
+    "audio": "@track2.mp3",
+    "byArtist": "@Band",
+    "recordingOf": "@AnotherComposition"
+  }
+]

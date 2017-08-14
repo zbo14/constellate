@@ -1,0 +1,33 @@
+[
+  {
+    "name": "Singer"
+  },
+  {
+    "name": "Guitarist"
+  },
+  {
+    "name": "Drummer"
+  },
+  {
+    "name": "Bassist"
+  },
+  {
+    "name": "Band",
+    "member": [
+      "@Singer",
+      "@Guitarist",
+      "@Bassist",
+      "@Drummer"
+    ]
+  },
+  {
+    "name": "Composition",
+    "composer": "@Singer"
+  },
+  {
+    "name": "Recording",
+    "audio": "@track1.mp3",
+    "byArtist": "@Band",
+    "recordingOf": "@Composition"
+  }
+]

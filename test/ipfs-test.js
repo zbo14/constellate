@@ -1,13 +1,15 @@
 'use strict'
 
-const assert = require('chai').assert
-
+const assert = require('assert')
+const fs = require('fs')
 const Ipfs = require('../lib/ipfs.js')
 const Resolver = require('../lib/resolver.js')
 
 const {
-  order,
-  Tasks
+  Tasks,
+  errInvalidElement,
+  errPathNotFound,
+  order
 } = require('../lib/util.js')
 
 const composer1 = {
@@ -45,55 +47,92 @@ const expanded = {
   publisher
 }
 
-const ipfs = new Ipfs.Node()
+const addr = // ...
+
+const contentService = new Ipfs.ContentService(addr)
+const metadataService = new Ipfs.MetadataService(addr)
+
+const resolver = new Resolver(metadataService)
+
+const content1 = fs.readFileSync('proj1/track1.mp3')
+const content2 = fs.readFileSync('proj2/track2.mp3')
 
 const tasks = new Tasks()
 
-tasks.init()
+let cid, count = 0, hashes
 
-let count = 0, resolver, service, t = 0
-
-tasks.add(ipfs => {
-  service = new Ipfs.MetadataService(ipfs._blockService)
-  // TODO: content service
-  resolver = new Resolver(service)
-  composition.composer = new Array(2)
-  service.put({ data: composer1 }, tasks, t, 0)
-  service.put({ data: composer2 }, tasks, t, 1)
-  service.put({ data: publisher }, tasks, t++, 2)
-})
-
-tasks.add((cid, j) => {
+tasks.add((_cid, j) => {
+  cid = _cid
   if (j === 2) {
     composition.publisher = {
-      '/': cid.toBaseEncodedString()
+      '/': metadataService.hashFromCID(cid) + '/data'
     }
   } else {
     composition.composer[j] = {
-      '/': cid.toBaseEncodedString()
+      '/': metadataService.hashFromCID(cid) + '/data'
     }
   }
   if (++count !== 3) return
-  service.put({ data: composition }, tasks, t++)
+  metadataService.put({ data: composition }, tasks, 1)
 })
 
 tasks.add(cid => {
-  resolver.get(cid, '', tasks, t++)
+  resolver.get(cid, '', tasks, 2)
 })
 
 tasks.add(result => {
-  assert.deepEqual(result, order(composition), 'query result does not equal composition')
-  resolver.expand(result, tasks, t++)
+  assert.deepEqual(result, { data: order(composition) })
+  resolver.expand(result, tasks, 3)
 })
 
 tasks.add(result => {
-  assert.deepEqual(result, order(expanded), 'query result does not equal expanded composition')
-  ipfs.stop(tasks, t++)
+  assert.deepEqual(result, { data: order(expanded) })
+  contentService.put([content1, content2], tasks, 4)
+})
+
+tasks.add(_hashes => {
+  hashes = _hashes
+  contentService.get(hashes[0], tasks, 5)
+})
+
+tasks.add(content => {
+  if (!content.equals(content1)) {
+    return tasks.error('content does not match')
+  }
+  contentService.get(hashes[1], tasks, 6)
+})
+
+tasks.add(content => {
+  if (!content.equals(content2)) {
+    return tasks.error('content does not match')
+  }
+  tasks.run(7)
+})
+
+tasks.add(elem => {
+  tasks.callback(err => {
+    assert.equal(err.message, errInvalidElement({}).message)
+    tasks.run(8)
+  })
+  metadataService.put({}, tasks, 8)
 })
 
 tasks.add(() => {
-  console.log('Done')
+  tasks.callback(err => {
+    assert.equal(err.message, errPathNotFound('badpath').message)
+    tasks.run(9)
+  })
+  resolver.get(cid, 'badpath', tasks, 9)
+})
+
+// TODO: test more errors
+
+tasks.add(() => {
+  console.log('Finished IPFS test')
   process.exit()
 })
 
-ipfs.start('/tmp/ipfs-test', tasks, t++)
+composition.composer = new Array(2)
+metadataService.put({ data: composer1 }, tasks, 0, 0)
+metadataService.put({ data: composer2 }, tasks, 0, 1)
+metadataService.put({ data: publisher }, tasks, 0, 2)

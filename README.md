@@ -14,7 +14,7 @@ Clone the repo and `npm install`.
 
 `npm start` should start the express app.
 
-Then go to `localhost:8888/main.html` in your browser.
+Then go to `localhost:8888/{project|query}.html` in your browser.
 
 #### Tests
 

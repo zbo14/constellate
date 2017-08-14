@@ -1,266 +1,246 @@
 'use strict'
 
-// const assert = require('chai').assert
+const assert = require('assert')
 const fs = require('fs')
-const Constellate = require('../lib/constellate')
-const Tasks = require('../lib/util').Tasks
 
-const constellate = new Constellate()
+const {
+  Account,
+  ContentService,
+  MetadataService,
+  Project,
+  ErrNoService,
+  errInvalidPassword,
+  errUnsupportedService
+} = require('../lib/constellate')
+
+const {
+  Tasks,
+  order
+} = require('../lib/util')
+
 const tasks = new Tasks()
 
-const proj1Path = '../demo/proj1/'
-const proj2Path = '../demo/proj2/'
-
-const content1 = fs.readFileSync(proj1Path + 'content/audio.mp3')
-const content2 = fs.readFileSync(proj2Path + 'content/audio.mp3')
+let content1 = fs.readFileSync('./proj1/track1.mp3'),
+    content2 = fs.readFileSync('./proj2/track2.mp3')
 
 const file1 = {
-  content: content1,
-  name: 'audio.mp3',
-  path: '',
+  content: Buffer.from(content1),
+  name: 'track1.mp3',
   type: 'audio/mp3'
 }
 
 const file2 = {
-  content: content2,
-  name: 'audio.mp3',
-  path: '',
+  content: Buffer.from(content2),
+  name: 'track2.mp3',
   type: 'audio/mp3'
 }
 
-const MusicComposition1 = {
-  content: fs.readFileSync(proj1Path + 'metadata/MusicComposition.csv', 'utf8'),
-  name: 'MusicComposition',
-  path: '',
-  type: 'text/csv'
+const metadata1 = JSON.parse(fs.readFileSync('./proj1/metadata.json', 'utf8'))
+const metadata2 = JSON.parse(fs.readFileSync('./proj2/metadata.json', 'utf8'))
+
+const account = new Account()
+
+const accountObject = {
+  encryptedPrivateKey: '27cc505f80060c48504d12aef9f0aa6f0dd6f16327a773da327d57ef0aecc7f8',
+  hash: 'a4b1d4f0a45c4d6c0b6afadcc87ceae2f7a20a82f41b812a7894702d39c1ad43',
+  publicKey: '6YoBAfpKWhgB7jn37kYWb5tn8H3LEEfxooktxA7kpDtG',
+  salt: '43fb2c46b972b93292780559b1b8d2041e5b5b3d'
 }
 
-const MusicGroup = {
-  content: fs.readFileSync(proj1Path + 'metadata/MusicGroup.csv', 'utf8'),
-  name: 'MusicGroup',
-  path: '',
-  type: 'text/csv'
+const accountPassword = 'passwerd'
+const encryptPassword = 'incrypt'
+
+const bigchaindb = {
+  name: 'bigchaindb',
+  path: // ...
 }
 
-const MusicRecording1 = {
-  content: fs.readFileSync(proj1Path + 'metadata/MusicRecording.csv', 'utf8'),
-  name: 'MusicRecording',
-  path: '',
-  type: 'text/csv'
+const ipfs = {
+  name: 'ipfs',
+  path: // ...
 }
 
-const Organization = {
-  content: fs.readFileSync(proj1Path + 'metadata/Organization.csv', 'utf8'),
-  name: 'Organization',
-  path: '',
-  type: 'text/csv'
+const swarm = {
+  name: 'swarm',
+  path: // ...
 }
 
-const Person = {
-  content: fs.readFileSync(proj1Path + 'metadata/Person.csv', 'utf8'),
-  name: 'Person',
-  path: '',
-  type: 'text/csv'
-}
-
-const Hash = {
-  content: fs.readFileSync(proj2Path + 'metadata/Hash.csv', 'utf8'),
-  name: 'Hash',
-  path: '',
-  type: 'text/csv'
-}
-
-const MusicComposition2 = {
-  content: fs.readFileSync(proj2Path + 'metadata/MusicComposition.csv', 'utf8'),
-  name: 'MusicComposition',
-  path: '',
-  type: 'text/csv'
-}
-
-const MusicRecording2 = {
-  content: fs.readFileSync(proj2Path + 'metadata/MusicRecording.csv', 'utf8'),
-  name: 'MusicRecording',
-  path: '',
-  type: 'text/csv'
-}
-
-let contentService = 'ipfs-content-service'
-const metadataService = 'ipfs-metadata-service'
-const password = 'passwerd'
-
-tasks.init()
-
-let hashes, t = 0
+let contentService,
+    metadataService,
+    project = new Project({
+      account,
+      contentService: ipfs,
+      metadataService: bigchaindb,
+      title: 'untitled'
+    })
 
 tasks.add(() => {
-  constellate.importContent(contentService, [file1], password, err => {
-    if (err) {
-      return tasks.error(err)
-    }
-    tasks.run(t++)
-  })
+  project._import([file1], metadata1, encryptPassword, tasks, 1)
 })
 
 tasks.add(() => {
-  constellate.importMetadata([
-    MusicComposition1,
-    MusicGroup,
-    MusicRecording1,
-    Organization,
-    Person
-  ], err => {
-    if (err) {
-      return tasks.error(err)
-    }
-    tasks.run(t++)
+  project._upload(accountPassword, tasks, 2)
+})
+
+tasks.add(result => {
+  metadataService = new MetadataService(bigchaindb)
+  metadataService.Hashes.import(project.export('metadata_hashes'))
+  setTimeout(() => metadataService._get('Band/data', true, tasks, 3), 3000)
+})
+
+tasks.add(result => {
+  assert.deepEqual(order(result), {
+    member: [
+      {
+        name: 'Bassist'
+      },
+      {
+        name: 'Drummer'
+      },
+      {
+        name: 'Guitarist'
+      },
+      {
+        name: 'Singer'
+      }
+    ],
+    name: 'Band',
   })
+  metadataService._get('Band/sender', false, tasks, 4)
+})
+
+tasks.add(result => {
+  assert.deepEqual(result, {
+    publicKey: account.publicKey()
+  })
+  metadataService._get('Band/recipient/0', false, tasks, 5)
+})
+
+tasks.add(result => {
+  assert.deepEqual(result, {
+    amount: 1,
+    publicKey: account.publicKey()
+  })
+  contentService = new ContentService(ipfs)
+  contentService.Decryption.import(project.export('content_decryption'))
+  contentService.Hashes.import(project.export('content_hashes'))
+  contentService._get('track1.mp3', { password: encryptPassword }, tasks, 6)
+})
+
+tasks.add(result => {
+  if (!result.equals(content1)) {
+    return tasks.error('content does not match')
+  }
+  project = new Project({
+    account,
+    contentService: swarm,
+    metadataService: bigchaindb,
+    title: 'different content service'
+  })
+  project._import([file2], metadata2, '', tasks, 7)
 })
 
 tasks.add(() => {
-  constellate.generateIPLD(metadataService, err => {
-    if (err) {
-      return tasks.error(err)
-    }
-    tasks.run(t++)
-  })
+  project._upload(accountPassword, tasks, 8)
 })
 
 tasks.add(() => {
-  constellate.pushIPLD(metadataService, err => {
-    if (err) {
-      return tasks.error(err)
-    }
-    tasks.run(t++)
+  metadataService.Hashes.import(project.export('metadata_hashes'))
+  setTimeout(() => metadataService._get('AnotherRecording/data/recordingOf', true, tasks, 9), 3000)
+})
+
+tasks.add(result => {
+  assert.deepEqual(result, {
+    composer: {
+      name: "Singer"
+    },
+    name: "AnotherComposition"
   })
+  metadataService._get('AnotherComposition/sender', false, tasks, 10)
+})
+
+tasks.add(result => {
+  assert.deepEqual(result, {
+    publicKey: account.publicKey()
+  })
+  metadataService._get('AnotherComposition/recipient/0', false, tasks, 11)
+})
+
+tasks.add(result => {
+  assert.deepEqual(result, {
+    amount: 1,
+    publicKey: account.publicKey()
+  })
+  contentService = new ContentService(swarm)
+  contentService.Hashes.import(project.export('content_hashes'))
+  contentService._get('track2.mp3', {}, tasks, 12)
+})
+
+tasks.add(result => {
+  if (!result.equals(content2)) {
+    return tasks.error('content does not match')
+  }
+  project = new Project({
+    contentService: swarm,
+    metadataService: ipfs,
+    title: 'no account, different metadata service'
+  })
+  project._import([file1], metadata1, '', tasks, 13)
 })
 
 tasks.add(() => {
-  constellate.uploadContent(contentService, err => {
-    if (err) {
-      return tasks.error(err)
-    }
-    tasks.run(t++)
-  })
+  project._upload('', tasks, 14)
 })
 
 tasks.add(() => {
-  hashes = constellate.exportMetaHashes()
-  constellate.getMetadata(metadataService, hashes.recording, true, (err, result) => {
-    if (err) {
-      return tasks.error(err)
+  metadataService = new MetadataService(ipfs)
+  metadataService.Hashes.import(project.export('metadata_hashes'))
+  metadataService._get('Composition', true, tasks, 15)
+})
+
+tasks.add(result => {
+  assert.deepEqual(order(result), {
+    data: {
+      composer: {
+        name: 'Singer'
+      },
+      name: 'Composition'
     }
-    console.log(JSON.stringify(result, null, 2))
-    tasks.run(t++)
   })
+  contentService.Hashes.import(project.export('content_hashes'))
+  contentService._get('track1.mp3', {}, tasks, 16)
+})
+
+tasks.add(result => {
+  content1 = fs.readFileSync('./proj1/track1.mp3')
+  if (!result.equals(content1)) {
+    return tasks.error('content does not match')
+  }
+  try {
+    contentService = new ContentService({
+      name: 'badservice',
+      path: 'path/to/*'
+    })
+  } catch (err) {
+    assert.equal(err.message, errUnsupportedService('badservice').message)
+    tasks.run(17)
+  }
 })
 
 tasks.add(() => {
-  const name = 'audio.mp3'
-  hashes = constellate.exportFileHashes()
-  constellate.getContent(contentService, hashes[name], { name, password }, (err, result) => {
-    if (err) {
-      return tasks.error(err)
-    }
-    if (!content1.equals(result.content)) {
-      return tasks.error('decrypted content does not match original')
-    }
-    constellate.clearFileHashes()
-    constellate.clearMetadata()
-    tasks.run(t++)
+  tasks.callback(err => {
+    assert.equal(err.message, errInvalidPassword('badpassword').message)
+    tasks.run(18)
   })
+  account._decrypt('badpassword', tasks, 18)
 })
 
-tasks.add(() => {
-  constellate.Swarm('http://swarm-gateways.net', err => {
-    if (err) {
-      return tasks.error(err)
-    }
-    contentService = 'swarm-content-service'
-    tasks.run(t++)
-  })
-})
+// TODO: test more errors
 
 tasks.add(() => {
-  constellate.importContent(contentService, [file2], err => {
-    if (err) {
-      return tasks.error(err)
-    }
-    tasks.run(t++)
-  })
-})
-
-tasks.add(() => {
-  constellate.importMetadata([
-    Hash,
-    MusicComposition2,
-    MusicRecording2
-  ], err => {
-    if (err) {
-      return tasks.error(err)
-    }
-    tasks.run(t++)
-  })
-})
-
-tasks.add(() => {
-  constellate.generateIPLD(metadataService, err => {
-    if (err) {
-      return tasks.error(err)
-    }
-    tasks.run(t++)
-  })
-})
-
-tasks.add(() => {
-  constellate.pushIPLD(metadataService, err => {
-    if (err) {
-      return tasks.error(err)
-    }
-    tasks.run(t++)
-  })
-})
-
-tasks.add(() => {
-  constellate.uploadContent(contentService, err => {
-    if (err) {
-      return tasks.error(err)
-    }
-    tasks.run(t++)
-  })
-})
-
-tasks.add(() => {
-  hashes = constellate.exportFileHashes()
-  constellate.getContent(contentService, hashes['audio.mp3'], (err, result) => {
-    if (err) {
-      return tasks.error(err)
-    }
-    if (!content2.equals(result.content)) {
-      return tasks.error('query result does not match content')
-    }
-    tasks.run(t++)
-  })
-})
-
-tasks.add(() => {
-  hashes = constellate.exportMetaHashes()
-  constellate.getMetadata(metadataService, hashes.anotherRecording, true, (err, result) => {
-    if (err) {
-      return tasks.error(err)
-    }
-    console.log(JSON.stringify(result, null, 2))
-    tasks.run(t++)
-  })
-})
-
-tasks.add(() => {
-  console.log('Done')
+  console.log('Finished constellate test')
   process.exit()
 })
 
-constellate.IPFS(err => {
-  if (err) {
-    return tasks.error(err)
-  }
-  tasks.run(t++)
-})
+account._import(accountObject, accountPassword, tasks, 0)
+// account._generate(accountPassword, tasks, 0)

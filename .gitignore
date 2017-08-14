@@ -1,5 +1,4 @@
-bigchaindb*
-bundle.*
+*bundle.*
 .DS_Store
 *.log
 node_modules
