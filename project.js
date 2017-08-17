@@ -5,7 +5,7 @@ const fileToAnchor = require('./lib/util').fileToAnchor
 const {
   Account,
   Project
-} = require('./lib/constellate')
+} = require('./lib/browser')
 
 const account = new Account({ browser: true })
 const newAccount = document.getElementById('new-account')
