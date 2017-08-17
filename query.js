@@ -5,7 +5,7 @@ const fileToAnchor = require('./lib/util').fileToAnchor
 const {
   ContentService,
   MetadataService
-} = require('./lib/constellate')
+} = require('./lib/browser')
 
 let contentService, metadataService
 
@@ -43,7 +43,7 @@ importDecryptionBtn.addEventListener('click', () => {
   if (!contentService) return
   const file = importDecryption.files[0]
   if (!file) return
-  contentService.Decryption.import(file)
+  contentService.importDecryption(file)
   console.log('Imported content decryption')
 })
 
@@ -51,7 +51,7 @@ importContentHashesBtn.addEventListener('click', () => {
   if (!contentService) return
   const file = importContentHashes.files[0]
   if (!file) return
-  contentService.Hashes.import(file)
+  contentService.importHashes(file)
   console.log('Imported content hashes')
 })
 
@@ -59,7 +59,7 @@ importMetadataHashesBtn.addEventListener('click', () => {
   if (!metadataService) return
   const file = importMetadataHashes.files[0]
   if (!file) return
-  metadataService.Hashes.import(file)
+  metadataService.importHashes(file)
   console.log('Imported metadata hashes')
 })
 

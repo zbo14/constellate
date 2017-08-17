@@ -65,42 +65,41 @@ SOFTWARE.
 */
 
 function BlockAPI(addr: string) {
+  this._send = moduleConfig(addr)
+}
 
-  const send = moduleConfig(addr)
-
-  this.get = (cid: Object, cb: Function) => {
-    const request = {
-      path: 'block/get',
-      args: cid.toBaseEncodedString()
-    }
-    const transform = (response, cb) => {
-      if (Buffer.isBuffer(response)) {
-        cb(null, new Block(response, cid))
-      } else {
-        streamToValue(response, (err, data) => {
-          if (err) {
-            return cb(err)
-          }
-          cb(null, new Block(data, cid))
-        })
-      }
-    }
-    send.andTransform(request, transform, cb)
+BlockAPI.prototype.get = function (cid: Object, cb: Function) {
+  const request = {
+    path: 'block/get',
+    args: cid.toBaseEncodedString()
   }
-
-  this.put = (data: Buffer, cb: Function) => {
-    const request = {
-      path: 'block/put',
-      files: data,
-      qs: {
-        format: 'cbor'
-      }
+  const transform = (response, cb) => {
+    if (Buffer.isBuffer(response)) {
+      cb(null, new Block(response, cid))
+    } else {
+      streamToValue(response, (err, data) => {
+        if (err) {
+          return cb(err)
+        }
+        cb(null, new Block(data, cid))
+      })
     }
-    const transform = (info, cb) => {
-      cb(null, new Block(data, new CID(info.Key)))
-    }
-    send.andTransform(request, transform, cb)
   }
+  this._send.andTransform(request, transform, cb)
+}
+
+BlockAPI.prototype.put = function (data: Buffer, cb: Function) {
+  const request = {
+    path: 'block/put',
+    files: data,
+    qs: {
+      format: 'cbor'
+    }
+  }
+  const transform = (info, cb) => {
+    cb(null, new Block(data, new CID(info.Key)))
+  }
+  this._send.andTransform(request, transform, cb)
 }
 
 /*
@@ -140,224 +139,225 @@ THE SOFTWARE.
 
 const Ipfs = {}
 
-Ipfs.ContentService = function (addr: string) {
-
+function ContentService (addr: string) {
   const maddr = multiaddr(addr)
-  const host = maddr.nodeAddress().address
-  const port = maddr.nodeAddress().port
-
-  const filesAPI = FilesAPI(addr)
-
-  this.pathToIRI = (path: string): string => {
-    return `http://${host}:${port}/api/v0/get?arg=` + path
-  }
-
-  this.isValidHash = isIpfs.multihash
-
-  this.hash = (content: Buffer, tasks: Object, t: number, i?: number) => {
-    const file = new UnixFS('file', content)
-    DAGNode.create(file.marshal(), (err, dagNode) => {
-      if (err) {
-        return tasks.error(err)
-      }
-      const mh = dagNode.toJSON().multihash
-      tasks.run(t, mh, i)
-    })
-  }
-
-  this.get = (path: string, tasks: Object, t: number, i?: number) => {
-    filesAPI.get(path, (err, stream) => {
-      if (err) {
-        return tasks.error(err)
-      }
-      stream.on('data', file => {
-        const chunks = []
-        file.content.on('data', chunk => {
-          chunks.push(chunk)
-        })
-        file.content.once('end', () => {
-          tasks.run(t, Buffer.concat(chunks), i)
-        })
-        file.content.resume()
-      })
-      stream.resume()
-    })
-  }
-
-  this.put = (contents: Buffer[], tasks: Object, t: number, i?: number) => {
-    filesAPI.add(contents, (err, results) => {
-      if (err) {
-        return tasks.error(err)
-      }
-      const hashes = results.map(result => result.hash)
-      tasks.run(t, hashes, i)
-    })
-  }
+  this.host = maddr.nodeAddress().address
+  this.port = maddr.nodeAddress().port
+  this._files = FilesAPI(addr)
 }
 
-Ipfs.MetadataService = function (addr: string) {
+ContentService.prototype.pathToURL = function (path: string): string {
+  return `http://${this.host}:${this.port}/api/v0/get?arg=` + path
+}
 
+// ContentService.prototype.isValidHash = isIpfs.multihash
+
+ContentService.prototype.hash = function (content: Buffer, tasks: Object, t: number, i?: number) {
+  const file = new UnixFS('file', content)
+  DAGNode.create(file.marshal(), (err, dagNode) => {
+    if (err) {
+      return tasks.error(err)
+    }
+    const mh = dagNode.toJSON().multihash
+    tasks.run(t, mh, i)
+  })
+}
+
+ContentService.prototype.get = function (path: string, tasks: Object, t: number, i?: number) {
+  this._files.get(path, (err, stream) => {
+    if (err) {
+      return tasks.error(err)
+    }
+    stream.on('data', file => {
+      const chunks = []
+      file.content.on('data', chunk => {
+        chunks.push(chunk)
+      })
+      file.content.once('end', () => {
+        tasks.run(t, Buffer.concat(chunks), i)
+      })
+      file.content.resume()
+    })
+    stream.resume()
+  })
+}
+
+ContentService.prototype.put = function (contents: Buffer[], tasks: Object, t: number, i?: number) {
+  this._files.add(contents, (err, results) => {
+    if (err) {
+      return tasks.error(err)
+    }
+    const hashes = results.map(result => result.hash)
+    tasks.run(t, hashes, i)
+  })
+}
+
+function MetadataService (addr: string) {
   const maddr = multiaddr(addr)
-  const host = maddr.nodeAddress().address
-  const port = maddr.nodeAddress().port
+  this.host = maddr.nodeAddress().address
+  this.port = maddr.nodeAddress().port
 
-  const blockAPI = new BlockAPI(addr)
+  this._blocks = new BlockAPI(addr)
+}
 
-  this.pathToIRI = (path: string): string => {
-    return `http://${host}:${port}/api/v0/dag/get?arg=` + path
+const isValidCID = (cid: Object): boolean => {
+  return cid.codec === dagCBOR.codec && cid.version === dagCBOR.version
+}
+
+MetadataService.prototype.pathToURL = function (path: string): string {
+  return `http://${this.host}:${this.port}/api/v0/dag/get?arg=` + path
+}
+
+MetadataService.prototype.pathToCID = (path: string): Object => {
+  const parts = path.split('/')
+  const cid = new CID(parts.shift())
+  const remPath = parts.join('/')
+  return { cid, remPath }
+}
+
+MetadataService.prototype.hash = (elem: Object, tasks: Object, t: number, i?: number) => {
+  if (!isElement(elem)) {
+    return tasks.error(errInvalidElement(elem))
   }
+  const t1 = tasks.add(cid => {
+    tasks.run(t, cid.toBaseEncodedString(), i)
+  })
+  dagCBOR.cid(elem.data, tasks, t1)
+}
 
-  this.pathToCID = (path: string): Object => {
-    const parts = path.split('/')
-    const cid = new CID(parts.shift())
-    const remPath = parts.join('/')
-    return { cid, remPath }
+MetadataService.prototype.toElement = (data: Object, path: string, tasks: Object, t: number, i?: number) => {
+  if (path) {
+    tasks.run(t, order(data), i)
+  } else {
+    tasks.run(t, { data }, i)
   }
+}
 
-  this.hash = (elem: Object, tasks: Object, t: number, i?: number) => {
-    if (!isElement(elem)) {
-      return tasks.error(errInvalidElement(elem))
+/*
+
+MetadataService.prototype.isValidHash = (hash: string): boolean => {
+  try {
+    const cid = new CID(hash)
+    return this.isValidCID(cid)
+  } catch (err) {
+    return false
+  }
+}
+
+*/
+
+MetadataService.prototype.hashFromCID = function (cid: Object): string {
+  if (!isValidCID(cid)) {
+    throw errUnexpectedCID(cid)
+  }
+  return cid.toBaseEncodedString()
+}
+
+MetadataService.prototype.resolve = (obj: Object, path: string, tasks: Object, t: number, i?: number) => {
+  if (!path || path === '/') {
+    return tasks.run(t, obj, '', i)
+  }
+  const parts = path.split('/')
+  const first = parts.shift()
+  switch (first) {
+    case 'data':
+      return dagCBOR.resolve(obj, parts.join('/'), tasks, t, i)
+    case 'sender':
+      return tasks.run(t, null, '', i)
+    case 'recipient':
+      return tasks.run(t, null, '', i)
+    default:
+      tasks.error(errPathNotFound(path))
+  }
+}
+
+MetadataService.prototype.get = function (cid: Object, tasks: Object, t: number, i?: number) {
+  if (!isValidCID(cid)) {
+    return tasks.error(errUnexpectedCID(cid))
+  }
+  const t1 = tasks.add(obj => {
+    obj = order(transform(obj, val => {
+      if (!isMerkleLink(val)) {
+        return val
+      }
+      cid = new CID(val['/'])
+      return {
+        '/': this.hashFromCID(cid) + '/data'
+      }
+    }))
+    tasks.run(t, obj, i)
+  })
+  this._blocks.get(cid, (err, block) => {
+    if (err) {
+      return tasks.error(err)
     }
-    const t1 = tasks.add(cid => {
-      tasks.run(t, cid.toBaseEncodedString(), i)
-    })
-    dagCBOR.cid(elem.data, tasks, t1)
-  }
+    dagCBOR.deserialize(block.data, tasks, t1)
+  })
+}
 
-  this.isValidCID = (cid: Object): boolean => {
-    return cid.codec === dagCBOR.codec && cid.version === dagCBOR.version
+MetadataService.prototype.put = function (elem: Object, tasks: Object, t: number, i?: number) {
+  if (!isElement(elem)) {
+    return tasks.error(errInvalidElement(elem))
   }
-
-  this.toElement = (data: Object, path: string, tasks: Object, t: number, i?: number) => {
-    if (path) {
-      tasks.run(t, order(data), i)
-    } else {
-      tasks.run(t, { data }, i)
-    }
-  }
-
-  this.isValidHash = (hash: string): boolean => {
-    try {
-      const cid = new CID(hash)
-      return this.isValidCID(cid)
-    } catch (err) {
-      return false
-    }
-  }
-
-  this.hashFromCID = (cid: Object): string => {
-    if (!this.isValidCID) {
-      throw errUnexpectedCID(cid)
-    }
-    return cid.toBaseEncodedString()
-  }
-
-  this.resolve = (obj: Object, path: string, tasks: Object, t: number, i?: number) => {
-    if (!path || path === '/') {
-      return tasks.run(t, obj, '', i)
-    }
-    const parts = path.split('/')
-    const first = parts.shift()
-    switch (first) {
-      case 'data':
-        return dagCBOR.resolve(obj, parts.join('/'), tasks, t, i)
-      case 'sender':
-        return tasks.run(t, null, '', i)
-      case 'recipient':
-        return tasks.run(t, null, '', i)
-      default:
-        tasks.error(errPathNotFound(path))
-    }
-  }
-
-  this.get = (cid: Object, tasks: Object, t: number, i?: number) => {
-    if (!this.isValidCID(cid)) {
-      return tasks.error(errUnexpectedCID(cid))
-    }
-    const t1 = tasks.add(obj => {
-      obj = order(transform(obj, val => {
-        if (!isMerkleLink(val)) {
-          return val
-        }
-        cid = new CID(val['/'])
-        return {
-          '/': this.hashFromCID(cid) + '/data'
-        }
-      }))
-      tasks.run(t, obj, i)
-    })
-    blockAPI.get(cid, (err, block) => {
+  const t1 = tasks.add(data => {
+    this._blocks.put(data, (err, block) => {
       if (err) {
         return tasks.error(err)
       }
-      dagCBOR.deserialize(block.data, tasks, t1)
+      tasks.run(t, block.cid, i)
     })
-  }
-
-  this.put = (elem: Object, tasks: Object, t: number, i?: number) => {
-    if (!isElement(elem)) {
-      return tasks.error(errInvalidElement(elem))
-    }
-    const t1 = tasks.add(data => {
-      blockAPI.put(data, (err, block) => {
-        if (err) {
-          return tasks.error(err)
-        }
-        tasks.run(t, block.cid, i)
-      })
-    })
-    dagCBOR.serialize(elem.data, tasks, t1)
-  }
+  })
+  dagCBOR.serialize(elem.data, tasks, t1)
 }
 
-Ipfs.Node = function() {
+function Node() {}
 
-    let intervalId, ipfs
-
-    this.start = (repo: Object|string, tasks: Object, t: number, i?: number) => {
-
-      ipfs = new IPFS({
-        init: true,
-        repo,
-        start: true,
-        EXPERIMENTAL: {
-          pubsub: true,
-          sharding: true,
-          dht: true
-        },
-        config: {
-          Addresses: {
-            Swarm: [
-              '/libp2p-webrtc-star/dns4/star-signal.cloud.ipfs.team/wss'
-            ]
-          }
-        }
-        // libp2p: {
-        //  modules: {
-        //    transport: [wstar],
-        //    discovery: [wstar.discovery]
-        //  }
-        // }
-      })
-
-      ipfs.on('error', err => {
-        tasks.error(err)
-      })
-
-      ipfs.on('ready', () => {
-        intervalId = setInterval(ipfs.swarm.peers, 3000)
-        console.log('IPFS Node is ready')
-        tasks.run(t, ipfs, i)
-      })
+Node.prototype.start = function (repo: Object|string, tasks: Object, t: number, i?: number) {
+  this._ipfs = new IPFS({
+    init: true,
+    repo,
+    start: true,
+    EXPERIMENTAL: {
+      pubsub: true,
+      sharding: true,
+      dht: true
+    },
+    config: {
+      Addresses: {
+        Swarm: [
+          '/libp2p-webrtc-star/dns4/star-signal.cloud.ipfs.team/wss'
+        ]
+      }
     }
+    // libp2p: {
+    //  modules: {
+    //    transport: [wstar],
+    //    discovery: [wstar.discovery]
+    //  }
+    // }
+  })
 
-    this.stop = (tasks: Object, t: number, i?: number) => {
-      ipfs.stop(() => {
-        clearInterval(intervalId)
-        console.log('Stopped IPFS Node')
-        tasks.run(t, i)
-      })
-    }
+  this._ipfs.on('error', err => {
+    tasks.error(err)
+  })
+
+  this._ipfs.on('ready', () => {
+    this._intervalId = setInterval(this._ipfs.swarm.peers, 3000)
+    console.log('IPFS Node is ready')
+    tasks.run(t, this._ipfs, i)
+  })
 }
 
-module.exports = Ipfs
+Node.prototype.stop = function (tasks: Object, t: number, i?: number) {
+  this._ipfs.stop(() => {
+    clearInterval(this._intervalId)
+    console.log('Stopped IPFS Node')
+    tasks.run(t, i)
+  })
+}
+
+module.exports = {
+  ContentService,
+  MetadataService,
+  Node
+}

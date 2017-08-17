@@ -8,7 +8,7 @@ NOTE: some functionality isn't documented below (e.g. `import` and `put`). It is
 
 #### new ContentService
 ```js
-const ContentService = require('./lib/constellate').ContentService
+const ContentService = require('./lib').ContentService
 
 const params = {
   name: 'ipfs',
@@ -18,7 +18,7 @@ const params = {
 const contentService = new ContentService(params)
 ```
 
-#### contentService.Hashes.import
+#### contentService.importHashes
 
 Import hashes to enable querying by name.
 
@@ -29,7 +29,7 @@ const hashes = {
   ...
 }
 
-contentService.Hashes.import(hashes)
+contentService.importHashes(hashes)
 ```
 
 ##### Parameters
@@ -63,7 +63,7 @@ NOTE: some functionality isn't documented below (e.g. `import` and `put`). It is
 
 #### new MetadataService
 ```js
-const MetadataService = require('./lib/constellate').MetadataService
+const MetadataService = require('./lib').MetadataService
 
 const params = {
   name: 'bigchaindb',
@@ -73,7 +73,7 @@ const params = {
 const metadataService = new MetadataService(params)
 ```
 
-#### metadataService.Hashes.import
+#### metadataService.importHashes
 
 Import hashes to enable querying by name.
 
@@ -84,7 +84,7 @@ const hashes = {
   ...
 }
 
-metadataService.Hashes.import(hashes)
+metadataService.importHashes(hashes)
 ```
 
 ##### Parameters
@@ -106,10 +106,10 @@ metadataService.get('{hash|name}/data', false, (err, obj) => {
    //   name: 'Band',
    //   member: [
    //     {
-   //       '/': 'hash1'
+   //       '/': 'hash1/data'
    //     },
    //     {
-   //       '/': 'hash2'
+   //       '/': 'hash2/data'
    //     }
    //   ]
    // }
@@ -128,7 +128,7 @@ metadataService.get('{hash|name}/data', false, (err, obj) => {
 
 #### new Project
 ```js
-const Project = require('./lib/constellate').Project
+const Project = require('./lib').Project
 
 const params = {
   contentService: {
@@ -217,10 +217,9 @@ const metadataHashes = project.export('metadata_hashes')
 
 #### new ContentService
 ```js
-const ContentService = require('./lib/constellate').ContentService
+const ContentService = require('./lib/browser').ContentService
 
 const params = {
-  browser: true,
   name: 'ipfs',
   path: '/ip4/127.0.0.1/tcp/5001'
 }
@@ -228,7 +227,7 @@ const params = {
 const contentService = new ContentService(params)
 ```
 
-#### contentService.Hashes.import
+#### contentService.importHashes
 
 Import hashes to enable querying by name.
 
@@ -237,7 +236,7 @@ const input = document.querySelector('input[type="file"]')
 
 const file = input.files[0]
 
-contentService.Hashes.import(file)
+contentService.importHashes(file)
 ```
 
 ##### Parameters
@@ -269,10 +268,9 @@ contentService.get('{hash|name}', (err, file) => {
 
 #### new MetadataService
 ```js
-const MetadataService = require('./lib/constellate').MetadataService
+const MetadataService = require('./lib/browser').MetadataService
 
 const params = {
-  browser: true,
   name: 'bigchaindb',
   path: 'API_ENDPOINT'
 }
@@ -280,7 +278,7 @@ const params = {
 const metadataService = new MetadataService(params)
 ```
 
-#### metadataService.Hashes.import
+#### metadataService.importHashes
 
 Import hashes to enable querying by name.
 
@@ -289,7 +287,7 @@ const input = document.querySelector('input[type="file"]')
 
 const file = input.files[0]
 
-metadataService.Hashes.import(file)
+metadataService.importHashes(file)
 ```
 
 ##### Parameters
@@ -304,10 +302,9 @@ same as Node.js API method
 
 #### new Project
 ```js
-const Project = require('./lib/constellate').Project
+const Project = require('./lib/browser').Project
 
 const params = {
-  browser: true,
   contentService: {
     name: 'ipfs',
     path: '/ip4/127.0.0.1/tcp/5001'
