@@ -98,7 +98,7 @@ const swarmHash = (data: Buffer, tasks: Object, t: number, i?: number) => {
      if (++count !== chunks.length) return
      hashChunk(Buffer.concat(chunks), size, tasks, t, i)
    })
-   chunks = new Array(size%treeSize ? Math.round(size/treeSize)+1 : Math.round(size/treeSize))
+   chunks = new Array(Math.floor((size + treeSize - 1) / treeSize))
    for (let j = 0, s = 0; s < size; j++, s += treeSize) {
      if (size - s < treeSize) {
        secSize = size - s
@@ -140,64 +140,65 @@ SOFTWARE.
 
 */
 
-const Swarm = {}
+// const isValidHash = (hash: string): boolean => {
+//   return /^[a-f0-9]{64}$/.test(hash)
+// }
 
-Swarm.ContentService = function (url: string) {
+function ContentService (url: string) {
+  this.url = url
+}
 
-  this.hash = (content: Buffer, tasks: Object, t: number, i?: number) => {
-    const t1 = tasks.add(data => {
-      tasks.run(t, data.toString('hex'), i)
-    })
-    swarmHash(content, tasks, t1)
-  }
+ContentService.prototype.hash = (content: Buffer, tasks: Object, t: number, i?: number) => {
+  const t1 = tasks.add(data => {
+    tasks.run(t, data.toString('hex'), i)
+  })
+  swarmHash(content, tasks, t1)
+}
 
-  this.isValidHash = (hash: string): boolean => {
-    return /^[a-f0-9]{64}$/.test(hash)
-  }
+ContentService.prototype.pathToURL = function (path: string): string {
+  return this.url + '/bzzr://' + path
+}
 
-  this.pathToIRI = (path: string): string => {
-    return url + '/bzzr://' + path
-  }
-
-  this.get = (path: string, tasks: Object, t: number, i?: number) => {
-    request(
-      this.pathToIRI(path),
-      { responseType: 'arraybuffer' },
-      (err, data, res) => {
-        if (err) {
-          return tasks.error(err)
-        }
-        if (res.statusCode !== 200) {
-          return tasks.error(err)
-        }
-        tasks.run(t, Buffer.from(data), i)
+ContentService.prototype.get = function (path: string, tasks: Object, t: number, i?: number) {
+  request(
+    this.pathToURL(path),
+    { responseType: 'arraybuffer' },
+    (err, data, res) => {
+      if (err) {
+        return tasks.error(err)
       }
-    )
-  }
-
-  this.put = (contents: Buffer[], tasks: Object, t: number, i?: number) => {
-    const hashes = new Array(contents.length)
-    let count = 0
-    for (let j = 0; j < contents.length; j++) {
-      request(url + '/bzzr:', {
-        method: 'POST',
-        body: contents[j]
-      }, (err, data, res) => {
-        if (err) {
-          return tasks.error(err)
-        }
-        if (res.statusCode !== 200) {
-          return tasks.error(data)
-        }
-        if (!this.isValidHash(data)) {
-          return tasks.error('invalid hash: ' + data)
-        }
-        hashes[j] = data
-        if (++count !== contents.length) return
-        tasks.run(t, hashes, i)
-      })
+      if (res.statusCode !== 200) {
+        return tasks.error(err)
+      }
+      tasks.run(t, Buffer.from(data), i)
     }
+  )
+}
+
+ContentService.prototype.put = function (contents: Buffer[], tasks: Object, t: number, i?: number) {
+  const hashes = new Array(contents.length)
+  let count = 0
+  for (let j = 0; j < contents.length; j++) {
+    request(this.url + '/bzzr:', {
+      method: 'POST',
+      body: contents[j]
+    }, (err, data, res) => {
+      if (err) {
+        return tasks.error(err)
+      }
+      if (res.statusCode !== 200) {
+        return tasks.error(data)
+      }
+      // if (!isValidHash(data)) {
+      //   return tasks.error('invalid hash: ' + data)
+      // }
+      hashes[j] = data
+      if (++count !== contents.length) return
+      tasks.run(t, hashes, i)
+    })
   }
 }
 
-module.exports = Swarm
+module.exports = {
+  ContentService
+}

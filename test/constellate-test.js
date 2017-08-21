@@ -1,6 +1,7 @@
 'use strict'
 
 const assert = require('assert')
+const driver = require('bigchaindb-driver')
 const fs = require('fs')
 
 const {
@@ -11,10 +12,11 @@ const {
   ErrNoService,
   errInvalidPassword,
   errUnsupportedService
-} = require('../lib/constellate')
+} = require('../lib')
 
 const {
   Tasks,
+  assign,
   order
 } = require('../lib/util')
 
@@ -57,22 +59,24 @@ const bigchaindb = {
 
 const ipfs = {
   name: 'ipfs',
-  path: // ...
+  path: '/ip4/127.0.0.1/tcp/5001'
 }
 
 const swarm = {
   name: 'swarm',
-  path: // ...
+  path: 'http://swarm-gateways.net'
 }
 
 let contentService,
+    hash,
     metadataService,
     project = new Project({
       account,
       contentService: ipfs,
       metadataService: bigchaindb,
       title: 'untitled'
-    })
+    }),
+    recipient
 
 tasks.add(() => {
   project._import([file1], metadata1, encryptPassword, tasks, 1)
@@ -83,8 +87,8 @@ tasks.add(() => {
 })
 
 tasks.add(result => {
-  metadataService = new MetadataService(bigchaindb)
-  metadataService.Hashes.import(project.export('metadata_hashes'))
+  metadataService = new MetadataService(assign(bigchaindb, { account }))
+  metadataService.importHashes(project.export('metadata_hashes'))
   setTimeout(() => metadataService._get('Band/data', true, tasks, 3), 3000)
 })
 
@@ -116,14 +120,45 @@ tasks.add(result => {
   metadataService._get('Band/recipient/0', false, tasks, 5)
 })
 
+/*
+
 tasks.add(result => {
   assert.deepEqual(result, {
     amount: 1,
     publicKey: account.publicKey()
   })
+  const keypair = new driver.Ed25519Keypair()
+  recipient = [{
+    amount: 1,
+    publicKey: keypair.publicKey
+  }]
+  metadataService._transfer('Band', recipient, accountPassword, tasks, 6)
+})
+
+tasks.add(result => {
+  setTimeout(() => metadataService._get(result, false, tasks, 7), 3000)
+})
+
+*/
+
+tasks.add(result => {
+  // const hashes = metadataService._exportHashes()
+  // assert.deepEqual(result, {
+  //   data: {
+  //     '/': hashes.Band +'/data'
+  //   },
+  //   recipient,
+  //   sender: {
+  //     publicKey: account.publicKey()
+  //   }
+  // })
+  assert.deepEqual(result, {
+    amount: 1,
+    publicKey: account.publicKey()
+  })
   contentService = new ContentService(ipfs)
-  contentService.Decryption.import(project.export('content_decryption'))
-  contentService.Hashes.import(project.export('content_hashes'))
+  contentService.importDecryption(project.export('content_decryption'))
+  contentService.importHashes(project.export('content_hashes'))
   contentService._get('track1.mp3', { password: encryptPassword }, tasks, 6)
 })
 
@@ -145,16 +180,16 @@ tasks.add(() => {
 })
 
 tasks.add(() => {
-  metadataService.Hashes.import(project.export('metadata_hashes'))
+  metadataService.importHashes(project.export('metadata_hashes'))
   setTimeout(() => metadataService._get('AnotherRecording/data/recordingOf', true, tasks, 9), 3000)
 })
 
 tasks.add(result => {
   assert.deepEqual(result, {
     composer: {
-      name: "Singer"
+      name: 'Singer'
     },
-    name: "AnotherComposition"
+    name: 'AnotherComposition'
   })
   metadataService._get('AnotherComposition/sender', false, tasks, 10)
 })
@@ -172,7 +207,7 @@ tasks.add(result => {
     publicKey: account.publicKey()
   })
   contentService = new ContentService(swarm)
-  contentService.Hashes.import(project.export('content_hashes'))
+  contentService.importHashes(project.export('content_hashes'))
   contentService._get('track2.mp3', {}, tasks, 12)
 })
 
@@ -194,7 +229,7 @@ tasks.add(() => {
 
 tasks.add(() => {
   metadataService = new MetadataService(ipfs)
-  metadataService.Hashes.import(project.export('metadata_hashes'))
+  metadataService.importHashes(project.export('metadata_hashes'))
   metadataService._get('Composition', true, tasks, 15)
 })
 
@@ -207,7 +242,7 @@ tasks.add(result => {
       name: 'Composition'
     }
   })
-  contentService.Hashes.import(project.export('content_hashes'))
+  contentService.importHashes(project.export('content_hashes'))
   contentService._get('track1.mp3', {}, tasks, 16)
 })
 

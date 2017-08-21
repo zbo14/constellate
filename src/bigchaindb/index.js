@@ -30,8 +30,6 @@ const {
  * @module constellate/src/bigchaindb
  */
 
-const BigchainDB = {}
-
 const ErrMultipleInputs = new Error('tx with multiple inputs not supported')
 const ErrMultipleOwnersBefore = new Error('tx input with multiple owners_before not supported')
 const ErrMultiplePublicKeys = new Error('tx output with multiple public_keys not supported')
@@ -52,7 +50,7 @@ const hashTx = (tx: Object): Buffer => {
   return Buffer.from(sha3_256.create().update(data).buffer())
 }
 
-BigchainDB.Tx = {
+const Tx = {
 
   codec,
 
@@ -86,10 +84,13 @@ BigchainDB.Tx = {
         if (tx.inputs.length > 1) {
           return tasks.error(ErrMultipleInputs)
         }
-        const sender = {
-          publicKey: tx.inputs[0].owners_before[0]
+        const publicKey = tx.inputs[0].owners_before[0]
+        if (!parts[0]) {
+          return tasks.run(t, { publicKey }, '', i)
         }
-        return tasks.run(t, sender, '', i)
+        if (parts[0] === 'publicKey') {
+          return tasks.run(t, publicKey, '', i)
+        }
       case 'recipient':
         const recipient = order(tx.outputs.map(output => {
           if (output.public_keys.length > 1) {
@@ -100,10 +101,19 @@ BigchainDB.Tx = {
             publicKey: output.public_keys[0]
           }
         }))
-        if (parts[0]) {
-          return tasks.run(t, recipient[Number(parts.shift())], parts.join('/'), i)
+        if (!parts[0]) {
+          return tasks.run(t, recipient, '', i)
         }
-        return tasks.run(t, recipient, '', i)
+        const idx = Number(parts[0])
+        if (!parts[1]) {
+          return tasks.run(t, recipient[idx], '', i)
+        }
+        if (parts[1] === 'amount') {
+          return tasks.run(t, Number(recipient[idx].amount), '', i)
+        }
+        if (parts[1] === 'publicKey') {
+          return tasks.run(t, recipient[idx].publicKey, '', i)
+        }
       default:
         tasks.error(errPathNotFound(path))
     }
@@ -171,28 +181,29 @@ const conditionObject = (condition: Object): Object => {
   return { details, uri }
 }
 
-const _getPublicKeys = (details: Object): string[] => {
-  if (details.type === 'ed25519-sha-256') {
-    return [details.public_key]
-  }
-  if (details.type === 'threshold-sha-256') {
-    return details.subconditions.reduce((result, subcondition) => {
-      return result.concat(_getPublicKeys(subcondition))
-    }, [])
-  }
-  return []
-}
+// const _getPublicKeys = (details: Object): string[] => {
+//   if (details.type === 'ed25519-sha-256') {
+//     return [details.public_key]
+//   }
+//   if (details.type === 'threshold-sha-256') {
+//     return details.subconditions.reduce((result, subcondition) => {
+//       return result.concat(_getPublicKeys(subcondition))
+//     }, [])
+//   }
+//   return []
+// }
 
-const getPublicKeys = (details: Object): string[] => {
-  return Array.from(new Set(_getPublicKeys(details)))
-}
+// const getPublicKeys = (details: Object): string[] => {
+//   return Array.from(new Set(_getPublicKeys(details)))
+// }
 
 const newOutput = (amount: number|string, condition: Object): Object => {
   if (isNumber(amount)) {
     amount = amount.toString()
   }
   condition = conditionObject(condition)
-  const public_keys = getPublicKeys(condition.details)
+  // const public_keys = getPublicKeys(condition.details)
+  const public_keys = [condition.details.public_key]
   return { amount, condition, public_keys }
 }
 
@@ -292,156 +303,156 @@ const signTx = (sender: Object, tx: Object, tasks: Object, t, i) => {
     tasks.error(errInvalidOwnerBefore(sender.publicKey))
 }
 
-BigchainDB.ErrMultipleInputs = ErrMultipleInputs
-BigchainDB.ErrMultipleOwnersBefore = ErrMultipleOwnersBefore
-BigchainDB.ErrMultiplePublicKeys = ErrMultiplePublicKeys
+const isValidCID = (cid: Object): boolean => {
+  return cid.codec === codec && cid.version === version
+}
 
-BigchainDB.errInvalidOwnerBefore = errInvalidOwnerBefore
-BigchainDB.errUnexpectedOperation = errUnexpectedOperation
+function MetadataService (url: string) {
+  this.url = url
+}
 
-BigchainDB.MetadataService = function (url: string) {
+// MetadataService.prototype.isValidHash = (hash: string): boolean => {
+//   return /^[a-f0-9]{64}$/.test(hash)
+// }
 
-  this.isValidCID = (cid: Object): boolean => {
-    return cid.codec === codec && cid.version === version
+MetadataService.prototype.hashFromCID = (cid: Object): string => {
+  if (!isValidCID(cid)) {
+    throw errUnexpectedCID(cid)
   }
+  return multihash.decode(cid.multihash).digest.toString('hex')
+}
 
-  this.isValidHash = (hash: string): boolean => {
-    return /^[a-f0-9]{64}$/.test(hash)
+MetadataService.prototype.pathToCID = (path: string): Object => {
+  const parts = path.split('/')
+  const data = Buffer.from(parts.shift(), 'hex')
+  const mh = multihash.encode(data, 'sha3-256')
+  const cid = new CID(version, codec, mh)
+  const remPath = parts.join('/')
+  return { cid, remPath }
+}
+
+MetadataService.prototype.fromElement = function (elem: Object, tasks: Object, t: number, i?: number) {
+  if (!isElement(elem)) {
+    return tasks.error(errInvalidElement(elem))
   }
-
-  this.hashFromCID = (cid: Object): string => {
-    if (!this.isValidCID(cid)) {
-      throw errUnexpectedCID(cid)
-    }
-    return multihash.decode(cid.multihash).digest.toString('hex')
-  }
-
-  this.pathToCID = (path: string): Object => {
-    const parts = path.split('/')
-    const data = Buffer.from(parts.shift(), 'hex')
-    const mh = multihash.encode(data, 'sha3-256')
-    const cid = new CID(version, codec, mh)
-    const remPath = parts.join('/')
-    return { cid, remPath }
-  }
-
-  this.fromElement = (elem: Object, tasks: Object, t: number, i?: number) => {
-    if (!isElement(elem)) {
-      return tasks.error(errInvalidElement(elem))
-    }
-    if (elem.data && elem.data['/']) {
-      const t1 = tasks.add(tx => {
-        newTransferTx(elem.sender, null, elem.recipient, tx, tasks, t, i)
-      })
-      try {
-        const { cid, _ } = this.pathToCID(elem.data['/'])
-        this.get(cid, tasks, t1)
-      } catch(err) {
-        tasks.error(err)
-      }
-    }
-    if (elem.data) {
-      const data = transform(elem.data, val => {
-        if (isMerkleLink(val)) {
-          return {
-            '/': val['/'] + '/data'
-          }
-        }
-        return val
-      })
-      newCreateTx(data, elem.sender, null, elem.recipient, tasks, t, i)
-    }
-  }
-
-  this.hash = (elem: Object, tasks: Object, t: number, i?: number) => {
-    let t1, t2
-    t1 = tasks.add(tx => {
-      BigchainDB.Tx.cid(tx, tasks, t2)
+  if (elem.data['/']) {
+    const t1 = tasks.add(tx => {
+      newTransferTx(elem.sender, null, elem.recipient, tx, tasks, t, i)
     })
-    t2 = tasks.add(cid => {
-      tasks.run(t, this.hashFromCID(cid), i)
-    })
-    this.fromElement(elem, tasks, t1)
-  }
-
-  this.toElement = (tx: Object, path: string, tasks: Object, t: number, i?: number) => {
-    if (path) {
-      return tasks.run(t, order(tx), i)
-    }
-    const elem : Object = {}
-    if (tx.asset.data) {
-      elem.data = tx.asset.data
-    } else if (tx.asset.id) {
-      elem.data = {
-        '/': tx.asset.id
-      }
-    }
-    if (tx.inputs.length > 1) {
-      return tasks.error(ErrMultipleInputs)
-    }
-    if (tx.inputs[0].owners_before.length > 1) {
-      return tasks.error(ErrMultipleOwnersBefore)
-    }
-    elem.sender = {
-      publicKey: tx.inputs[0].owners_before[0]
-    }
-    elem.recipient = new Array(tx.outputs.length)
-    let output
-    for (let j = 0; j < tx.outputs.length; j++) {
-      output = tx.outputs[j]
-      if (output.public_keys.length > 1) {
-        return tasks.error(ErrMultiplePublicKeys)
-      }
-      elem.recipient[j] = {
-        amount: Number(output.amount),
-        publicKey: output.public_keys[0]
-      }
-    }
-    tasks.run(t, order(elem), i)
-  }
-
-  this.pathToIRI = (path: string): string => {
-    return url + '/transactions/' + path
-  }
-
-  this.resolve = BigchainDB.Tx.resolve
-
-  this.get = (cid: Object, tasks: Object, t: number, i?: number) => {
-    let hash
     try {
-      hash = this.hashFromCID(cid)
+      const { cid, _ } = this.pathToCID(elem.data['/'])
+      return this.get(cid, tasks, t1)
     } catch(err) {
       tasks.error(err)
     }
-    request(this.pathToIRI(hash), { json: true }, (err, tx, res) => {
-        if (err) {
-          return tasks.error(err)
-        }
-        if (res.statusCode !== 200) {
-          return tasks.error(JSON.stringify(tx))
-        }
-        tasks.run(t, tx, i)
-    })
   }
-
-  this.put = (elem: Object, tasks: Object, t: number, i?: number) => {
-    let t1, t2
-    t1 = tasks.add(tx => {
-      signTx(elem.sender, tx, tasks, t2)
-    })
-    t2 = tasks.add(tx => {
-      request(url + '/transactions', { method: 'POST', json: true, body: tx }, (err, json, res) => {
-        if (err) {
-          return tasks.error(err)
-        }
-        if (res.statusCode !== 200 && res.statusCode !== 202) {
-          return tasks.error(JSON.stringify(json))
-        }
-        BigchainDB.Tx.cid(json, tasks, t, i)
-      })
-    })
-    this.fromElement(elem, tasks, t1)
-  }
+  const data = transform(elem.data, val => {
+    if (isMerkleLink(val)) {
+      return {
+        '/': val['/'] + '/data'
+      }
+    }
+    return val
+  })
+  newCreateTx(data, elem.sender, null, elem.recipient, tasks, t, i)
 }
 
-module.exports = BigchainDB
+MetadataService.prototype.hash = function (elem: Object, tasks: Object, t: number, i?: number) {
+  let t1, t2
+  t1 = tasks.add(tx => {
+    Tx.cid(tx, tasks, t2)
+  })
+  t2 = tasks.add(cid => {
+    tasks.run(t, this.hashFromCID(cid), i)
+  })
+  this.fromElement(elem, tasks, t1)
+}
+
+MetadataService.prototype.toElement = (tx: Object, path: string, tasks: Object, t: number, i?: number) => {
+  if (path) {
+    return tasks.run(t, order(tx), i)
+  }
+  const elem : Object = {}
+  if (tx.asset.data) {
+    elem.data = tx.asset.data
+  } else if (tx.asset.id) {
+    elem.data = {
+      '/': tx.asset.id + '/data'
+    }
+  }
+  if (tx.inputs.length > 1) {
+    return tasks.error(ErrMultipleInputs)
+  }
+  if (tx.inputs[0].owners_before.length > 1) {
+    return tasks.error(ErrMultipleOwnersBefore)
+  }
+  elem.sender = {
+    publicKey: tx.inputs[0].owners_before[0]
+  }
+  elem.recipient = new Array(tx.outputs.length)
+  let output
+  for (let j = 0; j < tx.outputs.length; j++) {
+    output = tx.outputs[j]
+    if (output.public_keys.length > 1) {
+      return tasks.error(ErrMultiplePublicKeys)
+    }
+    elem.recipient[j] = {
+      amount: Number(output.amount),
+      publicKey: output.public_keys[0]
+    }
+  }
+  tasks.run(t, order(elem), i)
+}
+
+MetadataService.prototype.pathToURL = function (path: string) {
+  return this.url + '/transactions/' + path
+}
+
+MetadataService.prototype.resolve = Tx.resolve
+
+MetadataService.prototype.get = function (cid: Object, tasks: Object, t: number, i?: number) {
+  let hash
+  try {
+    hash = this.hashFromCID(cid)
+  } catch(err) {
+    tasks.error(err)
+  }
+  request(this.pathToURL(hash), { json: true }, (err, tx, res) => {
+      if (err) {
+        return tasks.error(err)
+      }
+      if (res.statusCode !== 200) {
+        return tasks.error(JSON.stringify(tx))
+      }
+      tasks.run(t, tx, i)
+  })
+}
+
+MetadataService.prototype.put = function (elem: Object, tasks: Object, t: number, i?: number) {
+  let t1, t2
+  t1 = tasks.add(tx => {
+    signTx(elem.sender, tx, tasks, t2)
+  })
+  t2 = tasks.add(tx => {
+    request(this.url + '/transactions', { method: 'POST', json: true, body: tx }, (err, json, res) => {
+      if (err) {
+        return tasks.error(err)
+      }
+      if (res.statusCode !== 200 && res.statusCode !== 202) {
+        return tasks.error(JSON.stringify(json))
+      }
+      Tx.cid(json, tasks, t, i)
+    })
+  })
+  this.fromElement(elem, tasks, t1)
+}
+
+module.exports = {
+  MetadataService,
+  Tx,
+  ErrMultipleInputs,
+  ErrMultiplePublicKeys,
+  ErrMultipleOwnersBefore,
+  errInvalidOwnerBefore,
+  errUnexpectedOperation
+}
