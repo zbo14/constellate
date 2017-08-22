@@ -115,7 +115,7 @@ exports.isRecipient = (recipient: any): boolean => {
            recipient.publicKey && isString(recipient.publicKey)
   }
   if (isArray(recipient, isObject)) {
-    return recipient.every(recipient => {
+    return recipient.length && recipient.every(recipient => {
       return recipient.amount && exports.isNumber(recipient.amount) &&
              recipient.publicKey && isString(recipient.publicKey)
     })
@@ -226,7 +226,6 @@ exports.traverse = (val: any, fn: Function) => {
         traverse(trail + '.' + i, val[i], fn)
       }
     } else if (isObject(val)) {
-      let fullPath
       const keys = Object.keys(val)
       for (i = 0; i < keys.length; i++) {
         traverse(
