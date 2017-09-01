@@ -6,10 +6,10 @@ const CID = require('cids')
 const multihash = require('multihashes')
 const request = require('xhr-request')
 const sha3_256 = require('js-sha3').sha3_256
-
 const dagCBOR = require('../../lib/dag-cbor')
 
 const {
+  Tasks,
   clone,
   errInvalidElement,
   errPathNotFound,
@@ -17,8 +17,6 @@ const {
   isMerkleLink,
   isElement,
   isNumber,
-  isObject,
-  isString,
   order,
   orderStringify,
   transform
@@ -311,9 +309,10 @@ function MetadataService (url: string) {
   this.url = url
 }
 
-// MetadataService.prototype.isValidHash = (hash: string): boolean => {
-//   return /^[a-f0-9]{64}$/.test(hash)
-// }
+MetadataService.prototype.get = function (cid: Object, cb: Function) {
+  const tasks = new Tasks(cb)
+  this._get(cid, tasks, -1)
+}
 
 MetadataService.prototype.hashFromCID = (cid: Object): string => {
   if (!isValidCID(cid)) {
@@ -331,7 +330,16 @@ MetadataService.prototype.pathToCID = (path: string): Object => {
   return { cid, remPath }
 }
 
-MetadataService.prototype.fromElement = function (elem: Object, tasks: Object, t: number, i?: number) {
+MetadataService.prototype.pathToURL = function (path: string) {
+  return this.url + '/transactions/' + path
+}
+
+MetadataService.prototype.put = function (elem: Object, cb: Function) {
+  const tasks = new Tasks(cb)
+  this._put(elem, tasks, -1)
+}
+
+MetadataService.prototype._fromElement = function (elem: Object, tasks: Object, t: number, i?: number) {
   if (!isElement(elem)) {
     return tasks.error(errInvalidElement(elem))
   }
@@ -357,7 +365,25 @@ MetadataService.prototype.fromElement = function (elem: Object, tasks: Object, t
   newCreateTx(data, elem.sender, null, elem.recipient, tasks, t, i)
 }
 
-MetadataService.prototype.hash = function (elem: Object, tasks: Object, t: number, i?: number) {
+MetadataService.prototype._get = function (cid: Object, tasks: Object, t: number, i?: number) {
+  let hash
+  try {
+    hash = this.hashFromCID(cid)
+  } catch(err) {
+    tasks.error(err)
+  }
+  request(this.pathToURL(hash), { json: true }, (err, tx, res) => {
+      if (err) {
+        return tasks.error(err)
+      }
+      if (res.statusCode !== 200) {
+        return tasks.error(JSON.stringify(tx))
+      }
+      tasks.run(t, tx, i)
+  })
+}
+
+MetadataService.prototype._hash = function (elem: Object, tasks: Object, t: number, i?: number) {
   let t1, t2
   t1 = tasks.add(tx => {
     Tx.cid(tx, tasks, t2)
@@ -365,10 +391,29 @@ MetadataService.prototype.hash = function (elem: Object, tasks: Object, t: numbe
   t2 = tasks.add(cid => {
     tasks.run(t, this.hashFromCID(cid), i)
   })
-  this.fromElement(elem, tasks, t1)
+  this._fromElement(elem, tasks, t1)
 }
 
-MetadataService.prototype.toElement = (tx: Object, path: string, tasks: Object, t: number, i?: number) => {
+MetadataService.prototype._put = function (elem: Object, tasks: Object, t: number, i?: number) {
+  let t1, t2
+  t1 = tasks.add(tx => {
+    signTx(elem.sender, tx, tasks, t2)
+  })
+  t2 = tasks.add(tx => {
+    request(this.url + '/transactions', { method: 'POST', json: true, body: tx }, (err, json, res) => {
+      if (err) {
+        return tasks.error(err)
+      }
+      if (res.statusCode !== 200 && res.statusCode !== 202) {
+        return tasks.error(JSON.stringify(json))
+      }
+      Tx.cid(json, tasks, t, i)
+    })
+  })
+  this._fromElement(elem, tasks, t1)
+}
+
+MetadataService.prototype._toElement = (tx: Object, path: string, tasks: Object, t: number, i?: number) => {
   if (path) {
     return tasks.run(t, order(tx), i)
   }
@@ -404,48 +449,7 @@ MetadataService.prototype.toElement = (tx: Object, path: string, tasks: Object, 
   tasks.run(t, order(elem), i)
 }
 
-MetadataService.prototype.pathToURL = function (path: string) {
-  return this.url + '/transactions/' + path
-}
-
-MetadataService.prototype.resolve = Tx.resolve
-
-MetadataService.prototype.get = function (cid: Object, tasks: Object, t: number, i?: number) {
-  let hash
-  try {
-    hash = this.hashFromCID(cid)
-  } catch(err) {
-    tasks.error(err)
-  }
-  request(this.pathToURL(hash), { json: true }, (err, tx, res) => {
-      if (err) {
-        return tasks.error(err)
-      }
-      if (res.statusCode !== 200) {
-        return tasks.error(JSON.stringify(tx))
-      }
-      tasks.run(t, tx, i)
-  })
-}
-
-MetadataService.prototype.put = function (elem: Object, tasks: Object, t: number, i?: number) {
-  let t1, t2
-  t1 = tasks.add(tx => {
-    signTx(elem.sender, tx, tasks, t2)
-  })
-  t2 = tasks.add(tx => {
-    request(this.url + '/transactions', { method: 'POST', json: true, body: tx }, (err, json, res) => {
-      if (err) {
-        return tasks.error(err)
-      }
-      if (res.statusCode !== 200 && res.statusCode !== 202) {
-        return tasks.error(JSON.stringify(json))
-      }
-      Tx.cid(json, tasks, t, i)
-    })
-  })
-  this.fromElement(elem, tasks, t1)
-}
+MetadataService.prototype._resolve = Tx.resolve
 
 module.exports = {
   MetadataService,

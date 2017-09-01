@@ -1,0 +1,32 @@
+{
+  "@context": "http://schema.org",
+  "@type": "MusicRecording",
+  "byArtist": [
+    {
+      "@context": "http://schema.org",
+      "@type": "MusicGroup",
+      "name": "Mouse Rat",
+      "member": [
+        {
+          "@context": "http://schema.org",
+          "@type": "Person",
+          "familyName": "Dwyer",
+          "givenName": "Andy"
+        }
+      ]
+    }
+  ],
+  "recordingOf": {
+    "@context": "http://coalaip.org",
+    "@type": "MusicComposition",
+    "name": "November",
+    "composer": [
+      {
+        "@context": "http://schema.org",
+        "@type": "Person",
+        "familyName": "Dwyer",
+        "givenName": "Andy"
+      }
+    ]
+  }
+}

@@ -1,0 +1,40 @@
+
+<html>
+  <head>
+    <title>constellate</title>
+  </head>
+  <body>
+    <h2>Services</h2>
+    <h4>Content</h4>
+    <select id='content-service-name'>
+      <option value='' selected disabled>--</option>
+      <option value='ipfs'>ipfs</option>
+      <option value='swarm'>swarm</option>
+    </select>
+    <input id='content-service-path' type='text' placeholder='path' /><br><br>
+    <button id='set-content-service-btn'>set</button>
+    <h4>Metadata</h4>
+    <select id='metadata-service-name'>
+      <option value='' selected disabled>--</option>
+      <option value='bigchaindb'>bigchaindb</option>
+      <option value='ipfs'>ipfs</option>
+    </select>
+    <input id='metadata-service-path' type='text' placeholder='path' /><br><br>
+    <button id='set-metadata-service-btn'>set</button>
+    <h2>Import</h2>
+    <h4>Content</h4>
+    <input id='content' type='file' accept='audio/*|image/*|video/*' multiple />
+    <button id='import-content-btn'>import</button>
+    <h4>Metadata</h4>
+    <input id='metadata' type='file' accept='application/json' /><br><br>
+    <button id='import-metadata-btn'>import</button>
+    <!--
+    <h2>Get</h2>
+    <h4>Content</h4>
+    <input id='content-hash' type='text' />
+    <button id='get-content-btn'>get</button><br><br>
+    <div id='media'></div>
+    -->
+  </body>
+  <script src='./bundle.js'></script>
+</html>

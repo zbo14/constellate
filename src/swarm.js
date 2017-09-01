@@ -4,11 +4,7 @@ const CID = require('cids')
 const Keccak = require('keccakjs')
 const multihash = require('multihashes')
 const request = require('xhr-request')
-
-const {
-  errInvalidElement,
-  isContentElement
-} = require('../lib/util.js')
+const Tasks = require('../lib/util.js').Tasks
 
 // @flow
 
@@ -148,18 +144,21 @@ function ContentService (url: string) {
   this.url = url
 }
 
-ContentService.prototype.hash = (content: Buffer, tasks: Object, t: number, i?: number) => {
-  const t1 = tasks.add(data => {
-    tasks.run(t, data.toString('hex'), i)
-  })
-  swarmHash(content, tasks, t1)
+ContentService.prototype.get = function (path: string, cb: Function) {
+  const tasks = new Tasks(cb)
+  this._get(path, tasks, -1)
 }
 
 ContentService.prototype.pathToURL = function (path: string): string {
   return this.url + '/bzzr://' + path
 }
 
-ContentService.prototype.get = function (path: string, tasks: Object, t: number, i?: number) {
+ContentService.prototype.put = function (contents: Buffer[], cb: Function) {
+  const tasks = new Tasks(cb)
+  this._put(contents, tasks, -1)
+}
+
+ContentService.prototype._get = function (path: string, tasks: Object, t: number, i?: number) {
   request(
     this.pathToURL(path),
     { responseType: 'arraybuffer' },
@@ -175,7 +174,14 @@ ContentService.prototype.get = function (path: string, tasks: Object, t: number,
   )
 }
 
-ContentService.prototype.put = function (contents: Buffer[], tasks: Object, t: number, i?: number) {
+ContentService.prototype._hash = (content: Buffer, tasks: Object, t: number, i?: number) => {
+  const t1 = tasks.add(data => {
+    tasks.run(t, data.toString('hex'), i)
+  })
+  swarmHash(content, tasks, t1)
+}
+
+ContentService.prototype._put = function (contents: Buffer[], tasks: Object, t: number, i?: number) {
   const hashes = new Array(contents.length)
   let count = 0
   for (let j = 0; j < contents.length; j++) {
@@ -189,9 +195,6 @@ ContentService.prototype.put = function (contents: Buffer[], tasks: Object, t: n
       if (res.statusCode !== 200) {
         return tasks.error(data)
       }
-      // if (!isValidHash(data)) {
-      //   return tasks.error('invalid hash: ' + data)
-      // }
       hashes[j] = data
       if (++count !== contents.length) return
       tasks.run(t, hashes, i)

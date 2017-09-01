@@ -47,19 +47,37 @@ exports.errPathNotFound = (path: string): Error => {
 }
 
 exports.errUnexpectedCID = (cid: Object): Error => {
-  return new Error('unexpected cid: ' + cid.toJSON())
+  return new Error('unexpected cid: ' + JSON.stringify(cid))
 }
 
 exports.errUnexpectedType = (actual: string, expected: string): Error => {
   return new Error(`expected type="${expected}", got "${actual}"`)
 }
 
-exports.fileToAnchor = (file: File, type: string): HTMLElement => {
+exports.fileToAnchor = (file: File): HTMLAnchorElement => {
   const a = document.createElement('a')
   a.setAttribute('href', URL.createObjectURL(file))
   a.setAttribute('download', file.name)
   a.innerText = file.name
   return a
+}
+
+exports.fileToMedia = (file: File): HTMLElement => {
+  const type = file.type.split('/')[0]
+  if (type !== 'audio' && type !== 'image' && type !== 'video') {
+    throw exports.errUnexpectedType(type, 'audio|image|video')
+  }
+  const el = document.createElement(type)
+  const url = URL.createObjectURL(file)
+  const source = document.createElement('source')
+  if (type === 'audio' || type === 'video') {
+    source.setAttribute('src', url)
+  }
+  if (type === 'image') {
+    source.setAttribute('srcset', url)
+  }
+  el.appendChild(source)
+  return el
 }
 
 // from https://toddmotto.com/understanding-javascript-types-and-reliable-type-checking/
@@ -141,7 +159,9 @@ exports.sort = (x: any, y: any) => {
     let result
     for (i = 0; i < x.length && i < y.length; i++) {
       result = exports.sort(x[i], y[i])
-      if (result) return result
+      if (result) {
+        return result
+      }
     }
     return 0
   }
@@ -149,19 +169,35 @@ exports.sort = (x: any, y: any) => {
       const xkeys = Object.keys(x).sort()
       const ykeys = Object.keys(y).sort()
       for (i = 0; i < xkeys.length && i < ykeys.length; i++) {
-          if (xkeys[i] < ykeys[i]) return -1
-          if (xkeys[i] > ykeys[i]) return 1
+          if (xkeys[i] < ykeys[i]) {
+            return -1
+          }
+          if (xkeys[i] > ykeys[i]) {
+            return 1
+          }
       }
-      if (xkeys.length < ykeys.length) return -1
-      if (xkeys.length > ykeys.length) return 1
+      if (xkeys.length < ykeys.length) {
+        return -1
+      }
+      if (xkeys.length > ykeys.length) {
+        return 1
+      }
       for (i = 0; i < xkeys.length && i < ykeys.length; i++) {
-          if (x[xkeys[i]] < y[ykeys[i]]) return -1
-          if (x[xkeys[i]] > y[ykeys[i]]) return 1
+          if (x[xkeys[i]] < y[ykeys[i]]) {
+            return -1
+          }
+          if (x[xkeys[i]] > y[ykeys[i]]) {
+            return 1
+          }
       }
       return 0
   }
-  if (x < y) return -1
-  if (x > y) return 1
+  if (x < y) {
+    return -1
+  }
+  if (x > y) {
+    return 1
+  }
   return 0
 }
 
