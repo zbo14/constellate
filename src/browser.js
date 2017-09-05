@@ -1,7 +1,9 @@
 'use strict'
 
 const constellate = require('../lib')
-const parse = require('/path/to/js-coalaip')
+const core = require('js-coalaip/src/core')
+const music = require('js-coalaip/src/music')
+const parse = require('js-coalaip/src/parse')
 
 const {
   Tasks,
@@ -17,6 +19,8 @@ const {
 /**
  * @module constellate/src/browser
  */
+
+const registry = Object.assign({}, core, music)
 
 const readFilesAs = (files: File[], readAs: string, tasks: Object, t: number, i?: number) => {
   let count = 0
@@ -78,7 +82,7 @@ MetadataService.prototype.import = function (file: File, recipient: Object|Objec
   const tasks = new Tasks(cb)
   tasks.add(text => {
     try {
-      const metadata = parse(JSON.parse(text)).tree()
+      const metadata = parse(JSON.parse(text), registry)
       this._import(metadata, recipient, tasks, -1)
     } catch (err) {
       tasks.error(err)

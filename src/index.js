@@ -16,7 +16,7 @@ const {
   AudioObject,
   ImageObject,
   VideoObject
-} = require('path/to/js-coalaip')
+} = require('js-coalaip/src/core')
 
 const {
   Tasks,
@@ -93,8 +93,6 @@ function ContentService({ name, path, service }: Object) {
   this._hashes = {}
   if (name === 'ipfs') {
     this._service = new Ipfs.ContentService(path)
-  } else if (name === 'node') {
-    this._service = service
   } else if (name === 'swarm') {
     this._service = new Swarm.ContentService(path)
   } else {
@@ -261,8 +259,6 @@ function MetadataService({ account, name, path, service }: Object) {
     this._service = new BigchainDB.MetadataService(path)
   } else if (name === 'ipfs') {
     this._service = new Ipfs.MetadataService(path)
-  } else if (name === 'node') {
-    this._service = service
   } else {
     throw errUnsupportedService(name)
   }
@@ -335,7 +331,7 @@ MetadataService.prototype._get = function (path: string, expand: boolean, tasks:
   }
 }
 
-MetadataService.prototype._import = function (metadata: Object[], recipient: Object|Object[], tasks: Object, t: number, i?: number) {
+MetadataService.prototype._import = function (metadata: Object|Object[], recipient: Object|Object[], tasks: Object, t: number, i?: number) {
   const account = this._account
   const elems = []
   const hashes = {}

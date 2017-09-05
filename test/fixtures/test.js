@@ -42,11 +42,7 @@ exports.constellate = params => {
   })
 
   it('imports metadata', done => {
-    const metadata = recording.tree()
-    metadata.forEach(meta => {
-      delete meta.path
-    })
-    metadataService.import(metadata, params.recipient, err => {
+    metadataService.import(recording.subInstances(), params.recipient, err => {
       if (err) {
         throw err
       }
@@ -152,8 +148,7 @@ exports.constellate = params => {
 
   it('imports linked metadata', done => {
     delete recording.path
-    const metadata = recording.tree()
-    metadataService.import(metadata, params.recipient, err => {
+    metadataService.import(recording.subInstances(), params.recipient, err => {
       if (err) {
         throw err
       }

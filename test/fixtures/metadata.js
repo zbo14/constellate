@@ -3,13 +3,13 @@
 const {
   AudioObject,
   Person
-} = require('/Users/zach/Desktop/js-coalaip/src/core')
+} = require('js-coalaip/src/core')
 
 const {
   MusicComposition,
   MusicGroup,
   MusicRecording
-} = require('/Users/zach/Desktop/js-coalaip/src/music')
+} = require('js-coalaip/src/music')
 
 const person = new Person()
 person.setFamilyName('Dwyer')

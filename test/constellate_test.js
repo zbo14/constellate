@@ -36,6 +36,7 @@ const recipient = [{
 
 describe('Constellate', () => {
 
+  /*
   describe('IPFS x BigchainDB', () => {
     test.constellate({
       accountPassword: account.password,
@@ -46,6 +47,7 @@ describe('Constellate', () => {
       recipient
     })
   })
+  */
 
   describe('IPFS x IPFS', () => {
     test.constellate({
@@ -55,6 +57,7 @@ describe('Constellate', () => {
     })
   })
 
+  /*
   describe('Swarm x BigchainDB', () => {
     test.constellate({
       accountPassword: account.password,
@@ -64,6 +67,7 @@ describe('Constellate', () => {
       recipient
     })
   })
+  */
 
   describe('Swarm x IPFS', () => {
     test.constellate({

@@ -30,6 +30,7 @@
     "ipfs-block": "^0.6.0",
     "ipfs-unixfs": "^0.1.12",
     "ipld-dag-pb": "^0.11.0",
+    "js-coalaip": "git+https://github.com/COALAIP/js-coalaip.git",
     "js-sha3": "^0.6.1",
     "keccakjs": "^0.2.1",
     "mocha": "^3.5.0",
