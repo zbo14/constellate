@@ -36,7 +36,7 @@ exports.constellate = params => {
       if (err) {
         throw err
       }
-      recording.setAudio(meta[0])
+      recording.addAudio(meta[0])
       done()
     })
   })

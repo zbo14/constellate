@@ -366,7 +366,8 @@ MetadataService.prototype._import = function (metadata: Object|Object[], recipie
   })
   t2 = tasks.add(hash => {
     paths.push(hash)
-    if (meta instanceof Person) {
+    console.log('is person: ' + meta instanceof Person || meta.constructor === Person)
+    if (meta instanceof Person || meta.constructor === Person) {
       name = meta.getGivenName() + ' ' + meta.getFamilyName()
     } else {
       name = meta.getName()
