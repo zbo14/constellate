@@ -3,12 +3,16 @@
 const Block = require('ipfs-block')
 const CID = require('cids')
 const dagCBOR = require('../lib/dag-cbor')
-const DAGNode = require('ipld-dag-pb').DAGNode
 const FilesAPI = require('ipfs-api/src/files')
 const moduleConfig = require('ipfs-api/src/utils/module-config')
 const streamToValue = require('ipfs-api/src/utils/stream-to-value')
 const UnixFS = require('ipfs-unixfs')
 const multiaddr = require('multiaddr')
+
+const {
+  DAGNode,
+  DAGLink
+} = require('ipld-dag-pb')
 
 const {
     Tasks,
@@ -98,6 +102,8 @@ BlockAPI.prototype.put = function (data: Buffer, cb: Function) {
 
 const Ipfs = {}
 
+const CHUNK_LENGTH = 262144
+
 function ContentService (addr: string) {
   const maddr = multiaddr(addr)
   this.host = maddr.nodeAddress().address
@@ -173,15 +179,78 @@ ContentService.prototype._get = function (path: string, tasks: Object, t: number
   })
 }
 
+/*
+
+The following code is adapted from https://github.com/ipfs/js-ipfs-unixfs-engine/tree/master/src/builder
+
+------------------------------- LICENSE -------------------------------
+
+The MIT License (MIT)
+
+Copyright (c) 2016 David Dias
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+*/
+
 ContentService.prototype._hash = function (content: Buffer, tasks: Object, t: number, i?: number) {
-  const file = new UnixFS('file', content)
-  DAGNode.create(file.marshal(), (err, dagNode) => {
-    if (err) {
-      return tasks.error(err)
-    }
-    const mh = dagNode.toJSON().multihash
-    tasks.run(t, mh, i)
+  const dagNodes = []
+  const files = []
+  const links = []
+  const numChunks = Math.ceil(content.length / CHUNK_LENGTH)
+  let file
+  const t2 = tasks.add(() => {
+    return DAGNode.create(file.marshal(), links, (err, dagNode) => {
+      if (err) {
+        return tasks.error(err)
+      }
+      const mh = dagNode.toJSON().multihash
+      tasks.run(t, mh, i)
+    })
   })
+  if (numChunks === 1) {
+    file = new UnixFS('file', content)
+    return tasks.run(t2)
+  }
+  let chunk, count = 0
+  const t1 = tasks.add((dagNode, j) => {
+    dagNodes[j] = dagNode
+    if (++count !== numChunks) return
+    file = new UnixFS('file')
+    for (j = 0; j < numChunks; j++) {
+      dagNode = dagNodes[j]
+      file.addBlockSize(files[j].fileSize())
+      links[j] = new DAGLink('', dagNode.size, dagNode.multihash)
+    }
+    tasks.run(t2)
+  })
+  for (let j = 0; j < numChunks; j++) {
+    chunk = content.slice(j*CHUNK_LENGTH, (j+1)*CHUNK_LENGTH)
+    files.push(new UnixFS('file', chunk))
+    const idx = j
+    DAGNode.create(files[j].marshal(), (err, dagNode) => {
+      if (err) {
+        return tasks.error(err)
+      }
+      tasks.run(t1, dagNode, idx)
+    })
+  }
 }
 
 ContentService.prototype._put = function (contents: Buffer[], tasks: Object, t: number, i?: number) {
