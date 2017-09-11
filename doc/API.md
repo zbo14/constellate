@@ -1,8 +1,10 @@
 # API
 
 ## Node.js
+The Node.js implementation of Constellate.
 
 ### ContentService
+The ContentService is responsible for the uplaoding and retrieval of media to and from data stores.
 
 #### new ContentService
 ```js
@@ -16,12 +18,14 @@ const params = {
 const contentService = new ContentService(params)
 ```
 
+
+
 #### contentService.get
+The get function is used to get media content which has been imported and put into the service previously. 
 ```js
 contentService.get('{hash|name}', (err, buf) => {
-  if (err) {
-    throw err
-  }
+  if (err) throw err
+
   console.log(buf)
 
   // <Buffer ...>
@@ -34,7 +38,10 @@ contentService.get('{hash|name}', (err, buf) => {
 
 `Function` - callback with the signature `function (err, buffer)`
 
+
+
 #### contentService.import
+Importing is the prerequisite to put. The content must first be imported into the service before it can be put on a data store. 
 ```js
 const file = {
   content:  <Buffer ...>,
@@ -42,22 +49,10 @@ const file = {
   type: 'audio/mp3'
 }
 
-contentService.import([file, ...], (err, objs) => {
-  if (err) {
-    throw err
-  }
-  console.log(objs)
+contentService.import([file, ...], (err) => {
+  if (err) throw err
 
-  // [
-  //   {
-  //     @context: 'http://schema.org',
-  //     @type:  'AudioObject',
-  //     contentUrl: '',
-  //     encodingFormat: 'audio/mp3',
-  //     name: 'track.mp3'
-  //   },
-  //   ...
-  // ]
+  ... do other stuff
 })
 ```
 
@@ -67,12 +62,13 @@ contentService.import([file, ...], (err, objs) => {
 
 `Function` - callback with the signature `function (err, objects)`
 
+
+
 #### contentService.put
+Put actually puts the object into the specified data store. The specified store's configuration is passed into the ContentService during instantiation.
 ```js
 contentService.put(err => {
-  if (err) {
-    throw err
-  }
+  if (err) throw err
   // ...
 })
 ```
@@ -81,7 +77,12 @@ contentService.put(err => {
 
 `Function` - callback with the signature `function (err)`
 
+
+
+
+
 ### MetadataService
+The MetadataService is responsible for the pushing and retrieval of metadata to and from specified data stores.
 
 #### new MetadataService
 ```js
@@ -95,26 +96,45 @@ const params = {
 const metadataService = new MetadataService(params)
 ```
 
+
+
 #### metadataService.get
+The get function is used to get metadata which has been imported and put into the service previously. The boolean value applies functionality to resolve merkle links therefore providing any and all information nested in the hash
 
 ```js
 metadataService.get('{hash|name}/data', false, (err, obj) => {
-  if (err) {
-    throw err
-   }
-   console.log(obj)
+  if (err) throw err
+  console.log(obj)
 
-   // {
-   //   name: 'Band',
-   //   member: [
-   //     {
-   //       '/': 'hash1/data'
-   //     },
-   //     {
-   //       '/': 'hash2/data'
-   //     }
-   //   ]
-   // }
+  // {
+  //   name: 'Band',
+  //   member: [
+  //     {
+  //       '/': 'hash1/data'
+  //     },
+  //     {
+  //       '/': 'hash2/data'
+  //     }
+  //   ]
+  // }
+})
+metadataService.get('{hash|name}/data', true, (err, obj) => {
+  if (err) throw err
+
+  console.log(obj)
+
+  // {
+  //   name: 'Band',
+  //   member: [
+  //     {
+  //       givenName: 'John',
+  //       familyName: 'Smith',
+  //     },
+  //     {
+  //       ...
+  //     }
+  //   ]
+  // }
 })
 ```
 
@@ -126,13 +146,13 @@ metadataService.get('{hash|name}/data', false, (err, obj) => {
 
 `Function` - callback with the signature `function (err, object)`
 
+
+
 #### metadataService.import
 
 ```js
 metadataService.import(metadata, err => {
-  if (err) {
-    throw err
-  }
+  if (err) throw err
   // ...
 })
 ```
@@ -159,6 +179,7 @@ metadataService.put(err => {
 `Function` - callback with the signature `function (err)`
 
 ## Browser
+Browser implementation - Zach is this still working?
 
 ### ContentService
 
