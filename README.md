@@ -42,16 +42,16 @@ contentService.import([file, ...], (err, files) => {
   if (err) throw err
 
   console.log(files)
-  // [
-  //   {
-  //     @context: 'http://schema.org',
-  //     @type:  'AudioObject',
-  //     contentUrl: 'ipfs.io/ipfs/QmcSFW_EXAMPLE_oH9HRxEyi3Eh3',
-  //     encodingFormat: 'audio/mp3',
-  //     name: 'track.mp3'
-  //   },
-  //   ...
-  // ]
+  [
+    {
+      @context: 'http://schema.org',
+      @type:  'AudioObject',
+      contentUrl: 'ipfs.io/ipfs/QmcSFW_EXAMPLE_oH9HRxEyi3Eh3',
+      encodingFormat: 'audio/mp3',
+      name: 'track.mp3'
+    },
+    ...
+  ]
   
   ...
 
