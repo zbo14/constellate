@@ -46,14 +46,16 @@ const {
 
 */
 
-const _get = (service: Object, cid: Object, path: string, tasks: Object, t: number, i?: number) => {
+const _get = (service: Object, cid: Object, path: string, id: string, tasks: Object, t: number, i?: number) => {
   let p = path, t1, t2
   t1 = tasks.add(elem => {
     service._resolve(elem, p, tasks, t2)
   })
   t2 = tasks.add((val, remPath) => {
-    p = remPath
-    if (!p || p === '/' && (val && !val['/'])) {
+    if (!remPath || remPath === '/' && (val && !val['/'])) {
+      if (id && isObject(val)) {
+        val[id] = service.hashFromCID(cid) + '/' + path
+      }
       return tasks.run(t, val, i)
     }
     if (val) {
@@ -65,7 +67,7 @@ const _get = (service: Object, cid: Object, path: string, tasks: Object, t: numb
       }
       cid = val.cid
       if (val.remPath) {
-        p = val.remPath + '/' + p
+        p = val.remPath + '/' + remPath
       }
     }
     service._get(cid, tasks, t1)
@@ -77,12 +79,12 @@ function Resolver (service: Object) {
   this._service = service
 }
 
-Resolver.prototype.get = function (cid: Object, path: string, expand: boolean, cb: Function) {
+Resolver.prototype.get = function (cid: Object, path: string, expand: boolean, id: string, cb: Function) {
   const tasks = new Tasks(cb)
-  this._get(cid, path, expand, tasks, -1)
+  this._get(cid, path, expand, id, tasks, -1)
 }
 
-Resolver.prototype._expand = function (obj: Object, tasks: Object, t: number, i?: number) {
+Resolver.prototype._expand = function (obj: Object, id: string, tasks: Object, t: number, i?: number) {
   const expanded = order(obj)
   const service = this._service
   const trails = []
@@ -92,9 +94,9 @@ Resolver.prototype._expand = function (obj: Object, tasks: Object, t: number, i?
     try {
       const { cid, remPath } = service.pathToCID(obj['/'])
       t1 = tasks.add(result => {
-        this._expand(result, tasks, t, i)
+        this._expand(result, id, tasks, t, i)
       })
-      return _get(service, cid, remPath, tasks, t1)
+      return _get(service, cid, remPath, id, tasks, t1)
     } catch (err) {
       tasks.error(err)
     }
@@ -114,7 +116,7 @@ Resolver.prototype._expand = function (obj: Object, tasks: Object, t: number, i?
   }
   let count = 0, inner, keys, lastKey, t2, x
   t1 = tasks.add((val, j) => {
-      this._expand(val, tasks, t2, j)
+      this._expand(val, id, tasks, t2, j)
   })
   t2 = tasks.add((val, j) => {
     keys = trails[j].split('.').filter(Boolean)
@@ -142,11 +144,11 @@ Resolver.prototype._expand = function (obj: Object, tasks: Object, t: number, i?
     tasks.run(t, expanded, i)
   })
   for (let j = 0; j < vals.length; j++) {
-      _get(service, vals[j].cid, vals[j].remPath, tasks, t1, j)
+    _get(service, vals[j].cid, vals[j].remPath, id, tasks, t1, j)
   }
 }
 
-Resolver.prototype._get = function (cid: Object, path: string, expand: boolean, tasks: Object, t: number, i?: number) {
+Resolver.prototype._get = function (cid: Object, path: string, expand: boolean, id: string, tasks: Object, t: number, i?: number) {
   const service = this._service
   let t1, t2
   t1 = tasks.add(val => {
@@ -155,10 +157,10 @@ Resolver.prototype._get = function (cid: Object, path: string, expand: boolean, 
   if (expand) {
     t2 = t1
     t1 = tasks.add(val => {
-      this._expand(val, tasks, t2)
+      this._expand(val, id, tasks, t2)
     })
   }
-  _get(service, cid, path, tasks, t1)
+  _get(service, cid, path, id, tasks, t1)
 }
 
 module.exports = Resolver

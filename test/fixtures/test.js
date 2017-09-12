@@ -14,7 +14,8 @@ const {
 
 const {
   errInvalidElement,
-  errPathNotFound
+  errPathNotFound,
+  order
 } = require('../../lib/util')
 
 const {
@@ -42,6 +43,9 @@ exports.constellate = params => {
   })
 
   it('imports metadata', done => {
+    recording.subInstances().forEach(instance => {
+      delete instance.path
+    })
     metadataService.import(recording.subInstances(), params.recipient, err => {
       if (err) {
         throw err
@@ -84,6 +88,22 @@ exports.constellate = params => {
         throw err
       }
       expect(result).to.deep.equal(recording.data())
+      done()
+    })
+  }).timeout(MAX_TIMEOUT)
+
+  it('gets expanded recording metadata with id', done => {
+    metadataService.get(recording.path + '/data', true, '@id', (err, result) => {
+      if (err) {
+        throw err
+      }
+      recording.subInstances().forEach(instance => {
+        instance.set('@id', instance.path + '/data')
+      })
+      expect(result).to.deep.equal(order(recording.data()))
+      recording.subInstances().forEach(instance => {
+        instance.rm('@id')
+      })
       done()
     })
   }).timeout(MAX_TIMEOUT)
@@ -291,17 +311,34 @@ exports.metadataService = (service, sender, recipient) => {
 
   it('gets expanded metadata', done => {
     cid = service.pathToCID(recording.path).cid
-    resolver.get(cid, 'data', true, (err, result) => {
+    resolver.get(cid, 'data', true, '', (err, result) => {
       if (err) {
         throw err
       }
       expect(result).to.deep.equal(recording.data())
       done()
     })
-  })
+  }).timeout(MAX_TIMEOUT)
+
+  it('gets expanded metadata with id', done => {
+    cid = service.pathToCID(recording.path).cid
+    resolver.get(cid, 'data', true, '@id', (err, result) => {
+      if (err) {
+        throw err
+      }
+      recording.subInstances().forEach(instance => {
+        instance.set('@id', instance.path + '/data')
+      })
+      expect(result).to.deep.equal(recording.data())
+      recording.subInstances().forEach(instance => {
+        instance.rm('@id')
+      })
+      done()
+    })
+  }).timeout(MAX_TIMEOUT)
 
   it('gets metadata sender', done => {
-    resolver.get(cid, 'sender', false, (err, result) => {
+    resolver.get(cid, 'sender', false, '', (err, result) => {
       if (err) {
         throw err
       }
@@ -310,20 +347,20 @@ exports.metadataService = (service, sender, recipient) => {
       })
       done()
     })
-  })
+  }).timeout(MAX_TIMEOUT)
 
   it('gets metadata recipient', done => {
-    resolver.get(cid, 'recipient', false, (err, result) => {
+    resolver.get(cid, 'recipient', false, '', (err, result) => {
       if (err) {
         throw err
       }
       expect(result).to.deep.equal(recipient)
       done()
     })
-  })
+  }).timeout(MAX_TIMEOUT)
 
   it('gets invalid path', done => {
-    resolver.get(cid, 'badpath', false, err => {
+    resolver.get(cid, 'badpath', false, '', err => {
       expect(err.message).to.equal(errPathNotFound('badpath').message)
       done()
     })

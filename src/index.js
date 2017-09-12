@@ -10,6 +10,7 @@ const BigchainDB = require('../lib/bigchaindb')
 const Ipfs = require('../lib/ipfs')
 const Resolver = require('../lib/resolver')
 const Swarm = require('../lib/swarm')
+const isSubType = require('js-coalaip/src/util').isSubType
 
 const {
   Person,
@@ -266,9 +267,12 @@ function MetadataService({ account, name, path, service }: Object) {
   this._resolver = new Resolver(this._service)
 }
 
-MetadataService.prototype.get = function (path: string, expand: boolean, cb: Function) {
+MetadataService.prototype.get = function (path: string, expand: boolean, id: string, cb: Function) {
+  if (typeof id === 'function') {
+    [cb, id] = [id, '']
+  }
   const tasks = new Tasks(cb)
-  this._get(path, expand, tasks, -1)
+  this._get(path, expand, id, tasks, -1)
 }
 
 MetadataService.prototype.import = function (metadata: Object, recipient: Object|Object[], cb: Function) {
@@ -311,7 +315,7 @@ MetadataService.prototype._decrypt = function (password: string, tasks: Object, 
   }
 }
 
-MetadataService.prototype._get = function (path: string, expand: boolean, tasks: Object, t: number, i?: number) {
+MetadataService.prototype._get = function (path: string, expand: boolean, id: string, tasks: Object, t: number, i?: number) {
   const hashes = this.hashes
   const parts = path.split('/')
   const first = parts.shift()
@@ -325,7 +329,7 @@ MetadataService.prototype._get = function (path: string, expand: boolean, tasks:
   }
   try {
     const { cid, remPath } = service.pathToCID(path)
-    resolver._get(cid, remPath, expand, tasks, t, i)
+    resolver._get(cid, remPath, expand, id, tasks, t, i)
   } catch(err) {
     tasks.error(err)
   }
@@ -366,8 +370,7 @@ MetadataService.prototype._import = function (metadata: Object|Object[], recipie
   })
   t2 = tasks.add(hash => {
     paths.push(hash)
-    console.log('is person: ' + meta instanceof Person || meta.constructor === Person)
-    if (meta instanceof Person || meta.constructor === Person) {
+    if (isSubType(meta, new Person())) {
       name = meta.getGivenName() + ' ' + meta.getFamilyName()
     } else {
       name = meta.getName()

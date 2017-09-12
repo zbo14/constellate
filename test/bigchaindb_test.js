@@ -1,5 +1,5 @@
 'use strict'
-
+/*
 const describe = require('mocha').describe
 const BigchainDB = require('../lib/bigchaindb')
 const endpoint = require('./fixtures/endpoints').bigchaindb
@@ -16,3 +16,4 @@ const recipient = [{
 describe('BigchainDB', () => {
   test.metadataService(service, keypair, recipient)
 })
+*/

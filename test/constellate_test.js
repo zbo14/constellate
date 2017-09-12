@@ -67,7 +67,6 @@ describe('Constellate', () => {
       recipient
     })
   })
-  */
 
   describe('Swarm x IPFS', () => {
     test.constellate({
@@ -75,4 +74,5 @@ describe('Constellate', () => {
       metadataService: ipfs
     })
   })
+  */
 })
