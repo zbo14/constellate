@@ -363,7 +363,7 @@ MetadataService.prototype._import = function (metadata: Object|Object[], recipie
       return tasks.run(t, i)
     }
     elem = Object.assign({
-      data: meta.data('ipld')
+      data: meta.ipld()
     }, parties)
     elems.push(elem)
     this._service._hash(elem, tasks, t2)

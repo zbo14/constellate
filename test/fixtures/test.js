@@ -2,7 +2,9 @@
 
 const expect = require('chai').expect
 const it = require('mocha').it
+const fileType = require('file-type')
 const files = require('./files')
+// const request = require('xhr-request')
 const Resolver = require('../../lib/resolver')
 
 const {
@@ -27,6 +29,8 @@ const {
 
 const MAX_TIMEOUT = 5000
 
+let mediaObject
+
 exports.constellate = params => {
 
   const contentService = new ContentService(params.contentService)
@@ -37,7 +41,9 @@ exports.constellate = params => {
       if (err) {
         throw err
       }
-      recording.addAudio(meta[0])
+      mediaObject = meta[0]
+      console.log(mediaObject.getContentUrl())
+      recording.addAudio(mediaObject)
       done()
     })
   })
@@ -81,6 +87,23 @@ exports.constellate = params => {
       done()
     })
   }).timeout(MAX_TIMEOUT)
+
+  /*
+  it('gets content by contentUrl', done => {
+    request(
+      mediaObject.getContentUrl(),
+      { responseType: 'arraybuffer' },
+      (err, data, result) => {
+        const buf = Buffer.from(data)
+        expect(err).to.be.null
+        console.log(fileType(buf))
+        expect(result.statusCode).to.equal(200)
+        // expect(buf).to.deep.equal(files[0].content)
+        done()
+      }
+    )
+  }).timeout(MAX_TIMEOUT)
+  */
 
   it('gets expanded recording metadata', done => {
     metadataService.get(recording.path + '/data', true, (err, result) => {
@@ -255,7 +278,7 @@ exports.metadataService = (service, sender, recipient) => {
 
   it('puts person metadata', done => {
     service.put({
-      data: person.data('ipld'),
+      data: person.ipld(),
       sender,
       recipient
     }, (err, result) => {
@@ -269,7 +292,7 @@ exports.metadataService = (service, sender, recipient) => {
 
   it('puts musicGroup metadata', done => {
     service.put({
-      data: musicGroup.data('ipld'),
+      data: musicGroup.ipld(),
       sender,
       recipient
     }, (err, result) => {
@@ -283,7 +306,7 @@ exports.metadataService = (service, sender, recipient) => {
 
   it('puts composition metadata', done => {
     service.put({
-      data: composition.data('ipld'),
+      data: composition.ipld(),
       sender,
       recipient
     }, (err, result) => {
@@ -297,7 +320,7 @@ exports.metadataService = (service, sender, recipient) => {
 
   it('puts recording metadata', done => {
     service.put({
-      data: recording.data('ipld'),
+      data: recording.ipld(),
       sender,
       recipient
     }, (err, result) => {
