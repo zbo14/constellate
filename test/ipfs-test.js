@@ -1,12 +1,16 @@
 'use strict'
 
 const describe = require('mocha').describe
-const Ipfs = require('../lib/ipfs.js')
 const endpoint = require('./fixtures/endpoints').ipfs
 const test = require('./fixtures/test')
 
-const contentService = new Ipfs.ContentService(endpoint)
-const metadataService = new Ipfs.MetadataService(endpoint)
+const {
+  ContentService,
+  MetadataService
+} = require('../src/ipfs')
+
+const contentService = new ContentService(endpoint)
+const metadataService = new MetadataService(endpoint)
 
 describe('IPFS', () => {
   test.contentService(contentService)

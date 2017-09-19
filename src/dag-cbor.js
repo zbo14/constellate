@@ -7,18 +7,9 @@ const multihash = require('multihashes')
 
 const {
   errPathNotFound,
-  isArray,
-  isObject,
-  isString,
   orderStringify,
   transform
-} = require('../lib/util')
-
-// @flow
-
-/**
- * @module constellate/src/dag-cbor
- */
+} = require('./util')
 
 /*
 
@@ -52,101 +43,99 @@ const {
 
 */
 
-const codec = 'dag-cbor'
-const version = 1
-
 const CID_CBOR_TAG = 42
 
 const decoder = new cbor.Decoder({
   tags: {
     [CID_CBOR_TAG]: val => {
-      return { '/': val.slice(1) }
+      return {
+        '/': val.slice(1)
+      }
     }
   }
 })
 
-const serialize = (elem: Object, tasks: Object, t: number, i?: number) => {
+const sha2_256 = data => {
+  return crypto.createHash('sha256').update(data).digest()
+}
+
+exports.codec = 'dag-cbor'
+exports.version = 1
+
+exports.cid = (obj, cb) => {
+  exports.serialize(obj, (err, data) => {
+    if (err) {
+      return cb(err)
+    }
+    try {
+      const mh = multihash.encode(sha2_256(data), 'sha2-256')
+      const cid = new CID(exports.version, exports.codec, mh)
+      cb(null, cid, data)
+    } catch (err) {
+      cb(err)
+    }
+  })
+}
+
+exports.deserialize = (data, cb) => {
+  try {
+    const obj = decoder.decodeFirst(data)
+    cb(null, obj)
+  } catch (err) {
+    cb(err)
+  }
+}
+
+exports.resolve = (obj, path, cb) => {
+  if (!path || path === '/') {
+    return cb(null, obj, '')
+  }
+  const parts = path.split('/')
+  let remPath = '', val = obj
+  for (let i = 0; i < parts.length; i++) {
+    if (val instanceof Array) {
+      val = val[Number(parts[i])]
+    } else if (val[parts[i]]) {
+      val = val[parts[i]]
+    } else {
+      if (!val) {
+        return cb(errPathNotFound(path))
+      }
+      remPath = parts.slice(i).join('/')
+      break
+    }
+  }
+  cb(null, val, remPath)
+}
+
+exports.serialize = (obj, cb) => {
   const seen = []
-  let cid
-  const tagged = transform(elem, val => {
-    if (!isObject(val)) {
+  let cid, stop
+  const tagged = transform(obj, val => {
+    if (val.constructor !== Object) {
       return val
     }
     if (seen.some(obj => orderStringify(obj) === orderStringify(val))) {
-      return tasks.error('the object passed has circular references')
+      stop = true
+      return cb(new Error('the object passed has circular references'))
     }
     seen.push(val)
     if (!(cid = val['/'])) {
       return val
     }
-    if (isString(cid)) {
+    if (typeof cid === 'string') {
       cid = new CID(cid.split('/')[0]).buffer
     }
     return new cbor.Tagged(CID_CBOR_TAG, Buffer.concat([
       Buffer.from('00', 'hex'), cid
     ]))
   })
-  try {
-    const data = cbor.encode(tagged)
-    tasks.run(t, data, i)
-  } catch(err) {
-    tasks.error(err)
-  }
-}
-
-const sha2_256 = (data: Buffer): Buffer => {
-  return crypto.createHash('sha256').update(data).digest()
-}
-
-module.exports = {
-
-  codec,
-
-  version,
-
-  serialize,
-
-  deserialize: (data: Buffer, tasks: Object, t: number, i?: number) => {
+  if (!stop) {
     try {
-      const elem = decoder.decodeFirst(data)
-      tasks.run(t, elem, i)
-    } catch(err) {
-      tasks.error(err)
+      const data = cbor.encode(tagged)
+      cb(null, data)
+    } catch (err) {
+      cb(err)
     }
-  },
-
-  cid: (elem: Object, tasks: Object, t: number, i?: number) => {
-    const t1 = tasks.add(data => {
-      try {
-        const mh = multihash.encode(sha2_256(data), 'sha2-256')
-        const cid = new CID(version, codec, mh)
-        tasks.run(t, cid, data, i)
-      } catch(err) {
-        tasks.error(err)
-      }
-    })
-    serialize(elem, tasks, t1)
-  },
-
-  resolve: (elem: Object, path: string, tasks: Object, t: number, i?: number) => {
-    if (!path || path === '/') {
-      return tasks.run(t, elem, '', i)
-    }
-    const parts = path.split('/')
-    let remPath = '', val = elem
-    for (let j = 0; j < parts.length; j++) {
-      if (isArray(val) && !Buffer.isBuffer(val)) {
-        val = val[Number(parts[j])]
-      } else if (val[parts[j]]) {
-        val = val[parts[j]]
-      } else {
-        if (!val) {
-          return tasks.error(errPathNotFound(path))
-        }
-        remPath = parts.slice(j).join('/')
-        break
-      }
-    }
-    tasks.run(t, val, remPath, i)
   }
 }

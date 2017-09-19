@@ -5,7 +5,7 @@
   "author": "Zachary Balder",
   "license": "MIT",
   "scripts": {
-    "bundle": "browserify index.js > bundle.js",
+    "bundle": "browserify test/browser-content-service.js > bundle.js",
     "flow": "read -p 'Enter filename: ' FILENAME && flow check-contents < src/$FILENAME",
     "remove-types": "read -p 'Enter filename: ' FILENAME && flow-remove-types src/$FILENAME | js-beautify -o lib/$FILENAME",
     "test": "./node_modules/.bin/mocha --reporter spec"

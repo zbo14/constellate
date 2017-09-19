@@ -1,24 +1,19 @@
 'use strict'
 
+const ContentService = require('../../src/content-service')
 const expect = require('chai').expect
 const it = require('mocha').it
 const fileType = require('file-type')
 const files = require('./files')
-// const request = require('xhr-request')
-const Resolver = require('../../lib/resolver')
+const MetadataService = require('../../src/metadata-service')
+const order = require('../../src/util').order
+const Resolver = require('../../src/resolver')
 
 const {
-  ContentService,
-  MetadataService,
   errInvalidPassword,
-  errUnsupportedService
-} = require('../../lib')
-
-const {
-  errInvalidElement,
   errPathNotFound,
-  order
-} = require('../../lib/util')
+  errUnsupportedService
+} = require('../../src/errors')
 
 const {
   person,
@@ -29,21 +24,15 @@ const {
 
 const MAX_TIMEOUT = 5000
 
-let mediaObject
-
 exports.constellate = params => {
 
   const contentService = new ContentService(params.contentService)
   const metadataService = new MetadataService(params.metadataService)
 
   it('imports content', done => {
-    contentService.import(files, params.encryptionPassword, (err, meta) => {
-      if (err) {
-        throw err
-      }
-      mediaObject = meta[0]
-      console.log(mediaObject.getContentUrl())
-      recording.addAudio(mediaObject)
+    contentService.import(files, params.encryptionPassword, (err, metadata) => {
+      expect(err).to.be.null
+      recording.addAudio(metadata[0])
       done()
     })
   })
@@ -52,76 +41,47 @@ exports.constellate = params => {
     recording.subInstances().forEach(instance => {
       delete instance.path
     })
-    metadataService.import(recording.subInstances(), params.recipient, err => {
-      if (err) {
-        throw err
-      }
+    metadataService.import(recording.subInstances(), err => {
+      expect(err).to.be.null
       done()
     })
   })
 
   it('puts content', done => {
     contentService.put(err => {
-      if (err) {
-        throw err
-      }
+      expect(err).to.be.null
       done()
     })
   }).timeout(MAX_TIMEOUT)
 
   it('puts metadata', done => {
-    metadataService.put(params.accountPassword, err => {
-      if (err) {
-        throw err
-      }
+    metadataService.put(err => {
+      expect(err).to.be.null
       setTimeout(done, 2000)
     })
   }).timeout(MAX_TIMEOUT)
 
   it('gets content', done => {
     contentService.get('track.mp3', params.encryptionPassword, (err, result) => {
-      if (err) {
-        throw err
-      }
+      expect(err).to.be.null
       expect(result).to.deep.equal(files[0].content)
       done()
     })
   }).timeout(MAX_TIMEOUT)
 
-  /*
-  it('gets content by contentUrl', done => {
-    request(
-      mediaObject.getContentUrl(),
-      { responseType: 'arraybuffer' },
-      (err, data, result) => {
-        const buf = Buffer.from(data)
-        expect(err).to.be.null
-        console.log(fileType(buf))
-        expect(result.statusCode).to.equal(200)
-        // expect(buf).to.deep.equal(files[0].content)
-        done()
-      }
-    )
-  }).timeout(MAX_TIMEOUT)
-  */
-
   it('gets expanded recording metadata', done => {
-    metadataService.get(recording.path + '/data', true, (err, result) => {
-      if (err) {
-        throw err
-      }
+    metadataService.get(recording.path, true, (err, result) => {
+      expect(err).to.be.null
       expect(result).to.deep.equal(recording.data())
       done()
     })
   }).timeout(MAX_TIMEOUT)
 
   it('gets expanded recording metadata with id', done => {
-    metadataService.get(recording.path + '/data', true, '@id', (err, result) => {
-      if (err) {
-        throw err
-      }
+    metadataService.get(recording.path, true, '@id', (err, result) => {
+      expect(err).to.be.null
       recording.subInstances().forEach(instance => {
-        instance.set('@id', instance.path + '/data')
+        instance.set('@id', instance.path)
       })
       expect(result).to.deep.equal(order(recording.data()))
       recording.subInstances().forEach(instance => {
@@ -132,7 +92,7 @@ exports.constellate = params => {
   }).timeout(MAX_TIMEOUT)
 
   it('gets expanded composition metadata', done => {
-    metadataService.get(recording.path + '/data/recordingOf', true, (err, result) => {
+    metadataService.get(recording.path + '/recordingOf', true, (err, result) => {
       if (err) {
         throw err
       }
@@ -142,7 +102,7 @@ exports.constellate = params => {
   }).timeout(MAX_TIMEOUT)
 
   it('gets expanded music group metadata', done => {
-    metadataService.get(recording.path + '/data/byArtist/0', true, (err, result) => {
+    metadataService.get(recording.path + '/byArtist/0', true, (err, result) => {
       if (err) {
         throw err
       }
@@ -152,7 +112,7 @@ exports.constellate = params => {
   }).timeout(MAX_TIMEOUT)
 
   it('gets expanded person metadata', done => {
-    metadataService.get(recording.path + '/data/byArtist/0/member/0', true, (err, result) => {
+    metadataService.get(recording.path + '/byArtist/0/member/0', true, (err, result) => {
       if (err) {
         throw err
       }
@@ -161,37 +121,9 @@ exports.constellate = params => {
     })
   }).timeout(MAX_TIMEOUT)
 
-  it('gets metadata sender', done => {
-    metadataService.get(recording.path + '/sender', false, (err, result) => {
-      if (err) {
-        throw err
-      }
-      if (params.sender) {
-        expect(result).to.deep.equal(params.sender)
-      } else {
-        expect(result).to.be.null
-      }
-      done()
-    })
-  }).timeout(MAX_TIMEOUT)
-
-  it('gets metadata recipient', done => {
-    metadataService.get(recording.path + '/recipient', false, (err, result) => {
-      if (err) {
-        throw err
-      }
-      if (params.recipient) {
-        expect(result).to.deep.equal(params.recipient)
-      } else {
-        expect(result).to.be.null
-      }
-      done()
-    })
-  }).timeout(MAX_TIMEOUT)
-
   it('imports linked metadata', done => {
     delete recording.path
-    metadataService.import(recording.subInstances(), params.recipient, err => {
+    metadataService.import(recording.subInstances(), err => {
       if (err) {
         throw err
       }
@@ -200,7 +132,7 @@ exports.constellate = params => {
   })
 
   it('puts linked metadata', done => {
-    metadataService.put(params.accountPassword, err => {
+    metadataService.put(err => {
       if (err) {
         throw err
       }
@@ -209,43 +141,16 @@ exports.constellate = params => {
   })
 
   it('gets nonexistent path', done => {
-    metadataService.get(recording.path + '/data/badpath', true, err => {
-      expect(err.message).to.equal(errPathNotFound('data/badpath').message)
+    metadataService.get(recording.path + '/badpath', true, err => {
+      expect(err.message).to.equal(errPathNotFound('badpath').message)
       done()
     })
-  })
-
-  if (params.accountPassword) {
-    it('uses invalid password', done => {
-      metadataService.put('badpassword', err => {
-        expect(err.message).to.equal(errInvalidPassword('badpassword').message)
-        done()
-      })
-    })
-  }
-
-  it('uses unexpected service', () => {
-    let err
-    try {
-      new ContentService({ name: 'badcontentservice' })
-    } catch (e) {
-      err = e
-    }
-    expect(err.message).to.equal(errUnsupportedService('badcontentservice').message)
-    try {
-      new MetadataService({ name: 'badmetadataservice' })
-    } catch (e) {
-      err = e
-    }
-    expect(err.message).to.equal(errUnsupportedService('badmetadataservice').message)
   })
 }
 
 exports.contentService = service => {
 
-  const contents = files.map(file => {
-    return file.content
-  })
+  const contents = files.map(file => file.content)
 
   let hashes
 
@@ -270,87 +175,67 @@ exports.contentService = service => {
   })
 }
 
-exports.metadataService = (service, sender, recipient) => {
+exports.metadataService = service => {
 
   const resolver = new Resolver(service)
 
-  let cid
-
   it('puts person metadata', done => {
-    service.put({
-      data: person.ipld(),
-      sender,
-      recipient
-    }, (err, result) => {
-      if (err) {
-        throw err
-      }
-      person.path = service.hashFromCID(result)
+    service.put(person.ipld(), (err, result) => {
+      expect(err).to.be.null
+      service.hashFromCID(result, (err, hash) => {
+        expect(err).to.be.null
+        person.path = hash
+      })
       done()
     })
   })
 
   it('puts musicGroup metadata', done => {
-    service.put({
-      data: musicGroup.ipld(),
-      sender,
-      recipient
-    }, (err, result) => {
-      if (err) {
-        throw err
-      }
-      musicGroup.path = service.hashFromCID(result)
+    service.put(musicGroup.ipld(), (err, result) => {
+      expect(err).to.be.null
+      service.hashFromCID(result, (err, hash) => {
+        expect(err).to.be.null
+        musicGroup.path = hash
+      })
       done()
     })
   })
 
   it('puts composition metadata', done => {
-    service.put({
-      data: composition.ipld(),
-      sender,
-      recipient
-    }, (err, result) => {
-      if (err) {
-        throw err
-      }
-      composition.path = service.hashFromCID(result)
+    service.put(composition.ipld(), (err, result) => {
+      expect(err).to.be.null
+      service.hashFromCID(result, (err, hash) => {
+        expect(err).to.be.null
+        composition.path = hash
+      })
       done()
     })
   })
 
   it('puts recording metadata', done => {
-    service.put({
-      data: recording.ipld(),
-      sender,
-      recipient
-    }, (err, result) => {
-      if (err) {
-        throw err
-      }
-      recording.path = service.hashFromCID(result)
-      setTimeout(done, 2000)
+    service.put(recording.ipld(), (err, result) => {
+      expect(err).to.be.null
+      service.hashFromCID(result, (err, hash) => {
+        expect(err).to.be.null
+        recording.path = hash
+        setTimeout(done, 2000)
+      })
     })
   }).timeout(MAX_TIMEOUT)
 
   it('gets expanded metadata', done => {
-    cid = service.pathToCID(recording.path).cid
-    resolver.get(cid, 'data', true, '', (err, result) => {
-      if (err) {
-        throw err
-      }
+    resolver.expand({ '/': recording.path }, '', (err, result) => {
+      expect(err).to.be.null
       expect(result).to.deep.equal(recording.data())
       done()
     })
   }).timeout(MAX_TIMEOUT)
 
   it('gets expanded metadata with id', done => {
-    cid = service.pathToCID(recording.path).cid
-    resolver.get(cid, 'data', true, '@id', (err, result) => {
-      if (err) {
-        throw err
-      }
+    resolver.expand({ '/': recording.path }, '@id', (err, result) => {
+      expect(err).to.be.null
       recording.subInstances().forEach(instance => {
-        instance.set('@id', instance.path + '/data')
+        instance.set('@id', instance.path)
       })
       expect(result).to.deep.equal(recording.data())
       recording.subInstances().forEach(instance => {
@@ -360,38 +245,10 @@ exports.metadataService = (service, sender, recipient) => {
     })
   }).timeout(MAX_TIMEOUT)
 
-  it('gets metadata sender', done => {
-    resolver.get(cid, 'sender', false, '', (err, result) => {
-      if (err) {
-        throw err
-      }
-      expect(result).to.deep.equal({
-        publicKey: sender.publicKey
-      })
-      done()
-    })
-  }).timeout(MAX_TIMEOUT)
-
-  it('gets metadata recipient', done => {
-    resolver.get(cid, 'recipient', false, '', (err, result) => {
-      if (err) {
-        throw err
-      }
-      expect(result).to.deep.equal(recipient)
-      done()
-    })
-  }).timeout(MAX_TIMEOUT)
-
   it('gets invalid path', done => {
-    resolver.get(cid, 'badpath', false, '', err => {
+    const { cid, _ } = service.pathToCID(recording.path)
+    resolver.get(cid, 'badpath', '', err => {
       expect(err.message).to.equal(errPathNotFound('badpath').message)
-      done()
-    })
-  })
-
-  it('puts invalid element', done => {
-    service.put({}, err => {
-      expect(err.message).to.equal(errInvalidElement({}).message)
       done()
     })
   })
