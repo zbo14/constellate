@@ -17,9 +17,10 @@ const bufferToFile = (buf, name, cb) => {
 const readFiles = (files, cb) => {
   const results = []
   let count = 0, reader
+  files = [].concat(files)
   files.forEach((file, i) => {
     reader = new FileReader()
-    reader.onload(evt => {
+    reader.onload = evt => {
       results[i] = {
         content: Buffer.from(evt.target.result),
         name: file.name,
@@ -28,7 +29,7 @@ const readFiles = (files, cb) => {
       if (++count === files.length) {
         cb(results)
       }
-    })
+    }
     reader.readAsArrayBuffer(file)
   })
 }
