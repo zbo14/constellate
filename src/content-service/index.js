@@ -123,13 +123,17 @@ ContentService.prototype.import = function (files, password, cb) {
       if (err) {
         return cb(err)
       }
+      this.files = files
       cb(null, metadata)
     })
   }
 }
 
 ContentService.prototype.put = function (cb) {
-  const contents = [].concat(this.files).map(file => file.content)
+  if (!this.files || !this.files.length) {
+    return cb(new Error('no files'))
+  }
+  const contents = this.files.map(file => file.content)
   let file
   this.service.put(contents, (err, results) => {
     if (err) {

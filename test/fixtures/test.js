@@ -102,7 +102,7 @@ exports.constellate = params => {
   }).timeout(MAX_TIMEOUT)
 
   it('gets expanded person metadata', done => {
-    metadataService.get(recording.path + '/byArtist/0/member/0', true, (err, result) => {
+    metadataService.get('Andy Dwyer', true, (err, result) => {
       expect(err).to.be.null
       expect(result).to.deep.equal(person.data())
       done()
