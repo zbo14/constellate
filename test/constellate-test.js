@@ -1,7 +1,6 @@
 'use strict'
 
 const describe = require('mocha').describe
-const expect = require('chai').expect
 const endpoints = require('./fixtures/endpoints')
 const test = require('./fixtures/test')
 

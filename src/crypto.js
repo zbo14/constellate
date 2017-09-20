@@ -1,6 +1,7 @@
 'use strict'
 
 const aes = require('aes-js')
+const base58 = require('bs58')
 const crypto = require('crypto')
 const errInvalidPassword = require('./errors').errInvalidPassword
 const nacl = require('tweetnacl')
@@ -20,7 +21,7 @@ const options = {
 exports.decryptAccount = function (account, password, cb) {
   try {
     const salt = Buffer.from(account.salt, 'hex')
-    return scrypt2x(password, salt, (dkey, hash) => {
+    return exports.scrypt2x(password, salt, (dkey, hash) => {
       if (account.hash !== hash) {
         return cb(errInvalidPassword(password))
       }

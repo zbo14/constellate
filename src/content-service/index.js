@@ -21,7 +21,7 @@ const {
   VideoObject
 } = require('js-coalaip/src/core')
 
-function ContentService({ name, path, service }) {
+function ContentService({ name, path }) {
   if (name === 'ipfs') {
     this.service = new IpfsContentService(path)
   } else if (name === 'swarm') {
@@ -130,7 +130,7 @@ ContentService.prototype.import = function (files, password, cb) {
 
 ContentService.prototype.put = function (cb) {
   const contents = [].concat(this.files).map(file => file.content)
-  let count = 0, file
+  let file
   this.service.put(contents, (err, results) => {
     if (err) {
       return cb(err)

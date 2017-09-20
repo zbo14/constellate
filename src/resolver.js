@@ -1,11 +1,7 @@
 'use strict'
 
 const errPathNotFound = require('./errors').errPathNotFound
-
-const {
-  order,
-  traverse
-} = require('./util')
+const traverse = require('./util').traverse
 
 /*
 

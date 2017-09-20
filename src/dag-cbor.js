@@ -3,6 +3,7 @@
 const cbor = require('borc')
 const crypto = require('crypto')
 const CID = require('cids')
+const errPathNotFound = require('./errors').errPathNotFound
 const multihash = require('multihashes')
 
 const {

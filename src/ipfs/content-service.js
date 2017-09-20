@@ -125,32 +125,33 @@ ContentService.prototype.hash = function (content, cb) {
   const files = []
   const links = []
   let count = 0, chunk
+  const fn = i => {
+    DAGNode.create(files[i].marshal(), (err, dagNode) => {
+      if (err) {
+        return cb(err)
+      }
+      dagNodes[i] = dagNode
+      if (++count === numChunks) {
+        const file = new UnixFS('file')
+        for (i = 0; i < numChunks; i++) {
+          dagNode = dagNodes[i]
+          file.addBlockSize(files[i].fileSize())
+          links[i] = new DAGLink('', dagNode.size, dagNode.multihash)
+        }
+        DAGNode.create(file.marshal(), links, (err, dagNode) => {
+          if (err) {
+            return cb(err)
+          }
+          const mh = dagNode.toJSON().multihash
+          cb(null, mh)
+        })
+      }
+    })
+  }
   for (let i = 0; i < numChunks; i++) {
     chunk = content.slice(i*CHUNK_LENGTH, (i+1)*CHUNK_LENGTH)
     files[i] = new UnixFS('file', chunk)
-    (function (i) {
-      DAGNode.create(files[i].marshal(), (err, dagNode) => {
-        if (err) {
-          return cb(err)
-        }
-        dagNodes[i] = dagNode
-        if (++count === numChunks) {
-          const file = new UnixFS('file')
-          for (i = 0; i < numChunks; i++) {
-            dagNode = dagNodes[i]
-            file.addBlockSize(files[i].fileSize())
-            links[i] = new DAGLink('', dagNode.size, dagNode.multihash)
-          }
-          DAGNode.create(file.marshal(), links, (err, dagNode) => {
-            if (err) {
-              return cb(err)
-            }
-            const mh = dagNode.toJSON().multihash
-            cb(null, mh)
-          })
-        }
-      })
-    })(i)
+    fn(i)
   }
 }
 

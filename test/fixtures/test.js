@@ -1,19 +1,13 @@
 'use strict'
 
 const ContentService = require('../../src/content-service')
+const errPathNotFound = require('../../src/errors').errPathNotFound
 const expect = require('chai').expect
 const it = require('mocha').it
-const fileType = require('file-type')
 const files = require('./files')
 const MetadataService = require('../../src/metadata-service')
 const order = require('../../src/util').order
 const Resolver = require('../../src/resolver')
-
-const {
-  errInvalidPassword,
-  errPathNotFound,
-  errUnsupportedService
-} = require('../../src/errors')
 
 const {
   person,
@@ -232,7 +226,7 @@ exports.metadataService = service => {
   }).timeout(MAX_TIMEOUT)
 
   it('gets invalid path', done => {
-    const { cid, _ } = service.pathToCID(recording.path)
+    const { cid } = service.pathToCID(recording.path)
     resolver.get(cid, 'badpath', '', err => {
       expect(err.message).to.equal(errPathNotFound('badpath').message)
       done()

@@ -3,7 +3,6 @@
 const Block = require('ipfs-block')
 const CID = require('cids')
 const moduleConfig = require('ipfs-api/src/utils/module-config')
-const multiaddr = require('multiaddr')
 const streamToValue = require('ipfs-api/src/utils/stream-to-value')
 
 /*

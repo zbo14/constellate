@@ -1,8 +1,9 @@
 'use strict'
 
 const fs = require('fs')
+const path = require('path')
 
-const content = fs.readFileSync(__dirname + '/track.mp3')
+const content = fs.readFileSync(path.join(__dirname, 'track.mp3'))
 
 module.exports = [{
   content,

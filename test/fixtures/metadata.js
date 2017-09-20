@@ -1,9 +1,6 @@
 'use strict'
 
-const {
-  AudioObject,
-  Person
-} = require('js-coalaip/src/core')
+const Person = require('js-coalaip/src/core').Person
 
 const {
   MusicComposition,

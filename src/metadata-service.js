@@ -2,24 +2,17 @@
 
 const IpfsMetadataService = require('./ipfs/metadata-service')
 const isSubType = require('js-coalaip/src/util').isSubType
+const Person = require('js-coalaip/src/core').Person
 const Resolver = require('./resolver')
 
 const {
-  Person,
-  AudioObject,
-  ImageObject,
-  VideoObject
-} = require('js-coalaip/src/core')
-
-const {
-  errUnexpectedCID,
   errUnexpectedHash,
   errUnsupportedService
 } = require('./errors')
 
-function MetadataService ({ account, name, path }) {
+function MetadataService ({ name, path }) {
   if (name === 'bigchaindb') {
-    this.service = new BigchaindbMetadataService(account, path)
+    // ...
   } else if (name === 'ipfs') {
     this.service = new IpfsMetadataService(path)
   } else {
