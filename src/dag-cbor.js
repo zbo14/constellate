@@ -6,7 +6,6 @@ const CID = require('cids')
 const multihash = require('multihashes')
 
 const {
-  errPathNotFound,
   orderStringify,
   transform
 } = require('./util')

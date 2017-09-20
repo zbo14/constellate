@@ -1,7 +1,7 @@
 'use strict'
 
 const ContentService = require('../src/content-service/browser')
-const endpoint = require('./fixtures/endpoints').ipfs
+const endpoint = require('../test/fixtures/endpoints').ipfs
 
 const contentService = new ContentService({
   name: 'ipfs',

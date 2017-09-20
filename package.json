@@ -5,16 +5,8 @@
   "author": "Zachary Balder",
   "license": "MIT",
   "scripts": {
-    "bundle": "browserify test/browser-content-service.js > test/bundle.js",
-    "flow": "read -p 'Enter filename: ' FILENAME && flow check-contents < src/$FILENAME",
-    "remove-types": "read -p 'Enter filename: ' FILENAME && flow-remove-types src/$FILENAME | js-beautify -o lib/$FILENAME",
+    "bundle": "browserify browser/content-service.js > browser/bundle.js",
     "test": "./node_modules/.bin/mocha --reporter spec"
-  },
-  "babel": {
-    "presets": [
-      "es2015",
-      "flow"
-    ]
   },
   "dependencies": {
     "aes-js": "^3.1.0",
@@ -23,31 +15,18 @@
     "chai": "^4.1.2",
     "cids": "^0.5.0",
     "file-type": "^6.1.0",
-    "five-bells-condition": "^5.0.1",
-    "fpcalc": "^1.2.1",
     "ipfs-api": "^14.3.2",
     "ipfs-block": "^0.6.0",
     "ipfs-unixfs": "^0.1.12",
     "ipld-dag-pb": "^0.11.0",
     "js-coalaip": "git+https://github.com/COALAIP/js-coalaip.git",
-    "js-sha3": "^0.6.1",
-    "keccakjs": "^0.2.1",
     "mocha": "^3.5.0",
     "multiaddr": "^3.0.1",
     "multihashes": "^0.4.9",
     "scrypt-async": "^1.3.1",
-    "tweetnacl": "^1.0.0",
-    "xhr-request": "^1.0.1"
+    "tweetnacl": "^1.0.0"
   },
   "devDependencies": {
-    "babel-plugin-syntax-flow": "^6.18.0",
-    "babel-plugin-transform-flow-strip-types": "^6.22.0",
-    "babel-plugin-typecheck": "^3.9.0",
-    "babel-preset-es2015": "^6.24.1",
-    "babel-preset-flow": "^6.23.0",
-    "browserify": "^14.4.0",
-    "flow-bin": "^0.44.0",
-    "flow-remove-types": "^1.2.1",
-    "js-beautify": "^1.6.14"
+    "browserify": "^14.4.0"
   }
 }

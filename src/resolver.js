@@ -9,7 +9,7 @@ const {
 
 /*
 
-  The following code is adapted from https://github.com/ipfs/js-ipfs-api/tree/master/src/block
+  The following code is adapted from https://github.com/ipld/js-ipld-resolver/blob/master/src/index.js
 
   ------------------------------- LICENSE -------------------------------
 
@@ -100,7 +100,7 @@ Resolver.prototype.expand = function (obj, id, cb, val = obj, keys = []) {
   }
 }
 
-Resolver.prototype.get = function (cid, path, id, cb, p = path) { 
+Resolver.prototype.get = function (cid, path, id, cb, p = path) {
   this.service.get(cid, (err, obj) => {
     if (err) {
       return cb(err)

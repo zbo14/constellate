@@ -93,9 +93,7 @@ exports.constellate = params => {
 
   it('gets expanded composition metadata', done => {
     metadataService.get(recording.path + '/recordingOf', true, (err, result) => {
-      if (err) {
-        throw err
-      }
+      expect(err).to.be.null
       expect(result).to.deep.equal(composition.data())
       done()
     })
@@ -103,9 +101,7 @@ exports.constellate = params => {
 
   it('gets expanded music group metadata', done => {
     metadataService.get(recording.path + '/byArtist/0', true, (err, result) => {
-      if (err) {
-        throw err
-      }
+      expect(err).to.be.null
       expect(result).to.deep.equal(musicGroup.data())
       done()
     })
@@ -113,9 +109,7 @@ exports.constellate = params => {
 
   it('gets expanded person metadata', done => {
     metadataService.get(recording.path + '/byArtist/0/member/0', true, (err, result) => {
-      if (err) {
-        throw err
-      }
+      expect(err).to.be.null
       expect(result).to.deep.equal(person.data())
       done()
     })
@@ -124,18 +118,14 @@ exports.constellate = params => {
   it('imports linked metadata', done => {
     delete recording.path
     metadataService.import(recording.subInstances(), err => {
-      if (err) {
-        throw err
-      }
+      expect(err).to.be.null
       done()
     })
   })
 
   it('puts linked metadata', done => {
     metadataService.put(err => {
-      if (err) {
-        throw err
-      }
+      expect(err).to.be.null
       done()
     })
   })
@@ -156,9 +146,7 @@ exports.contentService = service => {
 
   it('puts content', done => {
     service.put(contents, (err, result) => {
-      if (err) {
-        throw err
-      }
+      expect(err).to.be.null
       hashes = result
       done()
     })
@@ -166,9 +154,7 @@ exports.contentService = service => {
 
   it('gets content', done => {
     service.get(hashes[0], (err, result) => {
-      if (err) {
-        throw err
-      }
+      expect(err).to.be.null
       expect(result).to.deep.equal(contents[0])
       done()
     })

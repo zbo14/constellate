@@ -14,5 +14,5 @@ const metadataService = new MetadataService(endpoint)
 
 describe('IPFS', () => {
   test.contentService(contentService)
-  test.metadataService(metadataService, null, null)
+  test.metadataService(metadataService)
 })
