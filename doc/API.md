@@ -3,12 +3,11 @@
 ## Node.js
 
 ### ContentService
-
-NOTE: some functionality isn't documented below (e.g. `import` and `put`). It is recommended to use `Project` for this, as it handles content and metadata together.
+The ContentService is responsible for persisting and retrieving media.
 
 #### new ContentService
 ```js
-const ContentService = require('./lib').ContentService
+const ContentService = require('./src/content-service')
 
 const params = {
   name: 'ipfs',
@@ -18,30 +17,8 @@ const params = {
 const contentService = new ContentService(params)
 ```
 
-#### contentService.importHashes
-
-Import hashes to enable querying by name.
-
-```js
-const hashes = {
-  name1: 'hash1',
-  name2: 'hash2',
-  ...
-}
-
-contentService.importHashes(hashes)
-```
-
-##### Parameters
-
-`Object` - an object with the hashes
-
 #### contentService.get
-
-Query content by hash or name.
-
-##### Parameters
-
+This method retrieves media which has been persisted to the storage layer.
 ```js
 contentService.get('{hash|name}', (err, buf) => {
   if (err) {
@@ -53,137 +30,49 @@ contentService.get('{hash|name}', (err, buf) => {
 })
 ```
 
+##### Parameters
+
 `string` - the hash or name to query
+
+*To query by name, `contentService.hashes` should be an object with names as keys and hashes as values*
 
 `Function` - callback with the signature `function (err, buffer)`
 
-### MetadataService
-
-NOTE: some functionality isn't documented below (e.g. `import` and `put`). It is recommended to use `Project` for this, as it handles content and metadata together.
-
-#### new MetadataService
-```js
-const MetadataService = require('./lib').MetadataService
-
-const params = {
-  name: 'bigchaindb',
-  path: 'API_ENDPOINT'
-}
-
-const metadataService = new MetadataService(params)
-```
-
-#### metadataService.importHashes
-
-Import hashes to enable querying by name.
+#### contentService.import
+Import media before persisting to a storage layer. This method generates a [js-coalaip](https://github.com/COALAIP/js-coalaip) MediaObject for each file.
 
 ```js
-const hashes = {
-  name1: 'hash1',
-  name2: 'hash2',
-  ...
-}
-
-metadataService.importHashes(hashes)
-```
-
-##### Parameters
-
-`Object` - an object with the hashes
-
-#### metadataService.get
-
-Query metadata by path.
-
-```js
-metadataService.get('{hash|name}/data', false, (err, obj) => {
-  if (err) {
-    throw err
-   }
-   console.log(obj)
-
-   // {
-   //   name: 'Band',
-   //   member: [
-   //     {
-   //       '/': 'hash1/data'
-   //     },
-   //     {
-   //       '/': 'hash2/data'
-   //     }
-   //   ]
-   // }
-})
-```
-
-##### Parameters
-
-`string` - the path to query
-
-`boolean` - whether to expand the object (i.e. resolve merkle links)
-
-`Function` - callback with the signature `function (err, object)`
-
-### Project
-
-#### new Project
-```js
-const Project = require('./lib').Project
-
-const params = {
-  contentService: {
-    name: 'ipfs',
-    path: '/ip4/127.0.0.1/tcp/5001'
-  },
-  metadataService: {
-    name: 'bigchaindb',
-    path: 'API_ENDPOINT'
-  },
-  title: 'proj1'
-}
-
-const project = new Project(params)
-```
-
-#### project.import
-
-Imports content, metadata and generates linked data.
-
-```js
-const fs = require('fs')
-
-const buf = fs.readFileSync('./test/proj1/track1.mp3')
-
-const content = {
-  content: buf,
-  name: 'track1.mp3',
+const file = {
+  content: <Buffer ...>,
+  name: 'track.mp3',
   type: 'audio/mp3'
 }
 
-const text = fs.readFileSync('./test/proj1/metadata.json', 'utf8')
-
-const metadata = JSON.parse(text)
-
-project.import([content, ...], metadata, err => {
+contentService.import([file, ...], (err, mediaObjects) => {
   if (err) {
     throw err
   }
-  // ...
+  console.log(contentService.hashes)
+
+  // {
+  //   "track.mp3": "QmSRna7zhvyzxyqN7bSHA4JbJMzWSMjkApJWaMzxPQ7LEN",
+  //   ...
+  // }
 })
 ```
 
 ##### Parameters
 
-`Object[]` - an array of content objects
+`Object[]` - an array of objects with file content, name, and type
 
-`Object[]` - an array of metadata objects (see examples in `./test/{proj1|proj2}`)
+`Function` - callback with the signature `function (err, MediaObjects)`
 
-#### project.upload
 
-Uploads content and pushes linked data.
 
+#### contentService.put
+This method persists imported media to a storage layer.
 ```js
-project.upload(err => {
+contentService.put(err => {
   if (err) {
     throw err
   }
@@ -195,21 +84,122 @@ project.upload(err => {
 
 `Function` - callback with the signature `function (err)`
 
-#### project.export
+### MetadataService
+The MetadataService is responsible for persisting and retrieving metadata.
+
+#### new MetadataService
+```js
+const MetadataService = require('./src/metadata-service')
+
+const params = {
+  name: 'ipfs',
+  path: '/ip4/127.0.0.1/tcp/5001'
+}
+
+const metadataService = new MetadataService(params)
+```
+
+
+#### metadataService.get
+This method retrieves metadata which has already been persisted to the database/storage layer.
 
 ```js
-const linkedData = project.export('linked_data')
-const contentHashes = project.export('content_hashes')
-const metadataHashes = project.export('metadata_hashes')
+metadataService.get('{hash|name}', false, (err, obj) => {
+  if (err) {
+    throw err
+  }
+  console.log(obj)
+
+  // {
+  //   "@context": "http://schema.org",
+  //   "@type": "MusicGroup",
+  //   "description": "descriptive",
+  //   "member": [
+  //     {
+  //       "/": "zdpuB2i18e52uzbBUHsM9bcUPEcAJQzPxSCsVVU8UtkJSL821"
+  //     }
+  //   ],
+  //   "name": "Beatles"
+  // }
+})
+
+// - VS -
+
+metadataService.get('{hash|name}', true, (err, obj) => {
+  if (err) {
+    throw err
+  }
+  console.log(obj)
+
+  // {
+  //   "@context": "http://schema.org",
+  //   "@type": "MusicGroup",
+  //   "description": "descriptive",
+  //   "member": [
+  //     {
+  //       "@context": "http://schema.org",
+  //       "@type": "Person",
+  //       "email": "jsmith@email.com",
+  //       "familyName": "Smith",
+  //       "givenName": "John"
+  //     }
+  //   ],
+  //   "name": "Beatles"
+  // }
+})
 ```
 
 ##### Parameters
 
-`string` - the name of the object to export
+`string` - the path to query
 
-##### Returns
+*To query by name, `metadataService.hashes` should be an object with names as keys and hashes as values*
 
-`Object` - the exported object
+`boolean` - whether to expand the object (i.e. resolve merkle links)
+
+`Function` - callback with the signature `function (err, object)`
+
+
+
+#### metadataService.import
+Import metadata from [js-coalaip](https://github.com/COALAIP/js-coalaip) instances.
+```js
+const metadata = instance.subInstances()
+
+metadataService.import(metadata, err => {
+  if (err) {
+    throw err
+  }
+  console.log(metadataService.hashes)
+
+  // {
+  //   Beatles: "zdpuAyUDHx2iJrnChYuWWBaATvW8GC1HRpd3h4FBkBMd9x9Fa",
+  //   John Smith: "zdpuB2i18e52uzbBUHsM9bcUPEcAJQzPxSCsVVU8UtkJSL821"
+  // }
+})
+```
+
+##### Parameters
+
+`js-coalaip instances`
+
+`Function` - callback with the signature `function (err)`
+
+#### metadataService.put
+This method persists imported metadata to the database/storage layer.
+```js
+metadataService.put(err => {
+  if (err) {
+    throw err
+  }
+  // ...
+})
+```
+
+##### Parameters
+
+`Function` - callback with the signature `function (err)`
+
 
 ## Browser
 
@@ -217,7 +207,7 @@ const metadataHashes = project.export('metadata_hashes')
 
 #### new ContentService
 ```js
-const ContentService = require('./lib/browser').ContentService
+const ContentService = require('./src/content-service/browser')
 
 const params = {
   name: 'ipfs',
@@ -227,27 +217,7 @@ const params = {
 const contentService = new ContentService(params)
 ```
 
-#### contentService.importHashes
-
-Import hashes to enable querying by name.
-
-```js
-const input = document.querySelector('input[type="file"]')
-
-const file = input.files[0]
-
-contentService.importHashes(file)
-```
-
-##### Parameters
-
-`File` - a JSON file with the hashes
-
 #### contentService.get
-
-Query content by hash or name.
-
-##### Parameters
 
 ```js
 contentService.get('{hash|name}', (err, file) => {
@@ -256,81 +226,26 @@ contentService.get('{hash|name}', (err, file) => {
   }
   console.log(file)
 
-  // File { name: 'track1.mp3', ... , type: 'audio/mp3' }
+  // File { name: 'track.mp3', ... , type: 'audio/mp3' }
 })
-```
-
-`string` - the hash or name to query
-
-`Function` - callback with the signature `function (err, file)`
-
-### MetadataService
-
-#### new MetadataService
-```js
-const MetadataService = require('./lib/browser').MetadataService
-
-const params = {
-  name: 'bigchaindb',
-  path: 'API_ENDPOINT'
-}
-
-const metadataService = new MetadataService(params)
-```
-
-#### metadataService.importHashes
-
-Import hashes to enable querying by name.
-
-```js
-const input = document.querySelector('input[type="file"]')
-
-const file = input.files[0]
-
-metadataService.importHashes(file)
 ```
 
 ##### Parameters
 
-`Object` - a JSON file with the hashes
+`string` - the hash or name to query
 
-#### metadataService.get
+*To query by name, `contentService.hashes` should be an object with names as keys and hashes as values*
 
-same as Node.js API method
+`Function` - callback with the signature `function (err, file)`
 
-### Project
-
-#### new Project
-```js
-const Project = require('./lib/browser').Project
-
-const params = {
-  contentService: {
-    name: 'ipfs',
-    path: '/ip4/127.0.0.1/tcp/5001'
-  },
-  metadataService: {
-    name: 'bigchaindb',
-    path: 'API_ENDPOINT'
-  },
-  title: 'proj1'
-}
-
-const project = new Project(params)
-```
-
-#### project.import
-
-Imports content, metadata and generates linked data.
+#### contentService.import
 
 ```js
-const contentInput = document.getElementById('content-input')
-const metadataInput = document.getElementById('metadata-input')
+const input = document.querySelector('input[type="file"]')
 
-const content = Array.from(contentInput.files)
-const metadata = metadataInput.files[0]
+const content = Array.from(input.files)
 
-project.import(content, metadata, err => {
+contentService.import(content, (err, mediaObjects) => {
   if (err) {
     throw err
   }
@@ -342,24 +257,8 @@ project.import(content, metadata, err => {
 
 `File[]` - an array of audio, image, and/or video files
 
-`File` - the metadata JSON file (see examples in `./test/{proj1|proj2}`)
+`Function` - callback with the signature `function (err, MediaObjects)`
 
-#### project.export
+#### contentService.put
 
-```js
-const linkedData = project.export('linked_data')
-const contentHashes = project.export('content_hashes')
-const metadataHashes = project.export('metadata_hashes')
-
-console.log(linkedData)
-
-// File { name: 'proj1_linked_data.json', ... , type: 'application/json' }
-```
-
-##### Parameters
-
-`string` - the name of the file to export
-
-##### Returns
-
-`File` - the exported file
+Same as Node.js API method
