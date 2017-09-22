@@ -8,6 +8,10 @@ const {
   MusicRecording
 } = require('js-coalaip/src/music')
 
+const me = new Person()
+me.setFamilyName('b')
+me.setGivenName('zach')
+
 const person = new Person()
 person.setFamilyName('Dwyer')
 person.setGivenName('Andy')
@@ -24,7 +28,10 @@ const recording = new MusicRecording()
 recording.addByArtist(musicGroup)
 recording.setRecordingOf(composition)
 
+const newRecording = new MusicRecording()
+
 module.exports = {
+  me,
   person,
   musicGroup,
   composition,

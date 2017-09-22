@@ -54,8 +54,8 @@ Resolver.prototype.expand = function (obj, id, cb, val = obj, keys = []) {
     return cb(null, obj)
   }
   if (obj['/']) {
-    const { cid, path } = this.service.pathToCID(obj['/'])
-    return this.get(cid, path, id, (err, result) => {
+    const { cid, remPath } = this.service.pathToCID(obj['/'])
+    return this.get(cid, remPath, id, (err, result) => {
       if (err) {
         return cb(err)
       }
@@ -70,8 +70,8 @@ Resolver.prototype.expand = function (obj, id, cb, val = obj, keys = []) {
   const queries = []
   traverse(val, (v, key) => {
     if (v.constructor === Object && v['/']) {
-      const { cid, path } = this.service.pathToCID(v['/'])
-      queries.push({ cid, path, key })
+      const { cid, remPath } = this.service.pathToCID(v['/'])
+      queries.push({ cid, remPath, key })
     }
   })
   if (!queries.length) {
@@ -79,8 +79,8 @@ Resolver.prototype.expand = function (obj, id, cb, val = obj, keys = []) {
   }
   let count = 0
   for (let i = 0; i < queries.length; i++) {
-    const { cid, path, key } = queries[i]
-    this.get(cid, path, id, (err, result) => {
+    const { cid, remPath, key } = queries[i]
+    this.get(cid, remPath, id, (err, result) => {
       if (err) {
         return cb(err)
       }
