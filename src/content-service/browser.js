@@ -39,8 +39,12 @@ function BrowserContentService (params) {
 }
 
 BrowserContentService.prototype = Object.create(ContentService.prototype)
+BrowserContentService.constructor = BrowserContentService
 
 BrowserContentService.prototype.get = function (path, password, cb) {
+  if (typeof password === 'function') {
+    [cb, password] = [password, '']
+  }
   ContentService.prototype.get.call(this, path, password, (err, content) => {
     if (err) {
       return cb(err)
